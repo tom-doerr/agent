@@ -163,13 +163,6 @@ trainset = [
     dspy.Example(source_text="The human brain contains approximately 86 billion neurons, each connected to thousands of other neurons through synapses. This complex network enables processes like learning, memory, and consciousness. Neuroplasticity allows the brain to reorganize itself by forming new neural connections throughout life.").with_inputs("source_text"),
 ]
 
-# Create harder validation set with Firecrawl
-validation_set = [
-    dspy.Example(source_text=get_firecrawl_content("https://en.wikipedia.org/wiki/List_of_unusual_animals")).with_inputs("source_text"),
-    dspy.Example(source_text=get_firecrawl_content("https://en.wikipedia.org/wiki/List_of_emerging_technologies")).with_inputs("source_text"),
-    dspy.Example(source_text=get_firecrawl_content("https://en.wikipedia.org/wiki/List_of_minor_planets")).with_inputs("source_text")
-]
-
 # === Main Optimization Workflow ===
 def main():
     print("--- Starting MemoryGAN SIMBA Optimization ---")
@@ -201,24 +194,46 @@ def main():
         # For now, just log a success metric or a tag
         mlflow.log_metric("optimization_completed", 1)
 
-        # Comprehensive validation
-        print("\n--- Validation Results ---")
-        total_score = 0
-        for i, example in enumerate(validation_set):
-            prediction = optimized_program(source_text=example.source_text)
-            score = gan_metric(example, prediction)
-            total_score += score
+        # Create harder validation set with Firecrawl only if API key is available
+        validation_set = []
+        if os.getenv("FIRECRAWL_API_KEY"):
+            try:
+                print("\nCreating Firecrawl validation set...")
+                validation_set = [
+                    dspy.Example(source_text=get_firecrawl_content("https://en.wikipedia.org/wiki/List_of_unusual_animals")).with_inputs("source_text"),
+                    dspy.Example(source_text=get_firecrawl_content("https://en.wikipedia.org/wiki/List_of_emerging_technologies")).with_inputs("source_text"),
+                    dspy.Example(source_text=get_firecrawl_content("https://en.wikipedia.org/wiki/List_of_minor_planets")).with_inputs("source_text")
+                ]
+                print("Firecrawl validation set created.")
+            except Exception as e:
+                print(f"Error creating Firecrawl validation set: {e}")
+                mlflow.log_param("firecrawl_validation_error", str(e))
+        else:
+            print("FIRECRAWL_API_KEY not set. Skipping Firecrawl validation set.")
+            mlflow.log_param("firecrawl_validation_status", "skipped")
+
+        # Only run validation if we have a validation set
+        if validation_set:
+            # Comprehensive validation
+            print("\n--- Validation Results ---")
+            total_score = 0
+            for i, example in enumerate(validation_set):
+                prediction = optimized_program(source_text=example.source_text)
+                score = gan_metric(example, prediction)
+                total_score += score
+            
+                print(f"\nValidation Example {i+1}:")
+                print(f"  Source: {example.source_text[:100]}...")
+                print(f"  Question: {prediction.question}")
+                print(f"  Memory Answer: {prediction.memory_answer}")
+                print(f"  Reference Answer: {prediction.reference_answer}")
+                print(f"  Score: {score}")
         
-            print(f"\nValidation Example {i+1}:")
-            print(f"  Source: {example.source_text[:100]}...")
-            print(f"  Question: {prediction.question}")
-            print(f"  Memory Answer: {prediction.memory_answer}")
-            print(f"  Reference Answer: {prediction.reference_answer}")
-            print(f"  Score: {score}")
-    
-        avg_score = total_score / len(validation_set)
-        print(f"\nAverage Validation Score: {avg_score}")
-        mlflow.log_metric("avg_validation_score", avg_score)
+            avg_score = total_score / len(validation_set)
+            print(f"\nAverage Validation Score: {avg_score}")
+            mlflow.log_metric("avg_validation_score", avg_score)
+        else:
+            print("Skipping validation - no validation set available")
 
     print("Script finished.")
 
