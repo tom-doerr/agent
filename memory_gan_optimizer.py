@@ -15,10 +15,20 @@ dotenv.load_dotenv()
 import dspy
 import mlflow
 import os
+import firecrawl
 from dspy.teleprompt import SIMBA
 from mlflow.models.signature import ModelSignature
 from mlflow.types.schema import Schema, ColSpec
 import time
+
+def get_firecrawl_content(url):
+    """Scrape a URL using Firecrawl and return the content."""
+    api_key = os.getenv("FIRECRAWL_API_KEY")
+    if not api_key:
+        raise ValueError("FIRECRAWL_API_KEY environment variable not set")
+    app = firecrawl.FirecrawlApp(api_key=api_key)
+    result = app.scrape_url(url, params={'extractBodyOnly': True})
+    return result['content']
 
 # === GLOBAL CONFIGURATIONS & DEFINITIONS ===
 
