@@ -104,55 +104,53 @@ class MemoryGAN(dspy.Module):
 
 # This will likely require an LLM as a judge
 class AssessAnswers(dspy.Signature):
-    """Given a source text, a question, a reference answer (assumed correct and derived from source), 
-    and a memory-based answer, assess the quality of the memory-based answer compared to the reference answer.
-    Consider if the memory answer is correct, partially correct, or incorrect, especially in the context of the source text.
-    Also, assess the quality/validity of the reference answer itself based on the source text and question."""
+    """Given a source text, a question, a reference answer (derived from source text), 
+    and a memory-based answer, provide a numerical score (0.0 to 1.0) based on:
+    1. Validity: Is the reference answer correct and derived from the source text? (0.5 if yes, 0.0 if no)
+    2. Stumping: Is the memory answer incorrect or significantly different from the reference? (0.5 if yes, 0.0 if no)
+    Total score = Validity + Stumping.
+    Only output the numerical score.
+    """
     source_text = dspy.InputField()
     question = dspy.InputField()
     reference_answer = dspy.InputField()
     memory_answer = dspy.InputField()
-    # Output: A score or a structured assessment. For SIMBA, a single float is best.
-    # Let's aim for a score where higher is better for the GAN's objective
-    # (i.e., reference_answer is good, memory_answer is bad/different)
-    assessment_score = dspy.OutputField(desc="A numerical score from 0.0 to 1.0. Higher score means the question successfully stumped the memory module while being valid (good reference answer).")
-
-assess_judge = dspy.Predict(AssessAnswers)
+    assessment_score = dspy.OutputField(desc="A numerical score from 0.0 to 1.0")
 
 def gan_metric(example, pred, trace=None):
-    source_text = pred.source_text # or example.source_text
-    question = pred.question
-    reference_answer = pred.reference_answer
-    memory_answer = pred.memory_answer
-
-    # Basic check: if any part is missing, penalize heavily
-    if not all([question, reference_answer, memory_answer]):
-        return 0.0
-
     try:
-        # Use LLM to judge the quality
-        # The prompt for AssessAnswers needs to be crafted carefully
-        # to reflect the GAN objective.
-        assessment = assess_judge(
+        # Extract components from prediction
+        source_text = pred.source_text
+        question = pred.question
+        reference_answer = pred.reference_answer
+        memory_answer = pred.memory_answer
+
+        # Skip if any component is missing
+        if not all([source_text, question, reference_answer, memory_answer]):
+            return 0.0
+
+        # Get assessment from judge
+        assessment = dspy.Predict(AssessAnswers)(
             source_text=source_text,
             question=question,
             reference_answer=reference_answer,
             memory_answer=memory_answer
         )
+        
+        # Parse score safely
         score = float(assessment.assessment_score)
-        # print(f"DEBUG: GAN Metric - Q: {question[:50]}... RefAns: {reference_answer[:50]}... MemAns: {memory_answer[:50]}... Score: {score}")
-        return score
+        return max(0.0, min(1.0, score))  # Clamp to [0.0, 1.0]
     except Exception as e:
         print(f"Error in gan_metric: {e}")
-        print(f"Problematic data: Q='{question}', Ref='{reference_answer}', Mem='{memory_answer}'")
-        return 0.0 # Penalize if assessment fails
+        return 0.0
 
 # === Training Data ===
 # Each example is just a source text. The 'inputs' for the MemoryGAN module is 'source_text'.
 trainset = [
     dspy.Example(source_text="The Eiffel Tower, located in Paris, France, was completed in 1889. It was designed by Gustave Eiffel and is one of the most recognizable landmarks in the world. Initially criticized by some of France's leading artists and intellectuals for its design, it has since become a global cultural icon of France and one of the most recognizable structures in the world. The tower is 330 metres (1,083 ft) tall, about the same height as an 81-storey building, and is the tallest structure in Paris. Its base is square, measuring 125 metres (410 ft) on each side.").with_inputs("source_text"),
     dspy.Example(source_text="Photosynthesis is a process used by plants, algae, and certain bacteria to convert light energy into chemical energy, through a process that uses sunlight, water, and carbon dioxide. This chemical energy is stored in carbohydrate molecules, such as sugars, which are synthesized from carbon dioxide and water. Oxygen is also released as a byproduct. Most plants, most algae, and cyanobacteria perform photosynthesis; such organisms are called photoautotrophs. Photosynthesis is largely responsible for producing and maintaining the oxygen content of the Earth's atmosphere, and supplies most of the energy necessary for life on Earth.").with_inputs("source_text"),
-    # Add more diverse and complex texts
+    dspy.Example(source_text="Quantum computing uses quantum-mechanical phenomena like superposition and entanglement to perform computation. Qubits can exist in multiple states simultaneously, enabling quantum computers to solve certain problems much faster than classical computers. However, qubits are fragile and require extremely cold temperatures to maintain their quantum states.").with_inputs("source_text"),
+    dspy.Example(source_text="The human brain contains approximately 86 billion neurons, each connected to thousands of other neurons through synapses. This complex network enables processes like learning, memory, and consciousness. Neuroplasticity allows the brain to reorganize itself by forming new neural connections throughout life.").with_inputs("source_text"),
 ]
 
 # === Main Optimization Workflow ===
@@ -161,14 +159,12 @@ def main():
     
     program_to_optimize = MemoryGAN()
 
-    # Configure SIMBA
-    # max_steps: Number of optimization steps (how many times it tries to improve prompts)
-    # max_demos: Max number of few-shot examples SIMBA will try to construct for prompts
+    # Configure SIMBA with increased steps and demos
     simba_optimizer = SIMBA(
         metric=gan_metric,
-        max_steps=10,      # Keep low for initial testing
-        max_demos=3,       # Keep low for initial testing
-        bsize=2            # Set batch size to 2 to match small trainset
+        max_steps=12,      # Increased for better optimization
+        max_demos=4,       # Increased to match larger trainset
+        bsize=2            # Batch size matches trainset size
     )
 
     with mlflow.start_run(run_name="SIMBA_MemoryGAN_Run") as run:
