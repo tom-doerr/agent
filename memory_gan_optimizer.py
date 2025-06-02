@@ -27,7 +27,7 @@ def get_firecrawl_content(url):
     if not api_key:
         raise ValueError("FIRECRAWL_API_KEY environment variable not set")
     app = firecrawl.FirecrawlApp(api_key=api_key)
-    result = app.scrape_url(url, extractBodyOnly=True)
+    result = app.scrape_url(url, params={'pageOptions': {'onlyMainContent': True}})
     
     # Handle potential API response variations
     if isinstance(result, dict) and 'content' in result:
