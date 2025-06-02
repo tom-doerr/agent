@@ -28,7 +28,14 @@ def get_firecrawl_content(url):
         raise ValueError("FIRECRAWL_API_KEY environment variable not set")
     app = firecrawl.FirecrawlApp(api_key=api_key)
     result = app.scrape_url(url, params={'extractBodyOnly': True})
-    return result['content']
+    
+    # Handle potential API response variations
+    if isinstance(result, dict) and 'content' in result:
+        return result['content']
+    elif isinstance(result, str):
+        return result
+    else:
+        raise ValueError(f"Unexpected Firecrawl response: {result}")
 
 # === GLOBAL CONFIGURATIONS & DEFINITIONS ===
 
