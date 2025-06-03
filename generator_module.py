@@ -9,7 +9,7 @@ class GeneratorSignature(dspy.Signature):
 class GeneratorModule(dspy.Module):
     def __init__(self):
         super().__init__()
-        self.generate = dspy.ChainOfThought(GeneratorSignature)
+        self.generate = dspy.Predict(GeneratorSignature)
 
     def forward(self, topic):
         return self.generate(topic=topic)

@@ -9,8 +9,7 @@ class ValueNetworkSignature(dspy.Signature):
 class ValueNetwork(dspy.Module):
     def __init__(self):
         super().__init__()
-        self.predict = dspy.ChainOfThought(ValueNetworkSignature)
+        self.predict = dspy.Predict(ValueNetworkSignature)
 
     def forward(self, data_point):
-        prediction = self.predict(data_point=data_point)
-        return prediction
+        return self.predict(data_point=data_point)
