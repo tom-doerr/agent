@@ -44,7 +44,8 @@ class AsyncModelManager:
         try:
             with self.model_lock:
                 # Load new model
-                new_model = dspy.Module.load(model_path)
+                # Load with the specific program class
+                new_model = self.base_program.__class__.load(model_path)
                 
                 # Atomic swap
                 old_model = self.current_model
@@ -168,9 +169,8 @@ class OptimizationEngine:
             # Initialize SIMBA with online-friendly parameters
             simba = dspy.SIMBA(
                 metric=self.metric_fn,
-                max_steps=8,      # Smaller for faster convergence
-                max_demos=10      # Manageable few-shot examples
-            )
+                max_steps=4,      # Reduced for faster optimization
+                max_demos=min(10, len(training_data))  # Adapt to available data
             
             # Convert data to DSPy format
             trainset = self._prepare_trainset(training_data)
@@ -401,10 +401,23 @@ async def main():
         while True:
             # Get user question
             question = await asyncio.get_event_loop().run_in_executor(
-                None, input, "\nAsk a question (or type 'exit'): "
+                None, input, "\nAsk a question (or type '/replay N' to optimize, 'exit' to quit): "
             )
+            
             if question.lower() == 'exit':
                 break
+                
+            if question.startswith('/replay'):
+                # Extract number of replays
+                try:
+                    num_replays = int(question.split()[1])
+                    for _ in range(num_replays):
+                        # Replay with random inputs
+                        random_question = f"Question {time.time()}"
+                        await self.run_question(system, random_question, last_version)
+                except:
+                    print("Invalid replay format. Use '/replay N'")
+                continue
                 
             # Run inference
             result = await system.inference(question)
@@ -417,13 +430,8 @@ async def main():
                 
             print(f"Model: {result.model_version} | Latency: {result.latency_ms:.2f}ms")
             
-            # Simulate feedback
-            if "capital" in question.lower():
-                ground_truth = "Paris"
-            elif "tallest" in question.lower():
-                ground_truth = "Mount Everest"
-            else:
-                ground_truth = "42"  # Default answer
+            # Use actual model prediction as ground truth for demo
+            ground_truth = result.prediction.answer if hasattr(result.prediction, 'answer') else result.prediction
                 
             system.add_feedback(question, result.prediction, ground_truth=ground_truth)
             print(f"Added feedback (Ground truth: '{ground_truth}')")
@@ -437,6 +445,34 @@ async def main():
             if last_version != result.model_version:
                 print(f"\n--- MODEL UPDATED: {last_version} → {result.model_version} ---")
                 last_version = result.model_version
+    async def run_question(self, system, question, last_version):
+        """Run a question through the system and handle output"""
+        # Run inference
+        result = await system.inference(question)
+        
+        # Show answer
+        if hasattr(result.prediction, 'answer'):
+            print(f"Answer: {result.prediction.answer}")
+        else:
+            print(f"Answer: {result.prediction}")
+            
+        print(f"Model: {result.model_version} | Latency: {result.latency_ms:.2f}ms")
+        
+        # Use prediction as ground truth for demo
+        ground_truth = result.prediction.answer if hasattr(result.prediction, 'answer') else result.prediction
+        system.add_feedback(question, result.prediction, ground_truth=ground_truth)
+        print(f"Added feedback (Ground truth: '{ground_truth[:50]}...')")
+        
+        # Show optimization status
+        status = system.get_system_status()
+        print(f"Data buffer: {status['data_buffer_size']}/{system.data_collector.batch_size} | "
+              f"Optimization queue: {status['optimization_queue_size']}")
+        
+        # Show version updates
+        if last_version != result.model_version:
+            print(f"\n--- MODEL UPDATED: {last_version} → {result.model_version} ---")
+            last_version = result.model_version
+        return last_version
                 
     finally:
         system.stop()
