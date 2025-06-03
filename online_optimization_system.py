@@ -213,25 +213,31 @@ class OptimizationEngine:
             # Hot-swap new model
             if self.model_manager.load_model(model_path, new_version):
                 logger.info(f"Optimized model loaded: {new_version}")
+                # Print for demo visibility
+                print(f"\n🔥 OPTIMIZATION COMPLETE! New model: {new_version}")
             else:
                 logger.error(f"Failed to load optimized model: {new_version}")
+                print(f"\n⚠️ OPTIMIZATION FAILED! Keeping previous model")
                 
         except Exception as e:
             logger.error(f"Optimization completion failed: {e}")
+            print(f"\n❌ OPTIMIZATION ERROR: {str(e)[:50]}...")
 
 class OnlineOptimizationSystem:
     """Main system that coordinates inference and optimization"""
     
-    def __init__(self, base_program: dspy.Module, metric_fn: Callable):
+    def __init__(self, base_program: dspy.Module, metric_fn: Callable, 
+                 batch_size=30, optimization_interval=3600, performance_trigger_count=100):
         self.model_manager = AsyncModelManager()
-        self.data_collector = DataCollector(batch_size=30)
+        self.data_collector = DataCollector(batch_size=batch_size)
         self.optimization_engine = OptimizationEngine(base_program, metric_fn, self.model_manager)
         
         # Optimization triggers
         self.inference_count = 0
         self.last_optimization = time.time()
-        self.optimization_interval = 3600  # 1 hour
+        self.optimization_interval = optimization_interval
         self.performance_threshold = 0.8   # Trigger if accuracy drops below 80%
+        self.performance_trigger_count = performance_trigger_count
         
         # Initialize with base model
         self.model_manager.current_model = base_program
@@ -317,7 +323,7 @@ class OnlineOptimizationSystem:
         if batch:
             self._trigger_optimization("data_batch_ready", batch)
         # Performance-based trigger
-        elif self.inference_count > 100:  # Check performance every 100 inferences
+        elif self.inference_count > self.performance_trigger_count:
             recent_performance = self._estimate_recent_performance()
             if recent_performance < self.performance_threshold:
                 batch = self.data_collector.get_batch()
@@ -357,10 +363,9 @@ class OnlineOptimizationSystem:
             'uptime': time.time() - getattr(self, 'start_time', time.time())
         }
 
-# Example usage
+# Interactive Demo
 async def main():
-    """Example of how to use the system"""
-    
+    """Interactive demo showing online optimization"""
     # Configure DSPy with DeepSeek Chat
     llm = dspy.LM(model='deepseek/deepseek-chat')
     dspy.settings.configure(lm=llm)
@@ -377,39 +382,76 @@ async def main():
     def accuracy_metric(example, prediction, trace=None):
         return example.answer.lower() == prediction.answer.lower()
     
-    # Initialize system
+    # Initialize system with demo-friendly settings
     base_program = SimpleQA()
-    system = OnlineOptimizationSystem(base_program, accuracy_metric)
+    system = OnlineOptimizationSystem(
+        base_program,
+        accuracy_metric,
+        batch_size=3,             # Small batch for quick demo
+        optimization_interval=10, # Short interval for demo
+        performance_trigger_count=3
+    )
     
     # Start system
     system.start()
+    print("System started. Type questions or 'exit' to quit.")
     
     try:
-        # Your application can now make inference calls
-        result = await system.inference("What is the capital of France?")
-        # Handle both prediction objects and fallback strings
-        if hasattr(result.prediction, 'answer'):
-            print(f"Answer: {result.prediction.answer}")
-        else:
-            print(f"Answer: {result.prediction}")
-        print(f"Model version: {result.model_version}")
-        print(f"Latency: {result.latency_ms:.2f}ms")
-        
-        # Add feedback when available
-        system.add_feedback(
-            "What is the capital of France?",
-            result.prediction,
-            ground_truth="Paris",
-            feedback_score=1.0
-        )
-        
-        # Check system status
-        status = system.get_system_status()
-        print(f"System status: {status}")
-        
+        last_version = system.model_manager.current_version
+        while True:
+            # Get user question
+            question = await asyncio.get_event_loop().run_in_executor(
+                None, input, "\nAsk a question (or type 'exit'): "
+            )
+            if question.lower() == 'exit':
+                break
+                
+            # Run inference
+            result = await system.inference(question)
+            
+            # Show answer
+            if hasattr(result.prediction, 'answer'):
+                print(f"Answer: {result.prediction.answer}")
+            else:
+                print(f"Answer: {result.prediction}")
+                
+            print(f"Model: {result.model_version} | Latency: {result.latency_ms:.2f}ms")
+            
+            # Simulate feedback
+            if "capital" in question.lower():
+                ground_truth = "Paris"
+            elif "tallest" in question.lower():
+                ground_truth = "Mount Everest"
+            else:
+                ground_truth = "42"  # Default answer
+                
+            system.add_feedback(question, result.prediction, ground_truth=ground_truth)
+            print(f"Added feedback (Ground truth: '{ground_truth}')")
+            
+            # Show optimization status
+            status = system.get_system_status()
+            print(f"Data buffer: {status['data_buffer_size']}/{system.data_collector.batch_size} | "
+                  f"Optimization queue: {status['optimization_queue_size']}")
+            
+            # Show version updates
+            if last_version != result.model_version:
+                print(f"\n--- MODEL UPDATED: {last_version} → {result.model_version} ---")
+                last_version = result.model_version
+                
     finally:
-        # Clean shutdown
         system.stop()
+        print("System stopped")
 
 if __name__ == "__main__":
+    print("="*60)
+    print("ONLINE OPTIMIZATION DEMO")
+    print("="*60)
+    print("This demo shows how a system can continuously improve its model:")
+    print("1. Ask questions (try about capitals or mountains)")
+    print("2. System collects feedback automatically")
+    print("3. When enough data is collected, optimization triggers")
+    print("4. New models are hot-swapped without downtime")
+    print("5. Watch for model version changes during the session")
+    print("Type 'exit' to quit\n")
+    
     asyncio.run(main())
