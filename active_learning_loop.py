@@ -62,8 +62,9 @@ def active_learning_loop():
             score = float(pred.score)
             uncertainty = float(pred.uncertainty)
             predictions.append((data_point, score, uncertainty))
-        except:
-            continue
+        except Exception as e:
+            print(f"Error processing prediction: {e}")
+            predictions.append((data_point, 0.5, 1.0))  # Default values when parsing fails
     
     # Sort by uncertainty (highest first)
     predictions.sort(key=lambda x: x[2], reverse=True)
