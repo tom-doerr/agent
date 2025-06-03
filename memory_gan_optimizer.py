@@ -10,15 +10,14 @@ while ensuring questions are valid (answerable by ReferenceModule).
 """
 
 import dotenv
-
-dotenv.load_dotenv()
-
 import dspy
 import mlflow
 import os
 import sys
 import firecrawl
 from dspy.teleprompt import SIMBA
+
+dotenv.load_dotenv()
 
 
 def get_firecrawl_content(url):
@@ -212,7 +211,7 @@ def main():
         metric=gan_metric, max_steps=max_steps, max_demos=4, bsize=2
     )
 
-    with mlflow.start_run(run_name="SIMBA_MemoryGAN_Run") as run:
+    with mlflow.start_run(run_name="SIMBA_MemoryGAN_Run"):
         mlflow.log_params(
             {
                 "llm_model_name": LLM_MODEL_NAME,
