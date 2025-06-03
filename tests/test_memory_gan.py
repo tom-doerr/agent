@@ -10,7 +10,7 @@ def mock_firecrawl(monkeypatch):
     # Mock Firecrawl responses
     mock_app = MagicMock()
     mock_app.scrape_url.return_value = {"content": "Test content"}
-    monkeypatch.setattr("memory_gan_optimizer.firecrawl.FirecrawlApp", lambda _: mock_app)
+    monkeypatch.setattr("memory_gan_optimizer.firecrawl.FirecrawlApp", lambda *args, **kwargs: mock_app)
 
 @pytest.fixture
 def mock_dspy(monkeypatch):
