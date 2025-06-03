@@ -28,7 +28,7 @@ def get_firecrawl_content(url):
         raise ValueError("FIRECRAWL_API_KEY environment variable not set")
     app = firecrawl.FirecrawlApp(api_key=api_key)
     try:
-        result = app.scrape_url(url, params={'pageOptions': {'onlyMainContent': True}})
+        result = app.scrape_url(url, options={'pageOptions': {'onlyMainContent': True}})
         return result.get('content', '') if isinstance(result, dict) else str(result)
     except Exception as e:
         print(f"Firecrawl error: {e}")
@@ -235,6 +235,11 @@ def main():
             valid_count = 0
             for i, example in enumerate(validation_set):
                 try:
+                    # Skip if source_text is empty
+                    if not example.source_text.strip():
+                        print(f"Skipping validation example {i+1}: empty source_text")
+                        continue
+                        
                     prediction = optimized_program(source_text=example.source_text)
                     score = gan_metric(example, prediction)
                     total_score += score
@@ -253,6 +258,8 @@ def main():
                 avg_score = total_score / valid_count
                 print(f"\nAverage Validation Score: {avg_score}")
                 mlflow.log_metric("avg_validation_score", avg_score)
+            else:
+                print("No valid validation examples completed successfully")
         else:
             print("Skipping validation - no validation set available")
 
