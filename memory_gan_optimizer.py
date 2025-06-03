@@ -188,15 +188,28 @@ def main():
         mlflow.log_param("num_train_examples", len(trainset))
 
         print(f"Optimizing MemoryGAN program with SIMBA...")
-        # Note: SIMBA expects trainset examples to have inputs matching the program's forward method.
-        # Our MemoryGAN.forward takes 'source_text'.
-        optimized_program = simba_optimizer.compile(program_to_optimize, trainset=trainset)
+        try:
+            # Note: SIMBA expects trainset examples to have inputs matching the program's forward method.
+            # Our MemoryGAN.forward takes 'source_text'.
+            optimized_program = simba_optimizer.compile(program_to_optimize, trainset=trainset)
 
-        print("--- SIMBA Compilation Finished ---")
+            print("--- SIMBA Compilation Finished ---")
+            mlflow.set_tag("simba_compilation_status", "Success")
 
-        # Log the optimized program (if possible, or its prompts)
-        # For now, just log a success metric or a tag
-        mlflow.log_metric("optimization_completed", 1)
+        except KeyboardInterrupt:
+            print("\nOptimization interrupted by user")
+            mlflow.set_tag("simba_compilation_status", "Interrupted")
+            # Re-raise to exit
+            raise
+        except Exception as e:
+            print(f"Error during SIMBA compilation: {e}")
+            mlflow.set_tag("simba_compilation_status", "Failed")
+            mlflow.log_param("simba_compilation_error", str(e))
+            optimized_program = None
+        else:
+            # Log the optimized program (if possible, or its prompts)
+            # For now, just log a success metric or a tag
+            mlflow.log_metric("optimization_completed", 1)
 
         # Create harder validation set with Firecrawl only if API key is available
         validation_set = []
