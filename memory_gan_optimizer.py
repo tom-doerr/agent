@@ -174,11 +174,15 @@ def main():
     program_to_optimize = MemoryGAN()
 
     # Configure SIMBA with increased steps and demos
+    # Reduce steps in test mode
+    test_mode = os.getenv("TEST_MODE", "false").lower() == "true"
+    max_steps = 1 if test_mode else 12
+    
     simba_optimizer = SIMBA(
         metric=gan_metric,
-        max_steps=12,      # Increased for better optimization
-        max_demos=4,       # Increased to match larger trainset
-        bsize=2            # Batch size matches trainset size
+        max_steps=max_steps,
+        max_demos=4,
+        bsize=2
     )
 
     with mlflow.start_run(run_name="SIMBA_MemoryGAN_Run") as run:

@@ -31,8 +31,12 @@ def mock_dspy(monkeypatch):
     # Mock configure_dspy
     monkeypatch.setattr("active_learning_loop.configure_dspy", MagicMock())
     
-    # Reduce the number of topics to speed up the test
-    monkeypatch.setattr("active_learning_loop.topics", ["AI ethics"])
+    # Reduce topics and mock LM
+    monkeypatch.setattr("active_learning_loop.topics", ["Test topic"])
+    
+    # Mock LM to avoid real API calls
+    mock_lm = MagicMock()
+    monkeypatch.setattr("active_learning_loop.dspy.settings.configure", MagicMock(return_value=mock_lm))
 
 @pytest.fixture
 def mock_input(monkeypatch):
