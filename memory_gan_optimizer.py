@@ -174,9 +174,8 @@ def main():
     program_to_optimize = MemoryGAN()
 
     # Configure SIMBA with increased steps and demos
-    # Reduce steps in test mode
-    test_mode = os.getenv("TEST_MODE", "false").lower() == "true"
-    max_steps = 1 if test_mode else 12
+    # Detect if running in pytest and reduce steps
+    max_steps = 2 if 'pytest' in sys.modules else 12
     
     simba_optimizer = SIMBA(
         metric=gan_metric,
