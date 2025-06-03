@@ -18,6 +18,7 @@ class ValueNetwork(dspy.Module):
             return dspy.Prediction(
                 score=str(output_dict['score']),
                 uncertainty=str(output_dict['uncertainty'])
+            )
         except Exception as e:
             print(f"Error parsing JSON output: {e}")
             print(f"Raw output: {prediction.json_output}")
