@@ -6,14 +6,18 @@ import io
 import contextlib
 from functools import partial
 
+# Centralized DSPy configuration
+def configure_dspy(model_name):
+    llm = dspy.LM(
+        model=model_name,
+        max_tokens=4000
+    )
+    dspy.settings.configure(lm=llm)
+    return llm
+
 # --- LLM Configuration ---
 llm_model_name = "deepseek/deepseek-reasoner"
-# API key is expected to be set in the environment and handled by LiteLLM/DSPy
-deepseek_lm = dspy.LM(
-    model=llm_model_name,
-    max_tokens=4000 # Default max_tokens for DeepSeek, adjust if needed
-)
-dspy.settings.configure(lm=deepseek_lm)
+deepseek_lm = configure_dspy(llm_model_name)
 
 # --- MLflow Parameters ---
 mlflow_params = {

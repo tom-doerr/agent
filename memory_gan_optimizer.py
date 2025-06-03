@@ -182,10 +182,14 @@ def main():
     )
 
     with mlflow.start_run(run_name="SIMBA_MemoryGAN_Run") as run:
-        mlflow.log_param("llm_model_name", LLM_MODEL_NAME)
-        mlflow.log_param("simba_max_steps", simba_optimizer.max_steps)
-        mlflow.log_param("simba_max_demos", simba_optimizer.max_demos)
-        mlflow.log_param("num_train_examples", len(trainset))
+        mlflow.log_params({
+            "llm_model_name": LLM_MODEL_NAME,
+            "simba_max_steps": simba_optimizer.max_steps,
+            "simba_max_demos": simba_optimizer.max_demos,
+            "num_train_examples": len(trainset),
+            "optimization_type": "SIMBA",
+            "target_metric": "GAN_score"
+        })
 
         print(f"Optimizing MemoryGAN program with SIMBA...")
         try:
