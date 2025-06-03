@@ -42,7 +42,7 @@ def manual_scoring_interface(data_point):
         rating = int(input("Enter rating (0-9): ").strip())
         # Normalize the rating to 0-1 range
         return rating / 9.0
-    except:
+    except Exception:
         print(
             "Invalid input. Using default rating 4.5 (which is 0.5 after normalization)."
         )
