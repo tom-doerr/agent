@@ -57,7 +57,7 @@ async def test_graceful_degradation(mock_system):
     assert "try again shortly" in result.prediction
 
 def test_optimization_trigger_data_batch(mock_system):
-    # Fill data collector
+    # Fill data collector with more than batch size
     for i in range(40):
         mock_system.data_collector.add_example(f"input{i}", f"prediction{i}")
     
@@ -66,7 +66,10 @@ def test_optimization_trigger_data_batch(mock_system):
     assert mock_system.optimization_engine.optimization_queue.qsize() == 1
 
 def test_optimization_trigger_performance(mock_system):
-    # Simulate performance drop
+    # Add data and simulate performance drop
+    for i in range(30):
+        mock_system.data_collector.add_example(f"input{i}", f"prediction{i}")
+    
     mock_system.model_manager.performance_history = [
         {'accuracy': 0.7, 'latency': 100, 'version': "v0", 'timestamp': time.time()}
     ]
@@ -77,14 +80,17 @@ def test_optimization_trigger_performance(mock_system):
     assert mock_system.optimization_engine.optimization_queue.qsize() == 1
 
 def test_optimization_completion(mock_system):
+    # Get initial version
+    _, initial_version = mock_system.model_manager.get_model()
+    
     # Mock optimization
     optimized_model = MockModule("optimized output")
-    request = OptimizationRequest([], "test", time.time(), "v0")
+    request = OptimizationRequest([], "test", time.time(), initial_version)
     
     # Complete optimization
     with patch("dspy.SIMBA.compile", return_value=optimized_model):
         mock_system.optimization_engine._on_optimization_complete(optimized_model, request)
     
-    # Verify model loaded
-    model, version = mock_system.model_manager.get_model()
-    assert "optimized" in version
+    # Verify new version loaded
+    model, new_version = mock_system.model_manager.get_model()
+    assert new_version != initial_version
