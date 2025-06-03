@@ -3,6 +3,7 @@ import os
 import json
 from unittest.mock import patch, MagicMock
 from active_learning_loop import active_learning_loop, load_training_data, save_training_data
+import dspy
 
 @pytest.fixture
 def mock_dspy(monkeypatch):
