@@ -19,7 +19,8 @@ def mock_dspy(monkeypatch):
     )
     
     # Mock generator predictions
-    mock_generator.return_value.generate.return_value = MagicMock(
+    mock_generator_instance = mock_generator.return_value
+    mock_generator_instance.forward.return_value = MagicMock(
         data_point="Test data point"
     )
     
