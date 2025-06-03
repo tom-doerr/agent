@@ -61,11 +61,11 @@ def test_gan_metric():
     
     # Mock assessment prediction
     mock_assess = MagicMock()
-    mock_assess.assessment_score = "0.75"
+    mock_assess.assessment_score = "1.0"
     
     with patch("memory_gan_optimizer.dspy.Predict", return_value=mock_assess):
         score = gan_metric(example, pred)
-        assert score == 0.75
+        assert score == 1.0
     
     # Test error handling
     with patch("memory_gan_optimizer.dspy.Predict", side_effect=Exception):
