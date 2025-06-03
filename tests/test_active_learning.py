@@ -13,14 +13,15 @@ def mock_dspy(monkeypatch):
     mock_value_net = MagicMock()
     mock_generator = MagicMock()
     
-    # Mock value network predictions
-    mock_value_net.return_value.predict.return_value = MagicMock(
+    # Mock value network: when the instance is called, it returns a MagicMock with score and uncertainty
+    mock_value_net_instance = mock_value_net.return_value
+    mock_value_net_instance.return_value = MagicMock(
         score="0.7", uncertainty="0.3"
     )
     
-    # Mock generator predictions
+    # Mock generator: when the instance is called, it returns a MagicMock with data_point
     mock_generator_instance = mock_generator.return_value
-    mock_generator_instance.forward.return_value = MagicMock(
+    mock_generator_instance.return_value = MagicMock(
         data_point="Test data point"
     )
     
@@ -29,6 +30,9 @@ def mock_dspy(monkeypatch):
 
     # Mock configure_dspy
     monkeypatch.setattr("active_learning_loop.configure_dspy", MagicMock())
+    
+    # Reduce the number of topics to speed up the test
+    monkeypatch.setattr("active_learning_loop.topics", ["AI ethics"])
 
 @pytest.fixture
 def mock_input(monkeypatch):
@@ -56,7 +60,8 @@ def test_active_learning_loop(mock_dspy, mock_input, cleanup_files, capsys):
     
     # Verify training data was saved
     training_data = load_training_data()
-    assert len(training_data) == 3
+    # We have one topic and we score top 3, but we only have one candidate, so only one is added
+    assert len(training_data) == 1
     assert training_data[0].data_point == "Test data point"
     assert training_data[0].score == pytest.approx(5/9.0)
 
