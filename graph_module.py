@@ -52,9 +52,15 @@ class GraphOrchestrator(dspy.Module):
             data = result.updated_data
             notes = result.updated_notes
             try:
-                current_module = int(result.next_module) % self.num_modules
+                next_module = int(result.next_module) % self.num_modules
             except ValueError:
-                current_module = 0
+                next_module = 0
+
+            # Break early if next_module is 0
+            if next_module == 0:
+                break
+
+            current_module = next_module
             current_step += 1
 
         return dspy.Prediction(final_data=data, final_notes=notes)
