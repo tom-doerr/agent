@@ -99,7 +99,11 @@ def test_step_limiting():
 def test_non_integer_next_module():
     mock_modules = [
         MockGraphModule(
-            {"next_module": "not_an_integer", "updated_data": "data0", "updated_notes": "notes0"}
+            {
+                "next_module": "not_an_integer",
+                "updated_data": "data0",
+                "updated_notes": "notes0",
+            }
         ),
     ]
 
