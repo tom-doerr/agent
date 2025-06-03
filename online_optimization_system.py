@@ -361,6 +361,10 @@ class OnlineOptimizationSystem:
 async def main():
     """Example of how to use the system"""
     
+    # Configure DSPy with DeepSeek Chat
+    llm = dspy.LM(model='deepseek/deepseek-chat')
+    dspy.settings.configure(lm=llm)
+
     # Define your DSPy program
     class SimpleQA(dspy.Module):
         def __init__(self):
@@ -383,7 +387,11 @@ async def main():
     try:
         # Your application can now make inference calls
         result = await system.inference("What is the capital of France?")
-        print(f"Answer: {result.prediction.answer}")
+        # Handle both prediction objects and fallback strings
+        if hasattr(result.prediction, 'answer'):
+            print(f"Answer: {result.prediction.answer}")
+        else:
+            print(f"Answer: {result.prediction}")
         print(f"Model version: {result.model_version}")
         print(f"Latency: {result.latency_ms:.2f}ms")
         
