@@ -286,7 +286,7 @@ def main():
                 try:
                     # Skip if source_text is empty
                     if not example.source_text.strip():
-                        print(f"Skipping validation example {i+1}: empty source_text")
+                        print(f"Skipping validation example {i + 1}: empty source_text")
                         continue
 
                     prediction = optimized_program(source_text=example.source_text)
@@ -294,14 +294,14 @@ def main():
                     total_score += score
                     valid_count += 1
 
-                    print(f"\nValidation Example {i+1}:")
+                    print(f"\nValidation Example {i + 1}:")
                     print(f"  Source: {example.source_text[:100]}...")
                     print(f"  Question: {prediction.question}")
                     print(f"  Memory Answer: {prediction.memory_answer[:50]}...")
                     print(f"  Reference Answer: {prediction.reference_answer[:50]}...")
                     print(f"  Score: {score}")
                 except Exception as e:
-                    print(f"Validation failed for example {i+1}: {e}")
+                    print(f"Validation failed for example {i + 1}: {e}")
 
             if valid_count > 0:
                 avg_score = total_score / valid_count
