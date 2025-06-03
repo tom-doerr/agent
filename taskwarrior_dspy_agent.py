@@ -1,9 +1,6 @@
-import dspy
-import subprocess
 import os
-import shlex
+import dspy
 from dotenv import load_dotenv
-
 from taskwarrior_dspy_definitions import TaskWarriorModule
 
 # --- Configuration ---
