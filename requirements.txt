@@ -4,3 +4,4 @@ ollama>=0.5.1
 mlflow>=2.0
 firecrawl-py>=0.1.0
 numpy>=1.0
+pytest>=7.0
