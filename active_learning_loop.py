@@ -33,15 +33,14 @@ def save_training_data(data):
 
 def manual_scoring_interface(data_point):
     print(f"\nData point: {data_point}")
-    print("Score the quality of this data point (0.0-1.0)")
-    print("1. Poor\n2. Fair\n3. Good\n4. Excellent")
-    choice = input("Enter choice (1-4): ").strip()
-    return {
-        '1': 0.25,
-        '2': 0.5,
-        '3': 0.75,
-        '4': 1.0
-    }.get(choice, 0.5)
+    print("Rate the quality of this data point on a scale from 0 to 9 (where 0 is worst, 9 is best):")
+    try:
+        rating = int(input("Enter rating (0-9): ").strip())
+        # Normalize the rating to 0-1 range
+        return rating / 9.0
+    except:
+        print("Invalid input. Using default rating 4.5 (which is 0.5 after normalization).")
+        return 0.5
 
 def active_learning_loop():
     # Load existing training data
