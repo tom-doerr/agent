@@ -173,3 +173,41 @@ cython_debug/
 # PyPI configuration file
 .pypirc
 .aider*
+# MLflow artifacts
+mlruns/
+
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+venv/
+env/
+.venv/
+
+# Jupyter Notebooks
+.ipynb_checkpoints
+
+# Log files
+*.log
+
+# Environment variables
+.env
+.env.local
+
+# Editors
+.vscode/
+.idea/
+
+# Data files
+*.csv
+*.json
+*.pickle
+*.pkl
+*.db
+
+# Build artifacts
+build/
+dist/
+*.egg-info/
