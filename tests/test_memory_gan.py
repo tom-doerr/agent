@@ -33,10 +33,7 @@ def mock_mlflow(monkeypatch):
     monkeypatch.setattr("memory_gan_optimizer.mlflow.log_metric", MagicMock())
     monkeypatch.setattr("memory_gan_optimizer.mlflow.set_tag", MagicMock())
 
-def test_main(mock_firecrawl, mock_dspy, mock_mlflow, capsys, monkeypatch):
-    # Set test mode
-    monkeypatch.setenv("TEST_MODE", "true")
-    
+def test_main(mock_firecrawl, mock_dspy, mock_mlflow, capsys):
     # Run the optimizer
     main()
     
