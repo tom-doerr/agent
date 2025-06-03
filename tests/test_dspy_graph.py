@@ -1,5 +1,4 @@
 import pytest
-import dspy
 from unittest.mock import MagicMock
 from dspy_graph import GraphModule, NodeModule
 
