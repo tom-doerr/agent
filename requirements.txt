@@ -1,0 +1,3 @@
+dspy-ai
+python-dotenv
+ollama
