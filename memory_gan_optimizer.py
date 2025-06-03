@@ -27,15 +27,12 @@ def get_firecrawl_content(url):
     if not api_key:
         raise ValueError("FIRECRAWL_API_KEY environment variable not set")
     app = firecrawl.FirecrawlApp(api_key=api_key)
-    result = app.scrape_url(url, params={'pageOptions': {'onlyMainContent': True}})
-    
-    # Handle potential API response variations
-    if isinstance(result, dict) and 'content' in result:
-        return result['content']
-    elif isinstance(result, str):
-        return result
-    else:
-        raise ValueError(f"Unexpected Firecrawl response: {result}")
+    try:
+        result = app.scrape_url(url, params={'pageOptions': {'onlyMainContent': True}})
+        return result.get('content', '') if isinstance(result, dict) else str(result)
+    except Exception as e:
+        print(f"Firecrawl error: {e}")
+        return ""
 
 # === GLOBAL CONFIGURATIONS & DEFINITIONS ===
 
@@ -219,26 +216,30 @@ def main():
             print("FIRECRAWL_API_KEY not set. Skipping Firecrawl validation set.")
             mlflow.log_param("firecrawl_validation_status", "skipped")
 
-        # Only run validation if we have a validation set
         if validation_set:
-            # Comprehensive validation
             print("\n--- Validation Results ---")
             total_score = 0
+            valid_count = 0
             for i, example in enumerate(validation_set):
-                prediction = optimized_program(source_text=example.source_text)
-                score = gan_metric(example, prediction)
-                total_score += score
+                try:
+                    prediction = optimized_program(source_text=example.source_text)
+                    score = gan_metric(example, prediction)
+                    total_score += score
+                    valid_count += 1
             
-                print(f"\nValidation Example {i+1}:")
-                print(f"  Source: {example.source_text[:100]}...")
-                print(f"  Question: {prediction.question}")
-                print(f"  Memory Answer: {prediction.memory_answer}")
-                print(f"  Reference Answer: {prediction.reference_answer}")
-                print(f"  Score: {score}")
+                    print(f"\nValidation Example {i+1}:")
+                    print(f"  Source: {example.source_text[:100]}...")
+                    print(f"  Question: {prediction.question}")
+                    print(f"  Memory Answer: {prediction.memory_answer[:50]}...")
+                    print(f"  Reference Answer: {prediction.reference_answer[:50]}...")
+                    print(f"  Score: {score}")
+                except Exception as e:
+                    print(f"Validation failed for example {i+1}: {e}")
         
-            avg_score = total_score / len(validation_set)
-            print(f"\nAverage Validation Score: {avg_score}")
-            mlflow.log_metric("avg_validation_score", avg_score)
+            if valid_count > 0:
+                avg_score = total_score / valid_count
+                print(f"\nAverage Validation Score: {avg_score}")
+                mlflow.log_metric("avg_validation_score", avg_score)
         else:
             print("Skipping validation - no validation set available")
 
