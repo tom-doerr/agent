@@ -27,11 +27,13 @@ print(f"\nAsking '{question_to_ask}' using dspy.LM configured for DeepSeek model
 
 try:
     # 5. Get the prediction
-    response = predict_answer(question=question_to_ask)
-
-    # 6. Print the answer
-    print(f"Question: {question_to_ask}")
-    print(f"Answer: {response.answer}")
+    try:
+        response = predict_answer(question=question_to_ask)
+        print(f"Question: {question_to_ask}")
+        print(f"Answer: {response.answer}")
+    except Exception as e:
+        print(f"API Error: {e}")
+        print("Please check your DeepSeek API key and network connection")
 
 except Exception as e:
     print(f"An error occurred: {e}")

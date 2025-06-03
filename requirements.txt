@@ -1,3 +1,7 @@
 dspy-ai
 python-dotenv
 ollama
+dspy-ai>=1.0
+mlflow>=2.0
+python-dotenv>=1.0
+firecrawl-py>=0.1.0
