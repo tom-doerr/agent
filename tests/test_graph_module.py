@@ -113,3 +113,21 @@ def test_non_integer_next_module():
     result = orchestrator(initial_data="initial_data")
     assert result.final_data == "data0"
     assert result.final_notes == "notes0"
+
+
+def test_module_selection_and_data_passing():
+    mock_modules = [
+        MockGraphModule(
+            {"next_module": 1, "updated_data": "data1", "updated_notes": "notes1"}
+        ),
+        MockGraphModule(
+            {"next_module": 0, "updated_data": "final", "updated_notes": "final_notes"}
+        ),
+    ]
+
+    orchestrator = GraphOrchestrator(num_modules=2, max_steps=3)
+    orchestrator.modules = mock_modules
+
+    result = orchestrator(initial_data="start")
+    assert result.final_data == "final"
+    assert result.final_notes == "final_notes"
