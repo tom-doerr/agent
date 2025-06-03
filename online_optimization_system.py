@@ -202,14 +202,21 @@ class OptimizationEngine:
     
     def _on_optimization_complete(self, optimized_model: dspy.Module, 
                                  request: OptimizationRequest):
-        """Handle completed optimization"""
-        # Save optimized model
-        new_version = f"v{int(time.time())}"
-        model_path = f"optimized_model_{new_version}.json"
-        optimized_model.save(model_path)
-        
-        # Could trigger model evaluation and hot-swap here
-        logger.info(f"Optimized model saved: {model_path}")
+        """Handle completed optimization and hot-swap model"""
+        try:
+            # Save optimized model
+            new_version = f"v{int(time.time())}"
+            model_path = f"optimized_model_{new_version}.json"
+            optimized_model.save(model_path)
+            
+            # Hot-swap new model
+            if self.model_manager.load_model(model_path, new_version):
+                logger.info(f"Optimized model loaded: {new_version}")
+            else:
+                logger.error(f"Failed to load optimized model: {new_version}")
+                
+        except Exception as e:
+            logger.error(f"Optimization completion failed: {e}")
 
 class OnlineOptimizationSystem:
     """Main system that coordinates inference and optimization"""
@@ -272,8 +279,15 @@ class OnlineOptimizationSystem:
             return result
             
         except Exception as e:
+            # Graceful degradation: fallback to simple response
             logger.error(f"Inference failed: {e}")
-            raise
+            return InferenceResult(
+                prediction="System is optimizing, try again shortly",
+                confidence=0.0,
+                model_version="fallback",
+                latency_ms=0,
+                timestamp=datetime.now()
+            )
     
     def add_feedback(self, input_data: Any, prediction: Any, 
                     ground_truth: Any = None, feedback_score: float = None):
@@ -324,9 +338,14 @@ class OnlineOptimizationSystem:
             self.last_optimization = time.time()
     
     def _estimate_recent_performance(self) -> float:
-        """Estimate recent model performance"""
-        # Simplified - in practice, you'd track actual accuracy
-        return 0.85  # Placeholder
+        """Estimate recent model performance from recorded history"""
+        if not self.model_manager.performance_history:
+            return 1.0  # Default to perfect performance
+        
+        # Use average accuracy of last 20 inferences
+        recent_history = self.model_manager.performance_history[-20:]
+        total_accuracy = sum(entry['accuracy'] for entry in recent_history)
+        return total_accuracy / len(recent_history)
     
     def get_system_status(self) -> Dict[str, Any]:
         """Get current system status"""
