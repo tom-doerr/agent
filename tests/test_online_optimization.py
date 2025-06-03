@@ -83,12 +83,13 @@ def test_optimization_completion(mock_system):
     # Get initial version
     _, initial_version = mock_system.model_manager.get_model()
     
-    # Mock optimization
+    # Mock optimization and model loading
     optimized_model = MockModule("optimized output")
     request = OptimizationRequest([], "test", time.time(), initial_version)
     
     # Complete optimization
-    with patch("dspy.SIMBA.compile", return_value=optimized_model):
+    with patch("dspy.SIMBA.compile", return_value=optimized_model), \
+         patch("dspy.Module.load", return_value=optimized_model):
         mock_system.optimization_engine._on_optimization_complete(optimized_model, request)
     
     # Verify new version loaded
