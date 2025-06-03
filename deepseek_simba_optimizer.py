@@ -1,10 +1,10 @@
-import dspy
 import os
-import mlflow
 import re
 import io
-import contextlib
+import mlflow
+import dspy
 from functools import partial
+from contextlib import redirect_stdout
 
 # Centralized DSPy configuration
 def configure_dspy(model_name):
