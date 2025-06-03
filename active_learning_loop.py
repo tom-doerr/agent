@@ -12,11 +12,6 @@ def configure_dspy(model_name):
     return llm
 
 
-# Initialize modules
-value_net = ValueNetwork()
-generator = GeneratorModule()
-configure_dspy("deepseek/deepseek-reasoner")
-
 # Training data storage
 TRAINING_DATA_FILE = "value_net_training_data.json"
 
@@ -53,6 +48,11 @@ def manual_scoring_interface(data_point):
 
 
 def active_learning_loop():
+    # Initialize modules
+    value_net = ValueNetwork()
+    generator = GeneratorModule()
+    configure_dspy("deepseek/deepseek-reasoner")
+
     # Load existing training data
     training_data = load_training_data()
 
