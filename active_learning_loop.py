@@ -20,6 +20,9 @@ configure_dspy("deepseek/deepseek-reasoner")
 # Training data storage
 TRAINING_DATA_FILE = "value_net_training_data.json"
 
+# Topics for candidate generation
+topics = ["AI ethics", "Renewable energy", "Space exploration", "Biotechnology"]
+
 
 def load_training_data():
     if os.path.exists(TRAINING_DATA_FILE):
@@ -54,7 +57,6 @@ def active_learning_loop():
     training_data = load_training_data()
 
     # Generate candidate data points
-    topics = ["AI ethics", "Renewable energy", "Space exploration", "Biotechnology"]
     candidates = []
     for topic in topics:
         result = generator(topic=topic)
