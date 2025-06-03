@@ -96,6 +96,12 @@ def main():
         try:
             prediction = task_module.forward(user_request=user_input)
             generated_command = prediction.taskwarrior_command.strip()
+            # Basic validation of generated command
+            if not generated_command.startswith("task "):
+                print("Warning: Generated command doesn't start with 'task'")
+                print(f"Raw command: {generated_command}")
+                generated_command = f"task {generated_command}"
+                
             print(f"LLM suggested command: {generated_command}")
 
             if not generated_command.lower().startswith("task"):
