@@ -96,7 +96,7 @@ with mlflow.start_run() as run:
     optimized_program = None # Initialize to ensure it's defined
     print("\n--- Starting SIMBA Compilation (stdout captured for metrics) ---")
     try:
-        with contextlib.redirect_stdout(stdout_capture):
+        with redirect_stdout(stdout_capture):
             # Pass a copy of the student program to avoid in-place modification issues if not desired
             optimized_program = simba_optimizer.compile(
                 student=unoptimized_program.deepcopy(), 
