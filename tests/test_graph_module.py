@@ -94,3 +94,18 @@ def test_step_limiting():
     result = orchestrator(initial_data="initial_data")
     assert result.final_data == "data_0"
     assert result.final_notes == "notes_0"
+
+
+def test_non_integer_next_module():
+    mock_modules = [
+        MockGraphModule(
+            {"next_module": "not_an_integer", "updated_data": "data0", "updated_notes": "notes0"}
+        ),
+    ]
+
+    orchestrator = GraphOrchestrator(num_modules=1, max_steps=1)
+    orchestrator.modules = mock_modules
+
+    result = orchestrator(initial_data="initial_data")
+    assert result.final_data == "data0"
+    assert result.final_notes == "notes0"
