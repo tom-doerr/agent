@@ -107,9 +107,10 @@ class DataCollector:
 class OptimizationEngine:
     """Background SIMBA optimization engine"""
     
-    def __init__(self, base_program: dspy.Module, metric_fn: Callable):
+    def __init__(self, base_program: dspy.Module, metric_fn: Callable, model_manager: AsyncModelManager):
         self.base_program = base_program
         self.metric_fn = metric_fn
+        self.model_manager = model_manager
         self.optimization_queue = queue.Queue()
         self.is_running = False
         self.worker_thread = None
@@ -224,7 +225,7 @@ class OnlineOptimizationSystem:
     def __init__(self, base_program: dspy.Module, metric_fn: Callable):
         self.model_manager = AsyncModelManager()
         self.data_collector = DataCollector(batch_size=30)
-        self.optimization_engine = OptimizationEngine(base_program, metric_fn)
+        self.optimization_engine = OptimizationEngine(base_program, metric_fn, self.model_manager)
         
         # Optimization triggers
         self.inference_count = 0
@@ -307,35 +308,33 @@ class OnlineOptimizationSystem:
         
         # Time-based trigger
         if current_time - self.last_optimization > self.optimization_interval:
-            self._trigger_optimization("scheduled_interval")
-            return
+            batch = self.data_collector.get_batch()
+            if batch:
+                self._trigger_optimization("scheduled_interval", batch)
         
         # Data availability trigger
         batch = self.data_collector.get_batch()
         if batch:
-            self._trigger_optimization("data_batch_ready")
-            return
-        
-        # Performance-based trigger (simplified)
-        if self.inference_count > 100:  # Check performance every 100 inferences
+            self._trigger_optimization("data_batch_ready", batch)
+        # Performance-based trigger
+        elif self.inference_count > 100:  # Check performance every 100 inferences
             recent_performance = self._estimate_recent_performance()
             if recent_performance < self.performance_threshold:
-                self._trigger_optimization("performance_degradation")
+                batch = self.data_collector.get_batch()
+                if batch:
+                    self._trigger_optimization("performance_degradation", batch)
     
-    def _trigger_optimization(self, reason: str):
-        """Trigger background optimization"""
-        # Get available training data
-        batch = self.data_collector.get_batch()
-        if batch:
-            request = OptimizationRequest(
-                training_data=batch,
-                trigger_reason=reason,
-                timestamp=datetime.now(),
-                model_version=self.model_manager.current_version
-            )
-            
-            self.optimization_engine.queue_optimization(request)
-            self.last_optimization = time.time()
+    def _trigger_optimization(self, reason: str, batch: List[Any]):
+        """Trigger background optimization with available batch"""
+        request = OptimizationRequest(
+            training_data=batch,
+            trigger_reason=reason,
+            timestamp=datetime.now(),
+            model_version=self.model_manager.current_version
+        )
+        
+        self.optimization_engine.queue_optimization(request)
+        self.last_optimization = time.time()
     
     def _estimate_recent_performance(self) -> float:
         """Estimate recent model performance from recorded history"""
