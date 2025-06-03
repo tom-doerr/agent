@@ -68,16 +68,29 @@ def test_step_limiting():
         MockGraphModule(
             {
                 "next_module": 0,
-                "updated_data": f"data_{i}",
-                "updated_notes": f"notes_{i}",
+                "updated_data": "data_0",
+                "updated_notes": "notes_0",
             }
-        )
-        for i in range(3)
+        ),
+        MockGraphModule(
+            {
+                "next_module": 0,
+                "updated_data": "data_1",
+                "updated_notes": "notes_1",
+            }
+        ),
+        MockGraphModule(
+            {
+                "next_module": 0,
+                "updated_data": "data_2",
+                "updated_notes": "notes_2",
+            }
+        ),
     ]
 
     orchestrator = GraphOrchestrator(num_modules=3, max_steps=2)
     orchestrator.modules = mock_modules
 
     result = orchestrator(initial_data="initial_data")
-    assert result.final_data == "data_1"
-    assert result.final_notes == "notes_1"
+    assert result.final_data == "data_0"
+    assert result.final_notes == "notes_0"
