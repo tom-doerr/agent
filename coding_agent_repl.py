@@ -32,21 +32,8 @@ class CodingAgent(dspy.Module):
         super().__init__()
         self.agent = dspy.ChainOfThought(CodingAgentSignature)
     
-    def forward(self, request, stream_callback=None):
-        # If streaming is requested, break up the generation
-        if stream_callback:
-            # We'll simulate streaming by generating token-by-token
-            # In a real implementation, this would use the LLM's streaming API
-            response = dotmap.DotMap()
-            tokens = []
-            for token in self.agent(request=request).split():
-                if not stream_callback(token + " "):
-                    return None
-                tokens.append(token)
-            response.plan = " ".join(tokens)
-            return response
-        else:
-            return self.agent(request=request)
+    def forward(self, request):
+        return self.agent(request=request)
 
 # --- Textual App ---
 class CodingAgentREPL(App):
