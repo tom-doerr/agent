@@ -170,7 +170,7 @@ class OptimizationEngine:
             simba = dspy.SIMBA(
                 metric=self.metric_fn,
                 max_steps=4,      # Reduced for faster optimization
-                max_demos=min(10, len(training_data))  # Adapt to available data
+                max_demos=min(10, len(training_data)))
             
             # Convert data to DSPy format
             trainset = self._prepare_trainset(training_data)
