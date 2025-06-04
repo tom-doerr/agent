@@ -448,9 +448,9 @@ async def main():
                 
             print(f"Model: {result.model_version} | Latency: {result.latency_ms:.2f}ms")
             
-            # Use prediction as ground truth for demo
-            ground_truth = result.prediction.answer if hasattr(result.prediction, 'answer') else result.prediction
-            print(f"Added feedback (Ground truth: '{ground_truth[:50]}...')")
+            # Add example without ground truth
+            system.data_collector.add_example(question, result.prediction)
+            print(f"Added example to data collector")
             
             # Show optimization status
             status = system.get_system_status()
