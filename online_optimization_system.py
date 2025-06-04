@@ -386,9 +386,9 @@ async def main():
     system = OnlineOptimizationSystem(
         base_program,
         accuracy_metric,
-        batch_size=32,             # Increased to meet SIMBA minimum
+        batch_size=10,             # Smaller for quicker demos
         optimization_interval=10, # Short interval for demo
-        performance_trigger_count=32
+        performance_trigger_count=10
     )
     
     # Define helper function for the demo
@@ -448,14 +448,6 @@ async def main():
                     print("Invalid replay format. Use '/replay N'")
                 continue
                 
-            # For demo purposes, add synthetic feedback to fill buffer
-            system.add_feedback(
-                f"Synthetic input {time.time()}",
-                "Synthetic prediction",
-                ground_truth="Synthetic ground truth"
-            )
-            print("Added synthetic feedback to fill buffer")
-                
             # Run inference
             result = await system.inference(question)
             
@@ -467,11 +459,9 @@ async def main():
                 
             print(f"Model: {result.model_version} | Latency: {result.latency_ms:.2f}ms")
             
-            # Use actual model prediction as ground truth for demo
+            # Use prediction as ground truth for demo
             ground_truth = result.prediction.answer if hasattr(result.prediction, 'answer') else result.prediction
-                
-            system.add_feedback(question, result.prediction, ground_truth=ground_truth)
-            print(f"Added feedback (Ground truth: '{ground_truth}')")
+            print(f"Added feedback (Ground truth: '{ground_truth[:50]}...')")
             
             # Show optimization status
             status = system.get_system_status()
