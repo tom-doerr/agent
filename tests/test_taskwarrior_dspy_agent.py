@@ -51,5 +51,5 @@ def test_main_flow(mock_execute, mock_module, mock_input, capsys):
     # Verify output
     captured = capsys.readouterr()
     assert "LLM suggested command" in captured.out
-    assert "Executing command" in captured.out
-    assert "Task output" in captured.out
+    assert "To execute, you would run:" in captured.out
+    assert "In an integrated environment" in captured.out
