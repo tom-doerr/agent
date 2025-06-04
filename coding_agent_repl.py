@@ -11,7 +11,7 @@ from textual.reactive import reactive
 
 # --- DSPy Configuration ---
 def configure_dspy():
-    llm = dspy.LM(model="deepseek/deepseek-reasoner")
+    llm = dspy.LM(model="openrouter/deepseek/deepseek-chat-v3-0324")
     dspy.settings.configure(lm=llm)
     return llm
 
