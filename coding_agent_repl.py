@@ -168,17 +168,8 @@ class CodingAgentREPL(App):
                 
             start_time = time.time()
             
-            # Create DSPy stream listener
-            stream_listener = dspy.streaming.StreamListener(signature_field_name="plan")
-            
-            # Wrap agent with streaming
-            stream_agent = dspy.streamify(
-                self.agent,
-                stream_listeners=[stream_listener]
-            )
-            
-            # Get streaming response
-            response = stream_agent(request=full_request)
+            # Get agent response
+            response = self.agent(request=full_request)
             elapsed = time.time() - start_time
             
             # Track step in history
