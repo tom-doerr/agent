@@ -14,9 +14,6 @@ class TestCodingAgentREPL:
             app = CodingAgentREPL()
             app.agent = MagicMock()
             app.LOG_FILE = "/dev/null"  # Disable logging for tests
-            
-            # Initialize app properly
-            app.on_mount()
             return app
 
     def test_configure_dspy(self):

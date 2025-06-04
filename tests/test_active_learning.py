@@ -12,31 +12,35 @@ def mock_dspy(monkeypatch):
     # Mock DSPy modules
     mock_value_net = MagicMock()
     mock_generator = MagicMock()
-    
+        
     # Mock value network: when the instance is called, it returns a MagicMock with score and uncertainty
     mock_value_net_instance = mock_value_net.return_value
     mock_value_net_instance.return_value = MagicMock(
         score="0.7", uncertainty="0.3"
     )
-    
+        
     # Mock generator: when the instance is called, it returns a MagicMock with data_point
     mock_generator_instance = mock_generator.return_value
     mock_generator_instance.return_value = MagicMock(
         data_point="Test data point"
     )
-    
+        
     monkeypatch.setattr("active_learning_loop.ValueNetwork", mock_value_net)
     monkeypatch.setattr("active_learning_loop.GeneratorModule", mock_generator)
 
     # Mock configure_dspy
     monkeypatch.setattr("active_learning_loop.configure_dspy", MagicMock())
-    
+        
     # Reduce topics and mock LM
     monkeypatch.setattr("active_learning_loop.topics", ["Test topic"])
-    
+        
     # Mock LM to avoid real API calls
     mock_lm = MagicMock()
     monkeypatch.setattr("active_learning_loop.dspy.settings.configure", MagicMock(return_value=mock_lm))
+        
+    # Also mock the generator instance to return our test data point
+    mock_generator_instance = MagicMock(return_value=MagicMock(data_point="Test data point"))
+    monkeypatch.setattr("active_learning_loop.generator", mock_generator_instance)
 
 @pytest.fixture
 def mock_input(monkeypatch):
