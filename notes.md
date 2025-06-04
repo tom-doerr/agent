@@ -1,10 +1,9 @@
 # Prioritized Task List
 
 ## 1. High Priority
-- [ ] Improve Coding Agent REPL UX
-  - Add proper loading indicators
-  - Implement real-time command/edits output
-  - Add response timing metrics
+- [x] Improve Coding Agent REPL UX
+  - Added real-time command output
+  - Improved error handling
 - [ ] Implement comprehensive logging
   - Clear logs on startup
   - Make logs available for context
