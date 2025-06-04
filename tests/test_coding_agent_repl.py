@@ -9,7 +9,8 @@ class TestCodingAgentREPL:
     @pytest.fixture
     def app(self):
         # Mock DSPy configuration
-        with patch("coding_agent_repl.dspy.settings.configure") as mock_configure:
+        with patch("coding_agent_repl.configure_dspy") as mock_configure:
+            mock_configure.return_value = MagicMock()
             app = CodingAgentREPL()
             app.agent = MagicMock()
             app.LOG_FILE = "/dev/null"  # Disable logging for tests
