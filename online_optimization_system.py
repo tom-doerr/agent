@@ -406,27 +406,37 @@ if __name__ == "__main__":
     )
     
     # Define helper function for the demo
-    async def run_question(system, question, last_version):
+    async def run_question(system, question, last_version, latency_history):
         """Run a question through the system and handle output"""
+        # Track input details
+        print(f"⤵️ Input: {question}")
+        
         # Run inference
+        start_time = time.time()
         result = await system.inference(question)
+        latency_ms = result.latency_ms
+        
+        # Track latency
+        latency_history.append(latency_ms)
+        if len(latency_history) > 10:
+            latency_history.pop(0)
+        avg_latency = sum(latency_history) / len(latency_history)
         
         # Show answer
         if hasattr(result.prediction, 'answer'):
-            print(f"Answer: {result.prediction.answer}")
+            print(f"🖼️  Model: {result.model_version} | 🔥 Answer: {result.prediction.answer}")
         else:
-            print(f"Answer: {result.prediction}")
+            print(f"🖼️  Model: {result.model_version}| 🔥 Answer: {result.prediction}")
             
-        print(f"Model: {result.model_version} | Latency: {result.latency_ms:.2f}ms")
+        print(f"⏱️  Latency: {latency_ms:.2f}ms | 📈 Avg: {avg_latency:.2f}ms")
         
         # Show optimization status
         status = system.get_system_status()
-        print(f"Data buffer: {status['data_buffer_size']}/{system.data_collector.batch_size} | "
-              f"Optimization queue: {status['optimization_queue_size']}")
+        print(f"📊 Buffer: {status['data_buffer_size']}/{system.data_collector.batch_size} | Queued: {status['optimization_queue_size']}")
         
         # Show version updates
         if last_version != result.model_version:
-            print(f"\n--- MODEL UPDATED: {last_version} → {result.model_version} ---")
+            print(f"\n🚀 MODEL UPDATED: {last_version} → {result.model_version}")
             last_version = result.model_version
         return last_version
     
@@ -437,6 +447,7 @@ if __name__ == "__main__":
         print("System started. Type questions or commands.")
         
         try:
+            latency_history = []  # Track last 10 latencies
             last_version = system.model_manager.current_version
             while True:
                 # Get user input
@@ -455,31 +466,13 @@ if __name__ == "__main__":
                             a = random.randint(10, 99)
                             b = random.randint(10, 99)
                             random_question = f"What is {a} times {b}?"
-                            last_version = await run_question(system, random_question, last_version)
+                            last_version = await run_question(system, random_question, last_version, latency_history)
                     except:
                         print("Error occurred during replay")
                     continue
                     
-                # Run inference
-                result = await system.inference(question)
-                
-                # Show answer
-                if hasattr(result.prediction, 'answer'):
-                    print(f"Answer: {result.prediction.answer}")
-                else:
-                    print(f"Answer: {result.prediction}")
-                    
-                print(f"Model: {result.model_version} | Latency: {result.latency_ms:.2f}ms")
-                
-                # Show optimization status
-                status = system.get_system_status()
-                print(f"Data buffer: {status['data_buffer_size']}/{system.data_collector.batch_size} | "
-                      f"Optimization queue: {status['optimization_queue_size']}")
-                
-                # Show version updates
-                if last_version != result.model_version:
-                    print(f"\n--- MODEL UPDATED: {last_version} → {result.model_version} ---")
-                    last_version = result.model_version
+                # Use common function for user questions
+                last_version = await run_question(system, question, last_version, latency_history)
                     
         finally:
             system.stop()
