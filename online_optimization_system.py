@@ -162,11 +162,11 @@ class OptimizationEngine:
                                base_version: str) -> dspy.Module:
         """Run SIMBA optimization on training data"""
         try:
-            # Initialize SIMBA with online-friendly parameters
+            # SIMBA configuration optimized for online learning
             simba = dspy.SIMBA(
                 metric=self.metric_fn,
-                max_steps=4,      # Reduced for faster optimization
-                max_demos=min(10, len(training_data)))
+                max_steps=1,      # Single step for micro-batches
+                max_demos=max(1, min(2, len(training_data)))  # 1-2 examples
             
             # Convert data to DSPy format
             trainset = self._prepare_trainset(training_data)
@@ -395,21 +395,21 @@ if __name__ == "__main__":
         except:
             return 0.0
     
-    # Initialize system with demo-friendly settings
+    # Initialize with micro-batches for true online optimization
     base_program = MultiplicationModule()
     system = OnlineOptimizationSystem(
         base_program,
         multiplication_metric,
-        batch_size=32,             # Increased to meet SIMBA minimum
-        optimization_interval=30,  # Longer interval to reduce triggers
-        performance_trigger_count=32
+        batch_size=2,             # Micro-batches for frequent updates
+        optimization_interval=5,  # Short interval
+        performance_trigger_count=2
     )
     
     # Define helper function for the demo
     async def run_question(system, question, last_version, latency_history):
-        """Run a question through the system and handle output"""
+        """Run a question and show detailed optimization status"""
         # Track input details
-        print(f"⤵️ Input: {question}")
+        print(f"\n⤵️ Input: {question}")
         
         # Run inference
         start_time = time.time()
@@ -418,16 +418,13 @@ if __name__ == "__main__":
         
         # Track latency
         latency_history.append(latency_ms)
-        if len(latency_history) > 10:
+        if len(latency_history) > 3:
             latency_history.pop(0)
         avg_latency = sum(latency_history) / len(latency_history)
         
-        # Show answer
-        if hasattr(result.prediction, 'answer'):
-            print(f"🖼️  Model: {result.model_version} | 🔥 Answer: {result.prediction.answer}")
-        else:
-            print(f"🖼️  Model: {result.model_version}| 🔥 Answer: {result.prediction}")
-            
+        # Show answer and model version
+        answer = result.prediction.answer if hasattr(result.prediction, 'answer') else result.prediction
+        print(f"🖼️  Model: {result.model_version} | 🔥 Answer: {answer[:50]}{'...' if len(answer) > 50 else ''}")
         print(f"⏱️  Latency: {latency_ms:.2f}ms | 📈 Avg: {avg_latency:.2f}ms")
         
         # Show optimization status
@@ -436,9 +433,12 @@ if __name__ == "__main__":
         
         # Show version updates
         if last_version != result.model_version:
-            print(f"\n🚀 MODEL UPDATED: {last_version} → {result.model_version}")
+            print(f"\n{'='*40}\n🚀 MODEL UPDATED: {last_version} → {result.model_version}\n{'='*40}")
             last_version = result.model_version
-        return last_version
+        else:
+            print()  # Add spacing between questions
+            
+        return last_version, latency_history
     
     async def main():
         """Interactive demo showing online optimization"""
@@ -459,20 +459,23 @@ if __name__ == "__main__":
                     break
                     
                 if question.startswith('/replay'):
-                    # Generate 40 problems to reliably fill buffer
+                    # Extract number of replays
                     try:
-                        for _ in range(40):
-                            # Generate random multiplication problem
-                            a = random.randint(10, 99)
-                            b = random.randint(10, 99)
-                            random_question = f"What is {a} times {b}?"
-                            last_version = await run_question(system, random_question, last_version, latency_history)
+                        num_str = question.split()[1] if len(question.split()) > 1 else "3"
+                        num_replays = int(num_str)
                     except:
-                        print("Error occurred during replay")
+                        num_replays = 3
+                    
+                    print(f"🔄 Replaying {num_replays} queries...")
+                    for _ in range(num_replays):
+                        a = random.randint(10, 99)
+                        b = random.randint(10, 99)
+                        random_question = f"What is {a} times {b}?"
+                        last_version, latency_history = await run_question(system, random_question, last_version, latency_history)
                     continue
                     
-                # Use common function for user questions
-                last_version = await run_question(system, question, last_version, latency_history)
+                # Process user questions
+                last_version, latency_history = await run_question(system, question, last_version, latency_history)
                     
         finally:
             system.stop()
