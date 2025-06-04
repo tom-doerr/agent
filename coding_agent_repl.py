@@ -3,6 +3,7 @@ import re
 import subprocess
 import dspy
 import time
+import threading
 from textual.app import App, ComposeResult
 from textual.containers import Container
 from textual.widgets import Header, Footer, Static, Input, Button
@@ -105,6 +106,7 @@ class CodingAgentREPL(App):
         with open(self.LOG_FILE, "w") as f:
             f.write("")
         self.update_output("🌟 Coding Agent REPL 🌟\nType '/exit' to quit\n")
+        self.enable_input()
     
     def update_output(self, text: str, style_class: str = "") -> None:
         # Add styling if provided
@@ -127,10 +129,16 @@ class CodingAgentREPL(App):
         self.query_one("#loading").add_class("hidden")
     
     def execute_agent(self, request: str) -> None:
-        """Execute agent on user request"""
+        """Execute agent on user request in background thread"""
         self.show_loading()
         self.update_output(f"> {request}", "info")
+        self.disable_input()
         
+        # Run agent in background thread
+        threading.Thread(target=self._run_agent, args=(request,)).start()
+    
+    def _run_agent(self, request: str) -> None:
+        """Background thread for agent processing"""
         try:
             start_time = time.time()
             response = self.agent(request=request)
@@ -158,6 +166,7 @@ class CodingAgentREPL(App):
             self.update_output(f"❌ Error: {str(e)}", "error")
         finally:
             self.hide_loading()
+            self.enable_input()
     
     def execute_commands(self, commands: str) -> None:
         """Execute shell commands"""
@@ -213,6 +222,14 @@ class CodingAgentREPL(App):
     def on_input_submitted(self, event: Input.Submitted) -> None:
         self.process_request()
     
+    def disable_input(self):
+        self.query_one("#request-input").disabled = True
+        self.query_one("#execute-btn").disabled = True
+
+    def enable_input(self):
+        self.query_one("#request-input").disabled = False
+        self.query_one("#execute-btn").disabled = False
+
     def process_request(self) -> None:
         request_input = self.query_one("#request-input")
         request = request_input.value.strip()
