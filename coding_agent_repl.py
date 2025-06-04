@@ -166,10 +166,20 @@ class CodingAgentREPL(App):
             if history:
                 full_request += "\n\n### Previous Steps:\n" + "\n".join(history)
                 
+            # Get log context
+            log_context = ""
+            try:
+                with open(self.LOG_FILE, "r") as f:
+                    logs = f.read()
+                    # Get last 2000 characters of logs
+                    log_context = logs[-2000:]
+            except Exception as e:
+                self.update_output(f"⚠️ Error reading logs: {str(e)}", "warning")
+                
             start_time = time.time()
             
-            # Get agent response
-            response = self.agent(request=full_request)
+            # Get agent response with log context
+            response = self.agent(request=full_request, log_context=log_context)
             elapsed = time.time() - start_time
             
             # Track step in history
