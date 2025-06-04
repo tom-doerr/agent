@@ -1,6 +1,6 @@
 import dspy
 
-class Coding极AgentSignature(dspy.Signature):
+class CodingAgentSignature(dspy.Signature):
     """Execute coding tasks autonomously. You can search Firebase by using 'firebase:' prefix in commands."""
     request = dspy.InputField(desc="User request for code changes")
     log_context = dspy.InputField(desc="Relevant log entries for context")
