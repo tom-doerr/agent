@@ -6,8 +6,11 @@ import time
 import threading
 from textual.app import App, ComposeResult
 from textual.containers import Container
-from textual.widgets import Header, Footer, Static, Input, Button
+from textual.widgets import Header, Footer, Static, Button
 from textual.reactive import reactive
+from textual import events
+from textual import log
+from dspy.utils import dotmap
 
 # --- DSPy Configuration ---
 def configure_dspy():
@@ -29,8 +32,21 @@ class CodingAgent(dspy.Module):
         super().__init__()
         self.agent = dspy.ChainOfThought(CodingAgentSignature)
     
-    def forward(self, request):
-        return self.agent(request=request)
+    def forward(self, request, stream_callback=None):
+        # If streaming is requested, break up the generation
+        if stream_callback:
+            # We'll simulate streaming by generating token-by-token
+            # In a real implementation, this would use the LLM's streaming API
+            response = dotmap.DotMap()
+            tokens = []
+            for token in self.agent(request=request).split():
+                if not stream_callback(token + " "):
+                    return None
+                tokens.append(token)
+            response.plan = " ".join(tokens)
+            return response
+        else:
+            return self.agent(request=request)
 
 # --- Textual App ---
 class CodingAgentREPL(App):
@@ -101,12 +117,28 @@ class CodingAgentREPL(App):
         yield Footer()
     
     def on_mount(self) -> None:
-        self.query_one("#request-input").focus()
+        self.vim_mode = "insert"
+        self.set_focus(self.query_one("#request-input"))
         # Clear log file on startup
         with open(self.LOG_FILE, "w") as f:
             f.write("")
         self.update_output("🌟 Coding Agent REPL 🌟\nType '/exit' to quit\n")
         self.enable_input()
+        
+    def on_key(self, event: events.Key) -> None:
+        if event.key == "escape":
+            self.vim_mode = "normal"
+        elif event.key == "i" and self.vim_mode == "normal":
+            self.vim_mode = "insert"
+        elif event.key == ":" and self.vim_mode == "normal":
+            self.vim_mode = "command"
+            self.query_one("#request-input").value = ":"
+        elif self.vim_mode == "insert":
+            # Let the input handle the key
+            return
+        else:
+            # Prevent key propagation in normal/command modes
+            event.prevent_default()
     
     def update_output(self, text: str, style_class: str = "") -> None:
         # This method must be called from the main thread
@@ -143,11 +175,18 @@ class CodingAgentREPL(App):
     
     def execute_agent(self, request: str) -> None:
         """Execute agent on user request in background thread"""
+        # Cancel any existing agent thread
+        if self.current_agent_thread and self.current_agent_thread.is_alive():
+            self.agent_cancel_event.set()
+            self.current_agent_thread.join(0.1)
+            
         self.show_loading()
         self.disable_input()
+        self.agent_cancel_event = threading.Event()
         
         # Run agent in background thread with step tracking
-        threading.Thread(target=self._run_agent, args=(request, 0, [])).start()
+        self.current_agent_thread = threading.Thread(target=self._run_agent, args=(request, 0, []))
+        self.current_agent_thread.start()
     
     def _run_agent(self, request: str, step: int, history: list) -> None:
         """Background thread for agent processing with multi-step capability"""
@@ -164,7 +203,17 @@ class CodingAgentREPL(App):
                 full_request += "\n\n### Previous Steps:\n" + "\n".join(history)
                 
             start_time = time.time()
-            response = self.agent(request=full_request)
+            
+            # Create streaming callback
+            def stream_callback(partial_response):
+                if self.agent_cancel_event.is_set():
+                    return False
+                if partial_response:
+                    self.update_output(partial_response, "info")
+                return True
+                
+            # Get streaming response
+            response = self.agent(request=full_request, stream_callback=stream_callback)
             elapsed = time.time() - start_time
             
             # Track step in history
@@ -283,6 +332,9 @@ class CodingAgentREPL(App):
         request_input = self.query_one("#request-input")
         request = request_input.value.strip()
         request_input.value = ""
+        
+        # Set focus back to input immediately
+        self.set_focus(request_input)
         
         if request.lower() == "/exit":
             self.exit()
