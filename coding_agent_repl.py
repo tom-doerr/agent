@@ -109,6 +109,14 @@ class CodingAgentREPL(App):
         self.enable_input()
     
     def update_output(self, text: str, style_class: str = "") -> None:
+        # This method must be called from the main thread
+        if threading.current_thread() == threading.main_thread():
+            self._do_update_output(text, style_class)
+        else:
+            # Schedule the update on the main thread
+            self.call_from_thread(self._do_update_output, text, style_class)
+    
+    def _do_update_output(self, text: str, style_class: str = "") -> None:
         # Add styling if provided
         styled_text = f"[{style_class}]{text}[/]" if style_class else text
         # Append to current state
