@@ -1,4 +1,4 @@
-i port asyncio
+import asyncio
 import threading
 import queue
 import time
