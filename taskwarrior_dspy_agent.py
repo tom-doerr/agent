@@ -33,30 +33,32 @@ def setup_dspy():
         raise
 
 # --- Task Execution ---
+import shlex
+import subprocess
+
 def execute_taskwarrior_command(command_str):
     """Executes a Taskwarrior command and returns its output."""
     if not command_str.strip().startswith("task"):
         print(f"Error: Command does not start with 'task': {command_str}")
-        return "Error: Invalid command format. Command must start with 'task'.", ""
+        return "", "Error: Invalid command format. Command must start with 'task'."
 
-    print(f"\nProposed command: {command_str}")
-    # User approval step is handled by Cascade's run_command tool's SafeToAutoRun=false
-    # For direct script execution, we'd implement an input() here.
-    # This script is designed to be run via Cascade, which will handle approval.
-
+    print(f"\nExecuting command: {command_str}")
+    
     try:
-        # We expect Cascade to run this via its run_command tool.
-        # For local testing, you might uncomment the subprocess call after approval.
-        # args = shlex.split(command_str)
-        # result = subprocess.run(args, capture_output=True, text=True, check=False)
-        # stdout = result.stdout
-        # stderr = result.stderr
-        # if result.returncode != 0:
-        #     print(f"Error executing command: {stderr}")
-        # return stdout, stderr
-        print("Command execution will be handled by the AI Assistant's environment.")
-        return "Command proposed. Waiting for execution by assistant.", ""
-
+        # Split command into arguments
+        args = shlex.split(command_str)
+        
+        # Run the command
+        result = subprocess.run(
+            args, 
+            capture_output=True, 
+            text=True,
+            check=False
+        )
+        
+        # Return output and error
+        return result.stdout, result.stderr
+        
     except FileNotFoundError:
         error_msg = "Error: 'task' command not found. Is Taskwarrior installed and in your PATH?"
         print(error_msg)
