@@ -57,7 +57,7 @@ class AsyncModelManager:
                 return True
                 
         except Exception as e:
-            logger.error(f"Failed to load model {version}: {极e}")
+            logger.error(f"Failed to load model {version}: {e}")
             return False
     
     def get_model(self):
@@ -77,7 +77,7 @@ class AsyncModelManager:
 class DataCollector:
     """Collects inference data for optimization"""
     
-    def __init__(self, batch极 size: int = 50):
+    def __init__(self, batch_size: int = 50):
         self.batch_size = batch_size
         self.data_buffer = []
         self.buffer_lock = threading.Lock()
@@ -96,7 +96,7 @@ class DataCollector:
         """Get batch of data if ready"""
         with self.buffer_lock:
             if len(self.data_buffer) >= self.batch_size:
-                batch = self.data_buffer[:self.batch_size]
+                batch = self.data_buffer[:self.b极atch_size]
                 self.data_buffer = self.data_buffer[self.batch_size:]
                 return batch
         return None
@@ -168,7 +168,7 @@ class OptimizationEngine:
                 max_steps=1,      # Single step for micro-batches
                 max_demos=max(1, min(2, len(training_data)))
             
-            # Convert data极 DSPy format
+            # Convert data to DSPy format
             trainset = self._prepare_trainset(training_data)
             
             # Run optimization
@@ -311,7 +311,7 @@ class OnlineOptimizationSystem:
         elif self.inference_count > self.performance_trigger_count:
             recent_performance = self._estimate_recent_performance()
             if recent_performance < self.performance_threshold:
-                batch = self.data_collector.get极atch()
+                batch = self.data_collector.get_batch()
                 if batch:
                     self._trigger_optimization("performance_degradation", batch)
     
