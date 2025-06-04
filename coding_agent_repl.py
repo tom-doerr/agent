@@ -204,16 +204,17 @@ class CodingAgentREPL(App):
                 
             start_time = time.time()
             
-            # Create streaming callback
-            def stream_callback(partial_response):
-                if self.agent_cancel_event.is_set():
-                    return False
-                if partial_response:
-                    self.update_output(partial_response, "info")
-                return True
-                
+            # Create DSPy stream listener
+            stream_listener = dspy.streaming.StreamListener(signature_field_name="plan")
+            
+            # Wrap agent with streaming
+            stream_agent = dspy.streamify(
+                self.agent,
+                stream_listeners=[stream_listener]
+            )
+            
             # Get streaming response
-            response = self.agent(request=full_request, stream_callback=stream_callback)
+            response = stream_agent(request=full_request)
             elapsed = time.time() - start_time
             
             # Track step in history
