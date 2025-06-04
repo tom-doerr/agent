@@ -359,27 +359,37 @@ async def main():
     llm = dspy.LM(model='deepseek/deepseek-chat')
     dspy.settings.configure(lm=llm)
 
-    # Define your DSPy program
-    class SimpleQA(dspy.Module):
-        def __init__(self):
-            self.generate_answer = dspy.ChainOfThought("question -> answer")
+import random
+
+class MultiplicationModule(dspy.Module):
+    def __init__(self):
+        self.generate_answer = dspy.ChainOfThought("question -> answer")
         
-        def forward(self, question):
-            return self.generate_answer(question=question)
-    
-    # Define your metric
-    def accuracy_metric(example, prediction, trace=None):
-        return example.answer.lower() == prediction.answer.lower()
-    
-    # Initialize system with demo-friendly settings
-    base_program = SimpleQA()
-    system = OnlineOptimizationSystem(
-        base_program,
-        accuracy_metric,
-        batch_size=10,             # Smaller for quicker demos
-        optimization_interval=10, # Short interval for demo
-        performance_trigger_count=10
-    )
+    def forward(self, question):
+        return self.generate_answer(question=question)
+
+def multiplication_metric(example, prediction, trace=None):
+    try:
+        # Parse numbers from question
+        a, b = [int(n) for n in example.split() if n.isdigit()]
+        correct_answer = a * b
+        
+        # Parse model's answer
+        model_answer = int(prediction.answer.split()[-1])
+        
+        return 1.0 if model_answer == correct_answer else 0.0
+    except:
+        return 0.0
+
+# Initialize system with demo-friendly settings
+base_program = MultiplicationModule()
+system = OnlineOptimizationSystem(
+    base_program,
+    multiplication_metric,
+    batch_size=5,             # Small batch for quick demos
+    optimization_interval=5, # Short interval for demo
+    performance_trigger_count=5
+)
     
     # Define helper function for the demo
     async def run_question(system, question, last_version):
@@ -394,10 +404,6 @@ async def main():
             print(f"Answer: {result.prediction}")
             
         print(f"Model: {result.model_version} | Latency: {result.latency_ms:.2f}ms")
-        
-        # Add example without ground truth
-        system.data_collector.add_example(question, result.prediction)
-        print(f"Added example to data collector")
         
         # Show optimization status
         status = system.get_system_status()
@@ -430,8 +436,10 @@ async def main():
                 try:
                     num_replays = int(question.split()[1])
                     for _ in range(num_replays):
-                        # Replay with random inputs
-                        random_question = f"Question {time.time()}"
+                        # Generate random multiplication problem
+                        a = random.randint(10, 99)
+                        b = random.randint(10, 99)
+                        random_question = f"What is {a} times {b}?"
                         last_version = await run_question(system, random_question, last_version)
                 except:
                     print("Invalid replay format. Use '/replay N'")
@@ -447,10 +455,6 @@ async def main():
                 print(f"Answer: {result.prediction}")
                 
             print(f"Model: {result.model_version} | Latency: {result.latency_ms:.2f}ms")
-            
-            # Add example without ground truth
-            system.data_collector.add_example(question, result.prediction)
-            print(f"Added example to data collector")
             
             # Show optimization status
             status = system.get_system_status()
