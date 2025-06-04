@@ -392,6 +392,36 @@ async def main():
         performance_trigger_count=3
     )
     
+    # Define helper function for the demo
+    async def run_question(system, question, last_version):
+        """Run a question through the system and handle output"""
+        # Run inference
+        result = await system.inference(question)
+        
+        # Show answer
+        if hasattr(result.prediction, 'answer'):
+            print(f"Answer: {result.prediction.answer}")
+        else:
+            print(f"Answer: {result.prediction}")
+            
+        print(f"Model: {result.model_version} | Latency: {result.latency_ms:.2f}ms")
+        
+        # Use prediction as ground truth for demo
+        ground_truth = result.prediction.answer if hasattr(result.prediction, 'answer') else result.prediction
+        system.add_feedback(question, result.prediction, ground_truth=ground_truth)
+        print(f"Added feedback (Ground truth: '{ground_truth[:50]}...')")
+        
+        # Show optimization status
+        status = system.get_system_status()
+        print(f"Data buffer: {status['data_buffer_size']}/{system.data_collector.batch_size} | "
+              f"Optimization queue: {status['optimization_queue_size']}")
+        
+        # Show version updates
+        if last_version != result.model_version:
+            print(f"\n--- MODEL UPDATED: {last_version} → {result.model_version} ---")
+            last_version = result.model_version
+        return last_version
+
     # Start system
     system.start()
     print("System started. Type questions or 'exit' to quit.")
@@ -414,7 +444,7 @@ async def main():
                     for _ in range(num_replays):
                         # Replay with random inputs
                         random_question = f"Question {time.time()}"
-                        await self.run_question(system, random_question, last_version)
+                        last_version = await run_question(system, random_question, last_version)
                 except:
                     print("Invalid replay format. Use '/replay N'")
                 continue
@@ -445,34 +475,6 @@ async def main():
             if last_version != result.model_version:
                 print(f"\n--- MODEL UPDATED: {last_version} → {result.model_version} ---")
                 last_version = result.model_version
-    async def run_question(self, system, question, last_version):
-        """Run a question through the system and handle output"""
-        # Run inference
-        result = await system.inference(question)
-        
-        # Show answer
-        if hasattr(result.prediction, 'answer'):
-            print(f"Answer: {result.prediction.answer}")
-        else:
-            print(f"Answer: {result.prediction}")
-            
-        print(f"Model: {result.model_version} | Latency: {result.latency_ms:.2f}ms")
-        
-        # Use prediction as ground truth for demo
-        ground_truth = result.prediction.answer if hasattr(result.prediction, 'answer') else result.prediction
-        system.add_feedback(question, result.prediction, ground_truth=ground_truth)
-        print(f"Added feedback (Ground truth: '{ground_truth[:50]}...')")
-        
-        # Show optimization status
-        status = system.get_system_status()
-        print(f"Data buffer: {status['data_buffer_size']}/{system.data_collector.batch_size} | "
-              f"Optimization queue: {status['optimization_queue_size']}")
-        
-        # Show version updates
-        if last_version != result.model_version:
-            print(f"\n--- MODEL UPDATED: {last_version} → {result.model_version} ---")
-            last_version = result.model_version
-        return last_version
                 
     finally:
         system.stop()
