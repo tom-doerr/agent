@@ -392,29 +392,29 @@ system = OnlineOptimizationSystem(
 )
     
     # Define helper function for the demo
-    async def run_question(system, question, last_version):
-        """Run a question through the system and handle output"""
-        # Run inference
-        result = await system.inference(question)
+async def run_question(system, question, last_version):
+    """Run a question through the system and handle output"""
+    # Run inference
+    result = await system.inference(question)
+    
+    # Show answer
+    if hasattr(result.prediction, 'answer'):
+        print(f"Answer: {result.prediction.answer}")
+    else:
+        print(f"Answer: {result.prediction}")
         
-        # Show answer
-        if hasattr(result.prediction, 'answer'):
-            print(f"Answer: {result.prediction.answer}")
-        else:
-            print(f"Answer: {result.prediction}")
-            
-        print(f"Model: {result.model_version} | Latency: {result.latency_ms:.2f}ms")
-        
-        # Show optimization status
-        status = system.get_system_status()
-        print(f"Data buffer: {status['data_buffer_size']}/{system.data_collector.batch_size} | "
-              f"Optimization queue: {status['optimization_queue_size']}")
-        
-        # Show version updates
-        if last_version != result.model_version:
-            print(f"\n--- MODEL UPDATED: {last_version} → {result.model_version} ---")
-            last_version = result.model_version
-        return last_version
+    print(f"Model: {result.model_version} | Latency: {result.latency_ms:.2f}ms")
+    
+    # Show optimization status
+    status = system.get_system_status()
+    print(f"Data buffer: {status['data_buffer_size']}/{system.data_collector.batch_size} | "
+          f"Optimization queue: {status['optimization_queue_size']}")
+    
+    # Show version updates
+    if last_version != result.model_version:
+        print(f"\n--- MODEL UPDATED: {last_version} → {result.model_version} ---")
+        last_version = result.model_version
+    return last_version
 
     # Start system
     system.start()
