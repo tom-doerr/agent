@@ -42,12 +42,14 @@ def manual_scoring_interface(data_point):
         print("Invalid input. Using default rating 4.5 (which is 0.5 after normalization).")
         return 0.5
 
+# Topics for active learning
+topics = ["AI ethics", "Renewable energy", "Space exploration", "Biotechnology"]
+
 def active_learning_loop():
     # Load existing training data
     training_data = load_training_data()
     
     # Generate candidate data points
-    topics = ["AI ethics", "Renewable energy", "Space exploration", "Biotechnology"]
     candidates = []
     for topic in topics:
         result = generator(topic=topic)
