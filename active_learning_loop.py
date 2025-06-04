@@ -33,14 +33,20 @@ def save_training_data(data):
 
 def manual_scoring_interface(data_point):
     print(f"\nData point: {data_point}")
-    print("Rate the quality of this data point on a scale from 0 to 9 (where 0 is worst, 9 is best):")
-    try:
-        rating = int(input("Enter rating (0-9): ").strip())
-        # Normalize the rating to 0-1 range
-        return rating / 9.0
-    except:
-        print("Invalid input. Using default rating 4.5 (which is 0.5 after normalization).")
-        return 0.5
+    while True:
+        try:
+            rating_str = input("Rate the quality of this data point (0-9 where 0=worst, 9=best): ").strip()
+            if not rating_str:
+                raise ValueError("Empty input")
+                
+            rating = int(rating_str)
+            if rating < 0 or rating > 9:
+                print("Please enter a number between 0 and 9.")
+                continue
+                
+            return rating / 9.0
+        except ValueError:
+            print("Invalid input. Please enter a number between 0 and 9.")
 
 # Topics for active learning
 topics = ["AI ethics", "Renewable energy", "Space exploration", "Biotechnology"]
