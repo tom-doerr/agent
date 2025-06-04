@@ -198,21 +198,17 @@ class OptimizationEngine:
     
     def _on_optimization_complete(self, optimized_model: dspy.Module, 
                                  request: OptimizationRequest):
-        """Handle completed optimization and hot-swap model"""
+        """Handle completed optimization by swapping model in memory"""
         try:
-            # Save optimized model
             new_version = f"v{int(time.time())}"
-            model_path = f"optimized_model_{new_version}.json"
-            optimized_model.save(model_path)
             
-            # Hot-swap new model
-            if self.model_manager.load_model(model_path, new_version):
-                logger.info(f"Optimized model loaded: {new_version}")
-                # Print for demo visibility
-                print(f"\n🔥 OPTIMIZATION COMPLETE! New model: {new_version}")
-            else:
-                logger.error(f"Failed to load optimized model: {new_version}")
-                print(f"\n⚠️ OPTIMIZATION FAILED! Keeping previous model")
+            # Safely swap model instance
+            with self.model_manager.model_lock:
+                self.model_manager.current_model = optimized_model
+                self.model_manager.current_version = new_version
+                
+            logger.info(f"Optimized model loaded: {new_version}")
+            print(f"\n🔥 OPTIMIZATION COMPLETE! New model: {new_version}")
                 
         except Exception as e:
             logger.error(f"Optimization completion failed: {e}")
@@ -404,9 +400,9 @@ if __name__ == "__main__":
     system = OnlineOptimizationSystem(
         base_program,
         multiplication_metric,
-        batch_size=5,             # Small batch for quick demos
-        optimization_interval=5,  # Short interval for demo
-        performance_trigger_count=5
+        batch_size=32,             # Increased to meet SIMBA minimum
+        optimization_interval=30,  # Longer interval to reduce triggers
+        performance_trigger_count=32
     )
     
     # Define helper function for the demo
@@ -452,17 +448,16 @@ if __name__ == "__main__":
                     break
                     
                 if question.startswith('/replay'):
-                    # Extract number of replays
+                    # Generate 40 problems to reliably fill buffer
                     try:
-                        num_replays = int(question.split()[1])
-                        for _ in range(num_replays):
+                        for _ in range(40):
                             # Generate random multiplication problem
                             a = random.randint(10, 99)
                             b = random.randint(10, 99)
                             random_question = f"What is {a} times {b}?"
                             last_version = await run_question(system, random_question, last_version)
                     except:
-                        print("Invalid replay format. Use '/replay N'")
+                        print("Error occurred during replay")
                     continue
                     
                 # Run inference
