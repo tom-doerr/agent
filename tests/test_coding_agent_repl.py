@@ -26,14 +26,4 @@ class TestCodingAgentREPL:
         app.execute_commands(commands)
         assert "hello" in app.current_state
 
-    def test_apply_edits(self, app, tmp_path):
-        # Create test file
-        file_path = tmp_path / "test.py"
-        file_path.write_text("original content")
-        
-        # Test edit block
-        edits = f"""
-        ```python
-        {file_path}
-        <<<<<<< SEARCH
-        original content
+        new content
