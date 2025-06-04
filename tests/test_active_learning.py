@@ -39,8 +39,7 @@ def mock_dspy(monkeypatch):
     monkeypatch.setattr("active_learning_loop.dspy.settings.configure", MagicMock(return_value=mock_lm))
         
     # Also mock the generator instance to return our test data point
-    mock_generator_instance = MagicMock(return_value=MagicMock(data_point="Test data point"))
-    monkeypatch.setattr("active_learning_loop.generator", mock_generator_instance)
+    monkeypatch.setattr("active_learning_loop.generator", MagicMock(return_value=MagicMock(data_point="Test data point")))
 
 @pytest.fixture
 def mock_input(monkeypatch):
