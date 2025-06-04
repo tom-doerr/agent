@@ -2,6 +2,7 @@ import os
 import re
 import subprocess
 import dspy
+import time
 from textual.app import App, ComposeResult
 from textual.containers import Container
 from textual.widgets import Header, Footer, Static, Input, Button
@@ -55,15 +56,26 @@ class CodingAgentREPL(App):
     Button {
         width: 15%;
     }
+    #loading {
+        background: $accent;
+        color: $text;
+        text-align: center;
+        padding: 1;
+    }
+    .hidden {
+        display: none;
+    }
     """
     
     current_state = reactive("")
     agent = CodingAgent()
     configure_dspy()
+    LOG_FILE = "coding_agent_repl.log"
     
     def compose(self) -> ComposeResult:
         yield Header()
         with Container():
+            yield Static("Thinking...", id="loading", classes="hidden")
             yield Static(id="output")
             with Container(id="input-container"):
                 yield Input(placeholder="Enter request", id="request-input")
@@ -72,36 +84,56 @@ class CodingAgentREPL(App):
     
     def on_mount(self) -> None:
         self.query_one("#request-input").focus()
+        # Clear log file on startup
+        with open(self.LOG_FILE, "w") as f:
+            f.write("")
         self.update_output("🌟 Coding Agent REPL 🌟\nType '/exit' to quit\n")
     
     def update_output(self, text: str) -> None:
         self.current_state += text + "\n"
         self.query_one("#output").update(self.current_state)
+        # Append to log file
+        with open(self.LOG_FILE, "a") as f:
+            f.write(text + "\n")
+    
+    def show_loading(self) -> None:
+        self.query_one("#loading").remove_class("hidden")
+    
+    def hide_loading(self) -> None:
+        self.query_one("#loading").add_class("hidden")
     
     def execute_agent(self, request: str) -> None:
         """Execute agent on user request"""
+        self.show_loading()
         self.update_output(f"> {request}")
         
         try:
+            start_time = time.time()
             response = self.agent(request=request)
+            elapsed = time.time() - start_time
+            self.update_output(f"⏱️ Agent response in {elapsed:.2f}s")
             self.update_output(f"PLAN:\n{response.plan}")
             
             # Execute commands
             if response.commands.strip():
+                self.update_output("\n💻 EXECUTING COMMANDS:")
                 self.execute_commands(response.commands)
             
             # Apply file edits
             if response.edits.strip():
+                self.update_output("\n📝 APPLYING EDITS:")
                 self.apply_edits(response.edits)
             
             # Check if done
             if "DONE" in response.done:
-                self.update_output("✅ TASK COMPLETE")
+                self.update_output("\n✅ TASK COMPLETE")
             else:
-                self.update_output("🔄 CONTINUING")
+                self.update_output("\n🔄 CONTINUING")
                 
         except Exception as e:
             self.update_output(f"❌ Error: {str(e)}")
+        finally:
+            self.hide_loading()
     
     def execute_commands(self, commands: str) -> None:
         """Execute shell commands"""
@@ -133,7 +165,7 @@ class CodingAgentREPL(App):
             search_content = match.group(3)
             replace_content = match.group(4)
             
-            self.update_output(f"Editing {file_path}")
+            self.update_output(f"✏️ Editing {file_path}")
             
             try:
                 with open(file_path, "r") as f:
