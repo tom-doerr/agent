@@ -111,7 +111,9 @@ class CodingAgentREPL(App):
     def update_output(self, text: str, style_class: str = "") -> None:
         # Add styling if provided
         styled_text = f"[{style_class}]{text}[/]" if style_class else text
+        # Append to current state
         self.current_state += styled_text + "\n"
+        # Update output widget
         output_widget = self.query_one("#output")
         output_widget.update(self.current_state)
         # Scroll to bottom
@@ -121,6 +123,9 @@ class CodingAgentREPL(App):
         # Append to log file
         with open(self.LOG_FILE, "a") as f:
             f.write(text + "\n")
+            
+        # Force UI refresh
+        self.refresh(layout=True)
     
     def show_loading(self) -> None:
         self.query_one("#loading").remove_class("hidden")
