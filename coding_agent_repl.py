@@ -80,6 +80,8 @@ class CodingAgentREPL(App):
     
     def on_mount(self) -> None:
         self.vim_mode = "insert"
+        self.current_agent_thread = None
+        self.agent_cancel_event = None
         self.set_focus(self.query_one("#request-input"))
         # Clear log file on startup
         with open(self.LOG_FILE, "w") as f:
