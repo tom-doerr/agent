@@ -25,5 +25,3 @@ class TestCodingAgentREPL:
         commands = "echo hello"
         app.execute_commands(commands)
         assert "hello" in app.current_state
-
-        new content
