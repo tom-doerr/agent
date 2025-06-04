@@ -82,15 +82,12 @@ class DataCollector:
         self.data_buffer = []
         self.buffer_lock = threading.Lock()
         
-    def add_example(self, input_data: Any, prediction: Any, 
-                   ground_truth: Any = None, feedback: float = None):
+    def add_example(self, input_data: Any, prediction: Any):
         """Add training example to buffer"""
         with self.buffer_lock:
             example = {
                 'input': input_data,
                 'prediction': prediction,
-                'ground_truth': ground_truth,
-                'feedback': feedback,
                 'timestamp': datetime.now()
             }
             self.data_buffer.append(example)
@@ -191,13 +188,12 @@ class OptimizationEngine:
         """Convert collected data to DSPy training format"""
         trainset = []
         for example in training_data:
-            if example.get('ground_truth') is not None:
-                # Convert to DSPy example format
-                dspy_example = dspy.Example(
-                    input=example['input'],
-                    output=example['ground_truth']
-                ).with_inputs('input')
-                trainset.append(dspy_example)
+            # Use prediction as both input and output for latency optimization
+            dspy_example = dspy.Example(
+                input=example['input'],
+                output=example['prediction']
+            ).with_inputs('input')
+            trainset.append(dspy_example)
         return trainset
     
     def _on_optimization_complete(self, optimized_model: dspy.Module, 
@@ -295,12 +291,6 @@ class OnlineOptimizationSystem:
                 timestamp=datetime.now()
             )
     
-    def add_feedback(self, input_data: Any, prediction: Any, 
-                    ground_truth: Any = None, feedback_score: float = None):
-        """Add feedback for a previous prediction"""
-        self.data_collector.add_example(
-            input_data, prediction, ground_truth, feedback_score
-        )
     
     def _collect_inference_data(self, input_data: Any, prediction: Any):
         """Collect inference data for optimization"""
@@ -405,10 +395,9 @@ async def main():
             
         print(f"Model: {result.model_version} | Latency: {result.latency_ms:.2f}ms")
         
-        # Use prediction as ground truth for demo
-        ground_truth = result.prediction.answer if hasattr(result.prediction, 'answer') else result.prediction
-        system.add_feedback(question, result.prediction, ground_truth=ground_truth)
-        print(f"Added feedback (Ground truth: '{ground_truth[:50]}...')")
+        # Add example without ground truth
+        system.data_collector.add_example(question, result.prediction)
+        print(f"Added example to data collector")
         
         # Show optimization status
         status = system.get_system_status()
