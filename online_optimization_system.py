@@ -43,9 +43,8 @@ class AsyncModelManager:
         """Thread-safe model loading"""
         try:
             with self.model_lock:
-                # Load new model
-                # Load with the specific program class
-                new_model = self.base_program.__class__.load(model_path)
+                # Load new model using the current model's class
+                new_model = self.current_model.__class__.load(model_path)
                 
                 # Atomic swap
                 old_model = self.current_model
@@ -387,9 +386,9 @@ async def main():
     system = OnlineOptimizationSystem(
         base_program,
         accuracy_metric,
-        batch_size=3,             # Small batch for quick demo
+        batch_size=32,             # Increased to meet SIMBA minimum
         optimization_interval=10, # Short interval for demo
-        performance_trigger_count=3
+        performance_trigger_count=32
     )
     
     # Define helper function for the demo
@@ -448,6 +447,14 @@ async def main():
                 except:
                     print("Invalid replay format. Use '/replay N'")
                 continue
+                
+            # For demo purposes, add synthetic feedback to fill buffer
+            system.add_feedback(
+                f"Synthetic input {time.time()}",
+                "Synthetic prediction",
+                ground_truth="Synthetic ground truth"
+            )
+            print("Added synthetic feedback to fill buffer")
                 
             # Run inference
             result = await system.inference(question)
