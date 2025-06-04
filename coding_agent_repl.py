@@ -17,12 +17,12 @@ def configure_dspy():
 
 # --- Core Agent ---
 class CodingAgentSignature(dspy.Signature):
-    """Execute coding tasks autonomously."""
+    """Execute coding tasks autonomously. You can search Firebase by using 'firebase:' prefix in commands."""
     request = dspy.InputField(desc="User request for code changes")
     plan = dspy.OutputField(desc="Step-by-step plan to complete request")
-    commands = dspy.OutputField(desc="Shell commands to execute")
+    commands = dspy.OutputField(desc="Shell commands to execute. Use 'firebase:query' for Firebase searches.")
     edits = dspy.OutputField(desc="File edits in SEARCH/REPLACE block format")
-    done = dspy.OutputField(desc="'DONE' when task is complete, otherwise 'CONTINUE'")
+    done = dspy.OutputField(desc="'DONE' when task is complete, 'CONTINUE' to process next step autonomously")
 
 class CodingAgent(dspy.Module):
     def __init__(self):
@@ -144,18 +144,34 @@ class CodingAgentREPL(App):
     def execute_agent(self, request: str) -> None:
         """Execute agent on user request in background thread"""
         self.show_loading()
-        self.update_output(f"> {request}", "info")
         self.disable_input()
         
-        # Run agent in background thread
-        threading.Thread(target=self._run_agent, args=(request,)).start()
+        # Run agent in background thread with step tracking
+        threading.Thread(target=self._run_agent, args=(request, 0, [])).start()
     
-    def _run_agent(self, request: str) -> None:
-        """Background thread for agent processing"""
+    def _run_agent(self, request: str, step: int, history: list) -> None:
+        """Background thread for agent processing with multi-step capability"""
+        if step >= 10:  # max_steps to prevent infinite loops
+            self.update_output("⚠️ Max steps reached (10). Stopping autonomous processing.", "warning")
+            self.hide_loading()
+            self.enable_input()
+            return
+            
         try:
+            # Include history in request
+            full_request = request
+            if history:
+                full_request += "\n\n### Previous Steps:\n" + "\n".join(history)
+                
             start_time = time.time()
-            response = self.agent(request=request)
+            response = self.agent(request=full_request)
             elapsed = time.time() - start_time
+            
+            # Track step in history
+            history.append(f"Step {step+1}:")
+            history.append(f"Request: {request}")
+            history.append(f"Plan: {response.plan}")
+            
             self.update_output(f"⏱️ Agent response in {elapsed:.2f}s", "info")
             self.update_output(f"PLAN:\n{response.plan}", "info")
             
@@ -163,44 +179,64 @@ class CodingAgentREPL(App):
             if response.commands.strip():
                 self.update_output("\n💻 EXECUTING COMMANDS:", "info")
                 self.execute_commands(response.commands)
+                history.append(f"Commands: {response.commands}")
             
             # Apply file edits
             if response.edits.strip():
                 self.update_output("\n📝 APPLYING EDITS:", "info")
                 self.apply_edits(response.edits)
+                history.append(f"Edits: {response.edits}")
             
             # Check if done
             if "DONE" in response.done:
                 self.update_output("\n✅ TASK COMPLETE", "success")
+                self.hide_loading()
+                self.enable_input()
+            elif "CONTINUE" in response.done:
+                self.update_output("\n🔄 CONTINUING AUTONOMOUSLY", "info")
+                # Continue processing with updated context
+                self._run_agent(request, step+1, history)
             else:
-                self.update_output("\n🔄 CONTINUING", "warning")
+                self.update_output("\n🔄 UNKNOWN STATE, CONTINUING WITH USER INPUT", "warning")
+                self.hide_loading()
+                self.enable_input()
                 
         except Exception as e:
             self.update_output(f"❌ Error: {str(e)}", "error")
-        finally:
             self.hide_loading()
             self.enable_input()
     
     def execute_commands(self, commands: str) -> None:
-        """Execute shell commands"""
+        """Execute shell commands including Firebase searches"""
         for command in commands.splitlines():
             if not command.strip():
                 continue
-            self.update_output(f"$ {command}", "info")
-            try:
-                result = subprocess.run(
-                    command, 
-                    shell=True, 
-                    capture_output=True, 
-                    text=True,
-                    cwd=os.getcwd()
-                )
-                if result.stdout:
-                    self.update_output(result.stdout)
-                if result.stderr:
-                    self.update_output(result.stderr, "error")
-            except Exception as e:
-                self.update_output(f"Command error: {str(e)}", "error")
+                
+            if command.startswith("firebase:"):
+                self.update_output(f"🔍 Firebase search: {command[9:]}", "info")
+                try:
+                    # In a real implementation, this would call Firebase SDK
+                    # For demo purposes, we'll simulate a search
+                    result = f"Firebase results for '{command[9:]}':\n- Result 1\n- Result 2"
+                    self.update_output(result)
+                except Exception as e:
+                    self.update_output(f"Firebase error: {str(e)}", "error")
+            else:
+                self.update_output(f"$ {command}", "info")
+                try:
+                    result = subprocess.run(
+                        command, 
+                        shell=True, 
+                        capture_output=True, 
+                        text=True,
+                        cwd=os.getcwd()
+                    )
+                    if result.stdout:
+                        self.update_output(result.stdout)
+                    if result.stderr:
+                        self.update_output(result.stderr, "error")
+                except Exception as e:
+                    self.update_output(f"Command error: {str(e)}", "error")
     
     def apply_edits(self, edits: str) -> None:
         """Apply SEARCH/REPLACE edits to files"""
