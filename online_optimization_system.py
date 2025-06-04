@@ -352,134 +352,142 @@ class OnlineOptimizationSystem:
             'uptime': time.time() - getattr(self, 'start_time', time.time())
         }
 
-# Interactive Demo
-async def main():
-    """Interactive demo showing online optimization"""
-    # Configure DSPy with DeepSeek Chat
-    llm = dspy.LM(model='deepseek/deepseek-chat')
-    dspy.settings.configure(lm=llm)
-
-import random
-
-class MultiplicationModule(dspy.Module):
-    def __init__(self):
-        self.generate_answer = dspy.ChainOfThought("question -> answer")
-        
-    def forward(self, question):
-        return self.generate_answer(question=question)
-
-def multiplication_metric(example, prediction, trace=None):
-    try:
-        # Parse numbers from question
-        a, b = [int(n) for n in example.split() if n.isdigit()]
-        correct_answer = a * b
-        
-        # Parse model's answer
-        model_answer = int(prediction.answer.split()[-1])
-        
-        return 1.0 if model_answer == correct_answer else 0.0
-    except:
-        return 0.0
-
-# Initialize system with demo-friendly settings
-base_program = MultiplicationModule()
-system = OnlineOptimizationSystem(
-    base_program,
-    multiplication_metric,
-    batch_size=5,             # Small batch for quick demos
-    optimization_interval=5, # Short interval for demo
-    performance_trigger_count=5
-)
-    
-    # Define helper function for the demo
-async def run_question(system, question, last_version):
-    """Run a question through the system and handle output"""
-    # Run inference
-    result = await system.inference(question)
-    
-    # Show answer
-    if hasattr(result.prediction, 'answer'):
-        print(f"Answer: {result.prediction.answer}")
-    else:
-        print(f"Answer: {result.prediction}")
-        
-    print(f"Model: {result.model_version} | Latency: {result.latency_ms:.2f}ms")
-    
-    # Show optimization status
-    status = system.get_system_status()
-    print(f"Data buffer: {status['data_buffer_size']}/{system.data_collector.batch_size} | "
-          f"Optimization queue: {status['optimization_queue_size']}")
-    
-    # Show version updates
-    if last_version != result.model_version:
-        print(f"\n--- MODEL UPDATED: {last_version} → {result.model_version} ---")
-        last_version = result.model_version
-    return last_version
-
-    # Start system
-    system.start()
-    print("System started. Type questions or 'exit' to quit.")
-    
-    try:
-        last_version = system.model_manager.current_version
-        while True:
-            # Get user question
-            question = await asyncio.get_event_loop().run_in_executor(
-                None, input, "\nAsk a question (or type '/replay N' to optimize, 'exit' to quit): "
-            )
-            
-            if question.lower() == 'exit':
-                break
-                
-            if question.startswith('/replay'):
-                # Extract number of replays
-                try:
-                    num_replays = int(question.split()[1])
-                    for _ in range(num_replays):
-                        # Generate random multiplication problem
-                        a = random.randint(10, 99)
-                        b = random.randint(10, 99)
-                        random_question = f"What is {a} times {b}?"
-                        last_version = await run_question(system, random_question, last_version)
-                except:
-                    print("Invalid replay format. Use '/replay N'")
-                continue
-                
-            # Run inference
-            result = await system.inference(question)
-            
-            # Show answer
-            if hasattr(result.prediction, 'answer'):
-                print(f"Answer: {result.prediction.answer}")
-            else:
-                print(f"Answer: {result.prediction}")
-                
-            print(f"Model: {result.model_version} | Latency: {result.latency_ms:.2f}ms")
-            
-            # Show optimization status
-            status = system.get_system_status()
-            print(f"Data buffer: {status['data_buffer_size']}/{system.data_collector.batch_size} | "
-                  f"Optimization queue: {status['optimization_queue_size']}")
-            
-            # Show version updates
-            if last_version != result.model_version:
-                print(f"\n--- MODEL UPDATED: {last_version} → {result.model_version} ---")
-                last_version = result.model_version
-                
-    finally:
-        system.stop()
-        print("System stopped")
+# Moved to top-level scope with other demo code
 
 if __name__ == "__main__":
     print("="*60)
     print("ONLINE OPTIMIZATION DEMO")
     print("="*60)
     print("This demo shows how a system can continuously improve its model:")
-    print("1. Ask questions (try about capitals or mountains)")
-    print("2. System collects feedback automatically")
-    print("3. When enough data is collected, optimization triggers")
-    print("4. New models are hot-swapped without downtime")
-    print("5. Watch for model version changes during the session")
+    print("1. Solve multiplication problems (e.g., 'What is 23 times 45?')")
+    print("2. Use '/replay N' to generate N random problems")
+    print("3. System collects data automatically")
+    print("4. When enough data is collected, optimization triggers")
+    print("5. New models are hot-swapped without downtime")
+    print("Watch for model version changes during the session")
     print("Type 'exit' to quit\n")
+    
+    # Configure DSPy with DeepSeek Chat
+    llm = dspy.LM(model='deepseek/deepseek-chat')
+    dspy.settings.configure(lm=llm)
+    
+    import random
+
+    class MultiplicationModule(dspy.Module):
+        def __init__(self):
+            self.generate_answer = dspy.ChainOfThought("question -> answer")
+            
+        def forward(self, question):
+            return self.generate_answer(question=question)
+    
+    def multiplication_metric(example, prediction, trace=None):
+        try:
+            # Parse numbers from input (works for both questions and assignments)
+            numbers = [int(n) for n in example.split() if n.isdigit()]
+            if len(numbers) < 2:
+                return 0.0
+            a, b = numbers[:2]
+            correct_answer = a * b
+            
+            # Parse model's answer - look for last number in response
+            numbers_in_answer = [int(n) for n in str(prediction.answer).split() if n.isdigit()]
+            if not numbers_in_answer:
+                return 0.0
+            model_answer = numbers_in_answer[-1]
+            
+            return 1.0 if model_answer == correct_answer else 0.0
+        except:
+            return 0.0
+    
+    # Initialize system with demo-friendly settings
+    base_program = MultiplicationModule()
+    system = OnlineOptimizationSystem(
+        base_program,
+        multiplication_metric,
+        batch_size=5,             # Small batch for quick demos
+        optimization_interval=5,  # Short interval for demo
+        performance_trigger_count=5
+    )
+    
+    # Define helper function for the demo
+    async def run_question(system, question, last_version):
+        """Run a question through the system and handle output"""
+        # Run inference
+        result = await system.inference(question)
+        
+        # Show answer
+        if hasattr(result.prediction, 'answer'):
+            print(f"Answer: {result.prediction.answer}")
+        else:
+            print(f"Answer: {result.prediction}")
+            
+        print(f"Model: {result.model_version} | Latency: {result.latency_ms:.2f}ms")
+        
+        # Show optimization status
+        status = system.get_system_status()
+        print(f"Data buffer: {status['data_buffer_size']}/{system.data_collector.batch_size} | "
+              f"Optimization queue: {status['optimization_queue_size']}")
+        
+        # Show version updates
+        if last_version != result.model_version:
+            print(f"\n--- MODEL UPDATED: {last_version} → {result.model_version} ---")
+            last_version = result.model_version
+        return last_version
+    
+    async def main():
+        """Interactive demo showing online optimization"""
+        # Start system
+        system.start()
+        print("System started. Type questions or commands.")
+        
+        try:
+            last_version = system.model_manager.current_version
+            while True:
+                # Get user input
+                question = await asyncio.get_event_loop().run_in_executor(
+                    None, input, "\nAsk a multiplication question (or type '/replay N' to optimize, 'exit' to quit): "
+                )
+                
+                if question.lower() == 'exit':
+                    break
+                    
+                if question.startswith('/replay'):
+                    # Extract number of replays
+                    try:
+                        num_replays = int(question.split()[1])
+                        for _ in range(num_replays):
+                            # Generate random multiplication problem
+                            a = random.randint(10, 99)
+                            b = random.randint(10, 99)
+                            random_question = f"What is {a} times {b}?"
+                            last_version = await run_question(system, random_question, last_version)
+                    except:
+                        print("Invalid replay format. Use '/replay N'")
+                    continue
+                    
+                # Run inference
+                result = await system.inference(question)
+                
+                # Show answer
+                if hasattr(result.prediction, 'answer'):
+                    print(f"Answer: {result.prediction.answer}")
+                else:
+                    print(f"Answer: {result.prediction}")
+                    
+                print(f"Model: {result.model_version} | Latency: {result.latency_ms:.2f}ms")
+                
+                # Show optimization status
+                status = system.get_system_status()
+                print(f"Data buffer: {status['data_buffer_size']}/{system.data_collector.batch_size} | "
+                      f"Optimization queue: {status['optimization_queue_size']}")
+                
+                # Show version updates
+                if last_version != result.model_version:
+                    print(f"\n--- MODEL UPDATED: {last_version} → {result.model_version} ---")
+                    last_version = result.model_version
+                    
+        finally:
+            system.stop()
+            print("System stopped")
     
     asyncio.run(main())
