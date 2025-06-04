@@ -38,11 +38,15 @@ class CodingAgentREPL(App):
         layout: vertical;
         height: 1fr;
     }
-    #output {
+    #output-container {
         height: 85%;
         border: solid $accent;
         padding: 1;
+        overflow: hidden;
+    }
+    #output {
         overflow-y: auto;
+        height: 100%;
     }
     #input-container {
         height: 15%;
@@ -65,6 +69,18 @@ class CodingAgentREPL(App):
     .hidden {
         display: none;
     }
+    .success {
+        color: green;
+    }
+    .error {
+        color: red;
+    }
+    .warning {
+        color: yellow;
+    }
+    .info {
+        color: blue;
+    }
     """
     
     current_state = reactive("")
@@ -76,7 +92,8 @@ class CodingAgentREPL(App):
         yield Header()
         with Container():
             yield Static("Thinking...", id="loading", classes="hidden")
-            yield Static(id="output")
+            with Container(id="output-container"):
+                yield Static(id="output")
             with Container(id="input-container"):
                 yield Input(placeholder="Enter request", id="request-input")
                 yield Button("Execute", id="execute-btn")
@@ -89,9 +106,16 @@ class CodingAgentREPL(App):
             f.write("")
         self.update_output("🌟 Coding Agent REPL 🌟\nType '/exit' to quit\n")
     
-    def update_output(self, text: str) -> None:
-        self.current_state += text + "\n"
-        self.query_one("#output").update(self.current_state)
+    def update_output(self, text: str, style_class: str = "") -> None:
+        # Add styling if provided
+        styled_text = f"[{style_class}]{text}[/]" if style_class else text
+        self.current_state += styled_text + "\n"
+        output_widget = self.query_one("#output")
+        output_widget.update(self.current_state)
+        # Scroll to bottom
+        output_container = self.query_one("#output-container")
+        output_container.scroll_end(animate=False)
+        
         # Append to log file
         with open(self.LOG_FILE, "a") as f:
             f.write(text + "\n")
@@ -105,33 +129,33 @@ class CodingAgentREPL(App):
     def execute_agent(self, request: str) -> None:
         """Execute agent on user request"""
         self.show_loading()
-        self.update_output(f"> {request}")
+        self.update_output(f"> {request}", "info")
         
         try:
             start_time = time.time()
             response = self.agent(request=request)
             elapsed = time.time() - start_time
-            self.update_output(f"⏱️ Agent response in {elapsed:.2f}s")
-            self.update_output(f"PLAN:\n{response.plan}")
+            self.update_output(f"⏱️ Agent response in {elapsed:.2f}s", "info")
+            self.update_output(f"PLAN:\n{response.plan}", "info")
             
             # Execute commands
             if response.commands.strip():
-                self.update_output("\n💻 EXECUTING COMMANDS:")
+                self.update_output("\n💻 EXECUTING COMMANDS:", "info")
                 self.execute_commands(response.commands)
             
             # Apply file edits
             if response.edits.strip():
-                self.update_output("\n📝 APPLYING EDITS:")
+                self.update_output("\n📝 APPLYING EDITS:", "info")
                 self.apply_edits(response.edits)
             
             # Check if done
             if "DONE" in response.done:
-                self.update_output("\n✅ TASK COMPLETE")
+                self.update_output("\n✅ TASK COMPLETE", "success")
             else:
-                self.update_output("\n🔄 CONTINUING")
+                self.update_output("\n🔄 CONTINUING", "warning")
                 
         except Exception as e:
-            self.update_output(f"❌ Error: {str(e)}")
+            self.update_output(f"❌ Error: {str(e)}", "error")
         finally:
             self.hide_loading()
     
@@ -140,7 +164,7 @@ class CodingAgentREPL(App):
         for command in commands.splitlines():
             if not command.strip():
                 continue
-            self.update_output(f"$ {command}")
+            self.update_output(f"$ {command}", "info")
             try:
                 result = subprocess.run(
                     command, 
@@ -152,9 +176,9 @@ class CodingAgentREPL(App):
                 if result.stdout:
                     self.update_output(result.stdout)
                 if result.stderr:
-                    self.update_output(result.stderr)
+                    self.update_output(result.stderr, "error")
             except Exception as e:
-                self.update_output(f"Command error: {str(e)}")
+                self.update_output(f"Command error: {str(e)}", "error")
     
     def apply_edits(self, edits: str) -> None:
         """Apply SEARCH/REPLACE edits to files"""
@@ -165,7 +189,7 @@ class CodingAgentREPL(App):
             search_content = match.group(3)
             replace_content = match.group(4)
             
-            self.update_output(f"✏️ Editing {file_path}")
+            self.update_output(f"✏️ Editing {file_path}", "info")
             
             try:
                 with open(file_path, "r") as f:
@@ -175,12 +199,12 @@ class CodingAgentREPL(App):
                     new_content = content.replace(search_content, replace_content, 1)
                     with open(file_path, "w") as f:
                         f.write(new_content)
-                    self.update_output(f"✅ Applied changes to {file_path}")
+                    self.update_output(f"✅ Applied changes to {file_path}", "success")
                 else:
-                    self.update_output(f"⚠️ Search content not found in {file_path}")
+                    self.update_output(f"⚠️ Search content not found in {file_path}", "warning")
             
             except Exception as e:
-                self.update_output(f"Error editing {file_path}: {str(e)}")
+                self.update_output(f"Error editing {file_path}: {str(e)}", "error")
     
     def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id == "execute-btn":
