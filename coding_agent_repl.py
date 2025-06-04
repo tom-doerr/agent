@@ -10,7 +10,6 @@ from textual.widgets import Header, Footer, Static, Input, Button
 from textual.reactive import reactive
 from textual import events
 from textual import log
-from dspy.utils import dotmap
 
 # --- DSPy Configuration ---
 def configure_dspy():
