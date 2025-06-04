@@ -6,7 +6,7 @@ import time
 import threading
 from textual.app import App, ComposeResult
 from textual.containers import Container
-from textual.widgets import Header, Footer, Static, Button
+from textual.widgets import Header, Footer, Static, Input, Button
 from textual.reactive import reactive
 from textual import events
 from textual import log
