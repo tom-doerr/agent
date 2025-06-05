@@ -32,3 +32,14 @@ class TestCodingAgentREPL:
         
         # Verify update_output was called
         app.update_output.assert_called()
+
+    def test_agent_forward_signature(self):
+        from agent_repl.agent import CodingAgent
+        agent = CodingAgent()
+        
+        # Test that forward accepts required parameters
+        agent.forward(request="test", log_context="logs")
+        
+        # Test that forward rejects extra parameters
+        with pytest.raises(TypeError):
+            agent.forward(request="test", log_context="logs", extra="invalid")
