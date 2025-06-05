@@ -37,11 +37,13 @@ class TestCodingAgentREPL:
         from agent_repl.agent import CodingAgent
         agent = CodingAgent()
         
-        # Mock LM configuration
-        with patch("dspy.settings.configure") as mock_configure:
-            # Test that forward accepts required parameters
-            agent.forward(request="test", log_context="logs")
-            
-            # Test that forward rejects extra parameters
-            with pytest.raises(TypeError):
-                agent.forward(request="test", log_context="logs", extra="invalid")
+        # Create a mock LM and configure DSPy to use it
+        mock_lm = MagicMock()
+        dspy.settings.configure(lm=mock_lm)
+        
+        # Test that forward accepts required parameters
+        agent.forward(request="test", log_context="logs")
+        
+        # Test that forward rejects extra parameters
+        with pytest.raises(TypeError):
+            agent.forward(request="test", log_context="logs", extra="invalid")
