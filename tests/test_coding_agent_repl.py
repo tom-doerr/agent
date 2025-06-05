@@ -34,12 +34,12 @@ class TestCodingAgentREPL:
         app.update_output.assert_called()
 
     def test_agent_forward_signature(self):
-        from agent_repl.agent import CodingAgent
-        agent = CodingAgent()
-        
         # Create a mock LM and configure DSPy to use it
         mock_lm = MagicMock()
         dspy.settings.configure(lm=mock_lm)
+        
+        from agent_repl.agent import CodingAgent
+        agent = CodingAgent()
         
         # Test that forward accepts required parameters
         agent.forward(request="test", log_context="logs")
