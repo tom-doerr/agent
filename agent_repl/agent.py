@@ -14,5 +14,5 @@ class CodingAgent(dspy.Module):
         super().__init__()
         self.agent = dspy.ChainOfThought(CodingAgentSignature)
     
-    def forward(self, request):
-        return self.agent(request=request)
+    def forward(self, request, log_context):
+        return self.agent(request=request, log_context=log_context)
