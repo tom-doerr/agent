@@ -37,7 +37,7 @@ class TestCodingAgentREPL:
         # Create a mock LM that inherits from BaseLM
         class MockBaseLM(dspy.BaseLM):
             def __init__(self):
-                super().__init__()
+                super().__init__(model="mock_model")
             def basic_request(self, prompt, **kwargs):
                 return "mock response"
             def __call__(self, prompt, **kwargs):
