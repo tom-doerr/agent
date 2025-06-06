@@ -40,7 +40,10 @@ class TestCodingAgentREPL:
                 super().__init__(model="mock_model")
             def basic_request(self, prompt, **kwargs):
                 return "mock response"
-            def __call__(self, prompt, **kwargs):
+            def __call__(self, messages, **kwargs):
+                # In DSPy, the messages are passed as a list of dicts
+                # We need to convert to a prompt string for the mock
+                prompt = "\n".join([m["content"] for m in messages])
                 return self.basic_request(prompt, **kwargs)
         
         mock_lm = MockBaseLM()
