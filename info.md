@@ -1,3 +1,17 @@
+# coding agent
+the coding agent should be using deepseek-chat for now
+please use the model openrouter/google/gemini-2.5-flash-preview-05-20
+is able to search using firebase
+the input text field should have vim key bindings
+when i sent a request it should keep the focus on the input text field so don't have to refocus when i want to send the next message
+i want to be able to interrupt responses. so when i send a new response while the old one is still processing i still want it to start working on the new message immediately
+it should stream the tokens and the ui refresh shouldn't just happen all at once 
+
+
+
+
+
+
 the project contains a memory gan
 there's a value module which predicts socre and uncertainty 
 there's a interface that let's me score the highest uncertainty items 
