@@ -39,7 +39,8 @@ class TestCodingAgentREPL:
             def __init__(self):
                 super().__init__(model="mock_model")
             def basic_request(self, prompt, **kwargs):
-                return "mock response"
+                # Return structured agent output with all expected fields
+                return "Plan: test plan\nCommands: test commands\nEdits: test edits\nDone: test done"
             def __call__(self, messages, **kwargs):
                 # In DSPy, the messages are passed as a list of dicts
                 # We need to convert to a prompt string for the mock
