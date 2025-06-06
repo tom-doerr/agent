@@ -34,8 +34,16 @@ class TestCodingAgentREPL:
         app.update_output.assert_called()
 
     def test_agent_forward_signature(self):
-        # Create a mock LM and configure DSPy to use it
-        mock_lm = MagicMock()
+        # Create a mock LM that inherits from BaseLM
+        class MockBaseLM(dspy.BaseLM):
+            def __init__(self):
+                super().__init__()
+            def basic_request(self, prompt, **kwargs):
+                return "mock response"
+            def __call__(self, prompt, **kwargs):
+                return self.basic_request(prompt, **kwargs)
+        
+        mock_lm = MockBaseLM()
         dspy.settings.configure(lm=mock_lm)
         
         from agent_repl.agent import CodingAgent
