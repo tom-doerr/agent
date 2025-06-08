@@ -14,7 +14,6 @@ from simpledspy import predict, chain_of_thought, configure
 class Agent(dspy.Module):
     def __init__(self):
         super().__init__()
-        self.select_action = dspy.Predict(ActionSelector)
         self.context = ''
 
     def forward(self, user_input: str) -> None:
