@@ -1,9 +1,12 @@
+"""A wrapper for persistent shell sessions."""
+
 import asyncio
 import os
 import shlex
 from typing import Tuple
 
 class ShellWrapper:
+    """Maintains a persistent shell process with state."""
     def __init__(self, shell: str = "/bin/bash"):
         self.shell = shell
         self.process = None
@@ -28,7 +31,6 @@ class ShellWrapper:
             # Write command with exit code marker
             self.process.stdin.write(f"{command}\necho __EXIT__$?\n".encode())
             await self.process.stdin.drain()
-            
             # Read output until exit marker
             output = []
             while True:
@@ -40,7 +42,6 @@ class ShellWrapper:
                     exit_code = int(text.split("__EXIT__")[1])
                     break
                 output.append(text)
-            
             return "\n".join(output), exit_code
 
     async def execute(self, command: str) -> Tuple[str, int]:
@@ -54,9 +55,9 @@ class ShellWrapper:
                     return f"cd error: Directory not found: {new_path}", 1
                 self.cwd = new_path
                 # Send to shell
-                output, exit_code = await self._execute_internal(f"cd {shlex.quote(new_path)}")
+                _output, exit_code = await self._execute_internal(f"cd {shlex.quote(new_path)}")
                 return f"Changed directory to {self.cwd}", exit_code
-            except Exception as e:
+            except OSError as e:
                 return f"cd error: {str(e)}", 1
         else:
             return await self._execute_internal(command)
