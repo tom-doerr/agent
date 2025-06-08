@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 
 
-from simpledspy import predict, chain_of_thought, configure
 import os
 from subprocess import run, PIPE, STDOUT, Popen
 from typing import Literal
@@ -11,56 +10,32 @@ import sys
 import termcolor
 from shell_wrapper import ShellWrapper
 import argparse
-
-
-
-
-
+from simpledspy import predict, chain_of_thought, configure
 
 class Agent(dspy.Module):
     def __init__(self):
         super().__init__()
         self.select_action = dspy.Predict(ActionSelector)
-        #self.done = dspy.Predict('context, options -> done')
         self.context = ''
-        self.shell = ShellWrapper()
-        # await self.shell.start_shell()
-
-    def print_context(self):
-        # use rich
-        rich.print(self.context)
-
 
     def forward(self, user_input: str) -> None:
         self.context += f'User: {user_input}\n'
         while True:
             action = self.select_action(context=self.context).selected_action
             self.context += f'Agent action: {action}\n'
-            #print(f'Context: {self.context}')
             if action == 'run_command':
-                #command = predict(self.context, description='Please generate a shell command for the command variable for running with subprocess.run. The command should be a string that can be executed in the shell.')
                 command = chain_of_thought(self.context, description='Please generate a shell command for the command variable for running with subprocess.run. The command should be a string that can be executed in the shell.')
                 self.context += f'Command: {command}\n'
-                # print(f'Running command: {command}')
                 rich.print(f'[bold blue]Running command:[/bold blue] {command}')
-                # result = run(command, shell=True, stdout=PIPE, stderr=PIPE, text=True)
 
+                process = Popen(command, shell=True, stdout=PIPE, stderr=STDOUT, text=True, bufsize=1)
+                output = ''
+                for line in process.stdout:
+                    print(line, end='')
+                    output += line
 
-                if True:
-                    process = Popen(command, shell=True, stdout=PIPE, stderr=STDOUT, text=True, bufsize=1)
-                    output = ''
-                    for line in process.stdout:
-                        print(line, end='')
-                        # self.context += f'{line}'
-                        output += line
-
-                    process.wait()
-                    self.context += f'Process finished with return code: {process.returncode}\n'
-                else:
-                    # output, exit_code = await self.shell.run_command(command)
-                    pass
-
-
+                process.wait()
+                self.context += f'Process finished with return code: {process.returncode}\n'
                 number_additional_chars = 0
                 for i in range(3):
                     output_frame = output[-(1000+number_additional_chars):]
@@ -79,20 +54,12 @@ class Agent(dspy.Module):
 
                     rich.print(f'[bold red]Not done viewing output, need to view more:[/bold red] {done_viewing_output}, additional chars: {number_additional_chars}')
 
-
                 self.context += f'Process started with PID: {process.pid}\n'
                 self.context += f'Command output:\n'
 
-#                if result.returncode == 0:
-#                    print(f'Command output: {result.stdout}')
-#                    self.context += f'Command output: {result.stdout}\n'
-#                else:
-#                    print(f'Command error: {result.stderr}')
-#                    self.context += f'Command error: {result.stderr}\n'
             elif action == 'reply_to_user':
                 response = predict(self.context)
                 self.context += f'Response: {response}\n'
-                # fancy and colored
                 rich.print(f'[bold green]Agent response:[/bold green] {response}')
             else:
                 print(f'Unknown action: {action}')
@@ -100,7 +67,6 @@ class Agent(dspy.Module):
             options = ['True', 'False']
             done = predict(self.context, options, description='Is the agent done for now or does it need to continue working to finish open tasks? Output True or False. Reply True if we need to wait for the user to reply, False if we can continue working. Only output True if you are sure that the agent is done and no further actions are needed.')
             self.context += f'Done: {done}\n'
-            #self.print_context()
             if done == 'True':
                 break
             elif done == 'False':
