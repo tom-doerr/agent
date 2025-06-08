@@ -1,13 +1,14 @@
 #!/usr/bin/env python3
 
 
-from simpledspy import predict
+from simpledspy import predict, chain_of_thought
 import os
 from subprocess import run, PIPE
 from typing import Literal
 import rich
 import dspy
 dspy.configure(lm=dspy.LM('openrouter/google/gemini-2.5-flash-preview'))
+#dspy.configure(lm=dspy.LM('openrouter/deepseek/deepseek-r1-0528'))
 
 
 
@@ -35,7 +36,8 @@ class Agent(dspy.Module):
             self.context += f'Agent action: {action}\n'
             #print(f'Context: {self.context}')
             if action == 'run_command':
-                command = predict(self.context, description='Please generate a shell command for the command variable for running with subprocess.run. The command should be a string that can be executed in the shell.')
+                #command = predict(self.context, description='Please generate a shell command for the command variable for running with subprocess.run. The command should be a string that can be executed in the shell.')
+                command = chain_of_thought(self.context, description='Please generate a shell command for the command variable for running with subprocess.run. The command should be a string that can be executed in the shell.')
                 self.context += f'Command: {command}\n'
                 print(f'Running command: {command}')
                 result = run(command, shell=True, stdout=PIPE, stderr=PIPE, text=True)
