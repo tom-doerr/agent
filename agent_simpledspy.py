@@ -10,12 +10,10 @@ import dspy
 import sys
 import termcolor
 from shell_wrapper import ShellWrapper
+import argparse
 
-dspy.configure(lm=dspy.LM('openrouter/google/gemini-2.5-flash-preview'))
-# dspy.configure(lm=dspy.LM('deepseek/deepseek-reasoner', max_tokens=20000))
 
-#dspy.configure(lm=dspy.LM('openrouter/deepseek/deepseek-r1-0528'))
-configure(logging_enabled=True)
+
 
 
 class ActionSelector(dspy.Signature):
@@ -47,17 +45,18 @@ class Agent(dspy.Module):
                 #command = predict(self.context, description='Please generate a shell command for the command variable for running with subprocess.run. The command should be a string that can be executed in the shell.')
                 command = chain_of_thought(self.context, description='Please generate a shell command for the command variable for running with subprocess.run. The command should be a string that can be executed in the shell.')
                 self.context += f'Command: {command}\n'
-                print(f'Running command: {command}')
+                # print(f'Running command: {command}')
+                rich.print(f'[bold blue]Running command:[/bold blue] {command}')
                 # result = run(command, shell=True, stdout=PIPE, stderr=PIPE, text=True)
 
 
                 if True:
                     process = Popen(command, shell=True, stdout=PIPE, stderr=STDOUT, text=True, bufsize=1)
-                    self.context += f'Process started with PID: {process.pid}\n'
-                    self.context += f'Command output:\n'
+                    output = ''
                     for line in process.stdout:
                         print(line, end='')
-                        self.context += f'{line}'
+                        # self.context += f'{line}'
+                        output += line
 
                     process.wait()
                     self.context += f'Process finished with return code: {process.returncode}\n'
@@ -66,6 +65,27 @@ class Agent(dspy.Module):
                     pass
 
 
+                number_additional_chars = 0
+                for i in range(3):
+                    output_frame = output[-(1000+number_additional_chars):]
+                    done_viewing_output, number_additional_chars, text_to_add_to_context = predict(
+                        self.context,
+                        output_frame,
+                        description='Please generate a string that should be added to the context. The string should. The text_to_add_to_context string will be all that we know from the output, so make sure to include all important information but do not fill the context with garbage.  If you are done viewing the output, output "True". If you need to view more output, output "False" and the number of additional characters to view abouve the output you have already seen.',
+                    )
+                    if bool(done_viewing_output):
+                        rich.print(f'[bold green]Done viewing output:[/bold green] {done_viewing_output}')
+                        self.context += f'Done viewing output: {done_viewing_output}\n'
+                        rich.print(f'[bold green]Text to add to context:[/bold green] {text_to_add_to_context}')
+                        self.context += f'Text to add to context: {text_to_add_to_context}\n'
+                        self.context += text_to_add_to_context + '\n'
+                        break
+
+                    rich.print(f'[bold red]Not done viewing output, need to view more:[/bold red] {done_viewing_output}, additional chars: {number_additional_chars}')
+
+
+                self.context += f'Process started with PID: {process.pid}\n'
+                self.context += f'Command output:\n'
 
 #                if result.returncode == 0:
 #                    print(f'Command output: {result.stdout}')
@@ -112,9 +132,31 @@ class Agent(dspy.Module):
 #        await self.process.stdin.drain()
 #        for
 
+MODEL_MAP = {
+        'flash': 'openrouter/google/gemini-2.5-flash-preview',
+        'r1': 'openrouter/deepseek/deepseek-r1-0528',
+        'dv3': 'openrouter/deepseek/deepseek-chat-v3-0324',
+}
+
+def parse_args():
+    parser = argparse.ArgumentParser(description='Run a simple agent with dspy.')
+    parser.add_argument('--lm', type=str, default='flash',
+                        help='The language model to use for the agent.')
+    parser.add_argument('--max-tokens', type=int, default=20000,
+                        help='The maximum number of tokens to use for the language model.')
+    parser.add_argument('--disable-logging', action='store_false', dest='logging',
+                        help='Disable logging to the console.')
+    return parser.parse_args()
 
 
 def main():
+    # dspy.configure(lm=dspy.LM('openrouter/google/gemini-2.5-flash-preview'))
+    # dspy.configure(lm=dspy.LM('deepseek/deepseek-reasoner', max_tokens=20000))
+    # dspy.configure(lm=dspy.LM('openrouter/deepseek/deepseek-r1-0528', max_tokens=20000))
+    args = parse_args()
+    dspy.configure(lm=dspy.LM(MODEL_MAP[args.lm], max_tokens=args.max_tokens))
+    configure(logging_enabled=args.logging)
+
     agent = Agent()
 
     if len(sys.argv) > 1 and '--' in sys.argv:
