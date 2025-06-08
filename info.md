@@ -1,3 +1,12 @@
+# simpledspy agent
+i would want to later have it ran many operations in parallel, like consolidating memory, reflecting, research, while messaging the user and looking for releveant information to load into short term memory 
+i would like to have a fast model and a slower reasoning model like deepseek r1 for reasoning
+
+# reasoning
+i would want to somehow make use of the deepseek r1 reasoning model. how could we use dspy to make better use of the reaosning models? i was thinking that maybe we could provide a list with constraints and give them to a dspy module and let it edit whichever system it is working on using filename search replace blocks. could be a book, a program, presentation, paper. we then task a reasoning model to compare the original version with the edited version and assign a rating on a scale from 1 to 10 for each constraint for each version. we then keep the version if the overall score has improved. note though that we somehow we should give higher weight to dimensions/constraints with low score, so we might want to just use l2 loss and square the distance to a perfect 10 score for each constraint and add them up. the delta in loss change could then be use during optimization of the dspy module
+
+
+
 # coding agent
 the coding agent should be using deepseek-chat for now
 please use the model openrouter/google/gemini-2.5-flash-preview-05-20
