@@ -1,6 +1,6 @@
-# Agent Project - TaskWarrior DSPy Assistant
+# Agent Project - SimpleDSPy Agent
 
-This project includes a DSPy-based assistant to interact with Taskwarrior using natural language. It utilizes a local LLM (Phi-3 via Ollama) for processing requests.
+This project features a DSPy-based agent that can run commands and interact with users. It uses OpenRouter models for processing requests.
 
 ## Setup
 
@@ -19,28 +19,42 @@ This project includes a DSPy-based assistant to interact with Taskwarrior using 
     ```
     If you are adding to an existing `requirements.txt`, ensure the new packages are installed.
 
-4.  **Ensure Ollama is running and you have pulled the `phi3` model:**
-    *   Install Ollama if you haven't: [https://ollama.com/](https://ollama.com/)
-    *   Pull the model:
+4.  **Set up OpenRouter API key:**
+    *   Create a free account at [OpenRouter](https://openrouter.ai/)
+    *   Add your API key to environment variables:
         ```bash
-        ollama pull phi3
+        echo "export OPENROUTER_API_KEY='your_api_key'" >> ~/.bashrc
+        source ~/.bashrc
         ```
-    *   Ensure Ollama server is running (it usually starts automatically after installation).
 
-5.  **(Optional) Create a `.env` file in this directory (`/home/tom/git/agent/.env`) to customize settings:**
-    ```env
-    # OLLAMA_BASE_URL=http://localhost:11434
-    # OLLAMA_MODEL=phi3
-    ```
-    The application will use sensible defaults if this file is not present. Note: Your global gitignore might prevent direct creation of this file by tools; you may need to create it manually.
-
-6.  **Run the TaskWarrior assistant:**
+5.  **Run the SimpleDSPy agent:**
     ```bash
-    python taskwarrior_dspy_agent.py
+    python agent_simpledspy.py
     ```
+
+## Training Data Management
+
+The agent's performance depends on quality training data stored in `.simpledspy/modules/`. To improve results:
+
+1.  **Review logged interactions:**
+    ```bash
+    less .simpledspy/modules/*/logged.jsonl
+    ```
+
+2.  **Add good samples to training data:**
+    Copy well-performing examples from `logged.jsonl` to corresponding `training.jsonl` files
+
+3.  **Correct problematic samples:**
+    Edit `training.jsonl` to fix incorrect responses
+
+4.  **Add new training examples:**
+    Create new entries in `training.jsonl` for desired behaviors
 
 ## Development
 
-*   The main TaskWarrior assistant script is `taskwarrior_dspy_agent.py`.
-*   DSPy modules and signatures for Taskwarrior are in `taskwarrior_dspy_definitions.py`.
-*   Remember to keep your local Ollama server running when developing or using the agent.
+*   The main agent script is `agent_simpledspy.py`
+*   Training data is stored in `.simpledspy/modules/`
+*   Use `--lm` flag to switch models: `flash`, `r1`, or `dv3`
+    ```bash
+    python agent_simpledspy.py --lm r1
+    ```
