@@ -8,7 +8,6 @@ import rich
 import dspy
 import sys
 import termcolor
-from shell_wrapper import ShellWrapper
 import argparse
 from simpledspy import predict, chain_of_thought, configure
 
@@ -21,7 +20,7 @@ class Agent(dspy.Module):
     def forward(self, user_input: str) -> None:
         self.context += f'User: {user_input}\n'
         while True:
-            action = self.select_action(context=self.context).selected_action
+            action = predict(self.context, description='Please select an action for the agent to take. The options are: run_command, reply_to_user. Output only the action name, no other text. If you are not sure, output "reply_to_user".')
             self.context += f'Agent action: {action}\n'
             if action == 'run_command':
                 command = chain_of_thought(self.context, description='Please generate a shell command for the command variable for running with subprocess.run. The command should be a string that can be executed in the shell.')
@@ -77,29 +76,6 @@ class Agent(dspy.Module):
 
 
 
-class ActionSelector(dspy.Signature):
-    context: str = dspy.InputField(description='The current context of the conversation, including user input and previous actions.')
-    selected_action: Literal['run_command', 'reply_to_user'] = dspy.OutputField()
-
-
-#class ShellWrapper:
-#    def __init__(self):
-#        self.process = None
-#        self.start_shell()
-#
-#    def start_shell(self):
-#        self.process = asyncio.create_subprocess_shell(
-#                '/usr/bin/zsh -i',
-#                stdin=asyncio.subprocess.PIPE,
-#                stdout=asyncio.subprocess.PIPE,
-#                stderr=asyncio.subprocess.STDOUT,
-#        )
-#
-#    async def run_command(self, command: str) -> str:
-#        self. process.stdin.write(f'{command}\n'.encode())
-#        await self.process.stdin.drain()
-#        for
-
 MODEL_MAP = {
         'flash': 'openrouter/google/gemini-2.5-flash-preview',
         'r1': 'openrouter/deepseek/deepseek-r1-0528',
@@ -108,7 +84,7 @@ MODEL_MAP = {
 
 def parse_args():
     parser = argparse.ArgumentParser(description='Run a simple agent with dspy.')
-    parser.add_argument('--lm', type=str, default='flash',
+    parser.add_argument('--lm', type=str, default='dv3',
                         help='The language model to use for the agent.')
     parser.add_argument('--max-tokens', type=int, default=20000,
                         help='The maximum number of tokens to use for the language model.')
@@ -118,9 +94,6 @@ def parse_args():
 
 
 def main():
-    # dspy.configure(lm=dspy.LM('openrouter/google/gemini-2.5-flash-preview'))
-    # dspy.configure(lm=dspy.LM('deepseek/deepseek-reasoner', max_tokens=20000))
-    # dspy.configure(lm=dspy.LM('openrouter/deepseek/deepseek-r1-0528', max_tokens=20000))
     args = parse_args()
     dspy.configure(lm=dspy.LM(MODEL_MAP[args.lm], max_tokens=args.max_tokens))
     configure(logging_enabled=args.logging)
@@ -133,8 +106,6 @@ def main():
         print(f'Initial input: {initial_input}')
         agent.forward(initial_input)
     while True:
-        # user_input = input('> ')
-        # user_input = input('\033[92m> \033[0m')  # green prompt
         user_input = input(termcolor.colored('> ', 'green'))  # green prompt
         agent.forward(user_input)
 
