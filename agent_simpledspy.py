@@ -16,10 +16,6 @@ import argparse
 
 
 
-class ActionSelector(dspy.Signature):
-    context: str = dspy.InputField(description='The current context of the conversation, including user input and previous actions.')
-    selected_action: Literal['run_command', 'reply_to_user'] = dspy.OutputField()
-
 
 class Agent(dspy.Module):
     def __init__(self):
@@ -112,6 +108,12 @@ class Agent(dspy.Module):
             else:
                 print(f'Unknown option: {done}')
                 self.context += f'Unknown option: {done}\n'
+
+
+
+class ActionSelector(dspy.Signature):
+    context: str = dspy.InputField(description='The current context of the conversation, including user input and previous actions.')
+    selected_action: Literal['run_command', 'reply_to_user'] = dspy.OutputField()
 
 
 #class ShellWrapper:
