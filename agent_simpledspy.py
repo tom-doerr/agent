@@ -1,19 +1,21 @@
 #!/usr/bin/env python3
 
 
-from simpledspy import predict, chain_of_thought
+from simpledspy import predict, chain_of_thought, configure
 import os
 from subprocess import run, PIPE, STDOUT, Popen
 from typing import Literal
 import rich
 import dspy
 import sys
+import termcolor
+from shell_wrapper import ShellWrapper
 
-# dspy.configure(lm=dspy.LM('openrouter/google/gemini-2.5-flash-preview'))
-dspy.configure(lm=dspy.LM('deepseek/deepseek-reasoner', max_tokens=20000))
+dspy.configure(lm=dspy.LM('openrouter/google/gemini-2.5-flash-preview'))
+# dspy.configure(lm=dspy.LM('deepseek/deepseek-reasoner', max_tokens=20000))
 
 #dspy.configure(lm=dspy.LM('openrouter/deepseek/deepseek-r1-0528'))
-
+configure(logging_enabled=True)
 
 
 class ActionSelector(dspy.Signature):
@@ -27,6 +29,8 @@ class Agent(dspy.Module):
         self.select_action = dspy.Predict(ActionSelector)
         #self.done = dspy.Predict('context, options -> done')
         self.context = ''
+        self.shell = ShellWrapper()
+        # await self.shell.start_shell()
 
     def print_context(self):
         # use rich
@@ -45,15 +49,24 @@ class Agent(dspy.Module):
                 self.context += f'Command: {command}\n'
                 print(f'Running command: {command}')
                 # result = run(command, shell=True, stdout=PIPE, stderr=PIPE, text=True)
-                process = Popen(command, shell=True, stdout=PIPE, stderr=STDOUT, text=True, bufsize=1)
-                self.context += f'Process started with PID: {process.pid}\n'
-                self.context += f'Command output:\n'
-                for line in process.stdout:
-                    print(line, end='')
-                    self.context += f'{line}'
 
-                process.wait()
-                self.context += f'Process finished with return code: {process.returncode}\n'
+
+                if True:
+                    process = Popen(command, shell=True, stdout=PIPE, stderr=STDOUT, text=True, bufsize=1)
+                    self.context += f'Process started with PID: {process.pid}\n'
+                    self.context += f'Command output:\n'
+                    for line in process.stdout:
+                        print(line, end='')
+                        self.context += f'{line}'
+
+                    process.wait()
+                    self.context += f'Process finished with return code: {process.returncode}\n'
+                else:
+                    # output, exit_code = await self.shell.run_command(command)
+                    pass
+
+
+
 #                if result.returncode == 0:
 #                    print(f'Command output: {result.stdout}')
 #                    self.context += f'Command output: {result.stdout}\n'
@@ -81,17 +94,39 @@ class Agent(dspy.Module):
                 self.context += f'Unknown option: {done}\n'
 
 
+#class ShellWrapper:
+#    def __init__(self):
+#        self.process = None
+#        self.start_shell()
+#
+#    def start_shell(self):
+#        self.process = asyncio.create_subprocess_shell(
+#                '/usr/bin/zsh -i',
+#                stdin=asyncio.subprocess.PIPE,
+#                stdout=asyncio.subprocess.PIPE,
+#                stderr=asyncio.subprocess.STDOUT,
+#        )
+#
+#    async def run_command(self, command: str) -> str:
+#        self. process.stdin.write(f'{command}\n'.encode())
+#        await self.process.stdin.drain()
+#        for
 
 
-agent = Agent()
 
-if len(sys.argv) > 1 and '--' in sys.argv:
-    # if we have a command line argument, use it as the initial user input
-    initial_input = ' '.join(sys.argv[1:]).replace('--', '')
-    print(f'Initial input: {initial_input}')
-    agent.forward(initial_input)
-while True:
-    user_input = input('> ')
-    agent.forward(user_input)
+def main():
+    agent = Agent()
 
+    if len(sys.argv) > 1 and '--' in sys.argv:
+        # if we have a command line argument, use it as the initial user input
+        initial_input = ' '.join(sys.argv[1:]).replace('--', '')
+        print(f'Initial input: {initial_input}')
+        agent.forward(initial_input)
+    while True:
+        # user_input = input('> ')
+        # user_input = input('\033[92m> \033[0m')  # green prompt
+        user_input = input(termcolor.colored('> ', 'green'))  # green prompt
+        agent.forward(user_input)
 
+if __name__ == '__main__':
+    main()
