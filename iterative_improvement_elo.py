@@ -91,12 +91,16 @@ def iterative_improvement_elo(task, iterations=1000):
             # Skip invalid responses
             continue
         
-        # Update ELO ratings and update list entries
-        winner_index = next(i for i, v in enumerate(elo_versions_list) 
-                        if v['version'] == winner['version'])
-        loser_index = next(i for i, v in enumerate(elo_versions_list) 
-                       if v['version'] == loser['version'])
-        update_elo_ratings(elo_versions_list[winner_index], elo_versions_list[loser_index])
+        # Update ELO ratings
+        update_elo_ratings(winner, loser)
+        
+        # Update the opponent's ELO in the list (since opponent is in the list)
+        # For the new_version_obj, we'll add it to the list below
+        # Find the opponent in the list and update its ELO
+        for version in elo_versions_list:
+            if version['version'] == opponent_obj['version']:
+                version['elo'] = opponent_obj['elo']
+                break
         
         # Add new version to list if not already present
         if new_version_str not in [v['version'] for v in elo_versions_list]:
