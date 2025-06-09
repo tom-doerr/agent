@@ -111,40 +111,6 @@ def iterative_improvement_elo(task, iterations=1000, parallel=10, model_name="un
     start_time = time.time()
     iteration_times = []
     
-    def display_iteration_stats(i, iterations, elo_versions_list, total_requests, gen_success, gen_failures, eval_success, eval_failures, iter_time, total_time, iteration_times, model_name):
-        if elo_versions_list:
-            # Sort in descending ELO order (best first)
-            sorted_versions_desc = sorted(elo_versions_list, key=lambda x: x['elo'], reverse=True)
-            top_three = sorted_versions_desc[:3]  # Get top 3 (best first)
-            
-            console.print(f"\nAfter iteration {i+1} (Total: {len(elo_versions_list)} versions, Requests: {total_requests}, Time: {iter_time:.2f}s, Total: {total_time:.2f}s):")
-            console.print(f"Requests: gen_success={gen_success}, gen_failures={gen_failures}, eval_success={eval_success}, eval_failures={eval_failures}")
-            console.print("[bold]Top 3 Versions:[/bold]")
-            for idx, version in enumerate(top_three, 1):
-                console.print(f"{idx}. [bold]ELO: {version['elo']:.2f}[/bold]")
-                console.print(version['version'])
-                console.print("-" * 80)
-            
-            # Compute and print statistics
-            elo_scores = [v['elo'] for v in elo_versions_list]
-            if elo_scores:
-                mean = np.mean(elo_scores)
-                median = np.median(elo_scores)
-                lowest = np.min(elo_scores)
-                highest = np.max(elo_scores)
-                std_dev = np.std(elo_scores)
-            
-                console.print(f"Model: {model_name}")
-                console.print(f"Statistics: Mean: {mean:.2f} | Median: {median:.2f} | Lowest: {lowest:.2f} | Highest: {highest:.2f} | StdDev: {std_dev:.2f}")
-            
-            # Print timing statistics
-            avg_time = np.mean(iteration_times) if iteration_times else 0
-            console.print(f"\nTiming Statistics:")
-            console.print(f"  Current Iteration: {iter_time:.2f}s")
-            console.print(f"  Average Iteration: {avg_time:.2f}s")
-            console.print(f"  Total Runtime: {total_time:.2f}s")
-            console.print(f"  Projected Remaining: {avg_time * (iterations - i - 1):.2f}s")
-    
     # Function to run a single comparison
     def run_comparison(new_version_str, opponent_version):
         with predict_lock:
