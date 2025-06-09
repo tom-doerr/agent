@@ -82,21 +82,25 @@ def iterative_improvement_elo(task, iterations=1000, parallel=10, model_name="un
         else:
             current_version = current_version_obj['version']
         
-        # Generate new version
-        # new_version_str = chain_of_thought(task, current_version)
-        new_version_str = predict(task, current_version)
-        new_version_obj = {'version': new_version_str, 'elo': 1000}
-        
-        # Do multiple comparisons for this new version in parallel
-        opponents = []
-        for _ in range(NUM_COMPARISONS_PER_GENERATION):
-            opponent_obj = get_random_opponent(elo_versions_list, new_version_obj)
-            if opponent_obj is None:
-                continue
-            opponents.append(opponent_obj)
-        
-        # Run comparisons in parallel
         with concurrent.futures.ThreadPoolExecutor(max_workers=parallel) as executor:
+            # Generate new version in the thread pool
+            try:
+                future_gen = executor.submit(predict, task, current_version)
+                new_version_str = future_gen.result()
+            except Exception as e:
+                console.print(f"[red]Error in generation: {e}[/red]")
+                continue
+                
+            new_version_obj = {'version': new_version_str, 'elo': 1000}
+            
+            # Do multiple comparisons for this new version in parallel
+            opponents = []
+            for _ in range(NUM_COMPARISONS_PER_GENERATION):
+                opponent_obj = get_random_opponent(elo_versions_list, new_version_obj)
+                if opponent_obj is None:
+                    continue
+                opponents.append(opponent_obj)
+            
             futures = []
             for opponent_obj in opponents:
                 futures.append(
@@ -120,10 +124,10 @@ def iterative_improvement_elo(task, iterations=1000, parallel=10, model_name="un
                     
                 except Exception as e:
                     console.print(f"[red]Error in comparison: {e}[/red]")
-        
-        # Add new version to list if not already present
-        if not any(v['version'] == new_version_str for v in elo_versions_list):
-            elo_versions_list.append(new_version_obj)
+            
+            # Add new version to list if not already present
+            if not any(v['version'] == new_version_str for v in elo_versions_list):
+                elo_versions_list.append(new_version_obj)
         
         iter_time = time.time() - iter_start
         iteration_times.append(iter_time)
