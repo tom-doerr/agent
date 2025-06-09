@@ -170,6 +170,7 @@ def test_top_three_display_order(mock_console):
     # Call display function
     display_iteration_stats(
         i=0,
+        iterations=5,  # arbitrary number for test
         elo_versions_list=elo_versions_list,
         total_requests=0,
         gen_success=0,
