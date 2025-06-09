@@ -21,7 +21,7 @@ predict_lock = threading.Lock()
 def display_iteration_stats(i, iterations, elo_versions_list, total_requests, gen_success, gen_failures, eval_success, eval_failures, iter_time, total_time, iteration_times, model_name):
     if elo_versions_list:
         # Sort in descending ELO order (best first)
-        sorted_versions_desc = sorted(elo极versions_list, key=lambda x: x['elo'], reverse=True)
+        sorted_versions_desc = sorted(elo_versions_list, key=lambda x:极 x['elo'], reverse=True)
         top_three = sorted_versions_desc[:3]  # Get top 3 (best first)
         
         console.print(f"\nAfter iteration {i+1} (Total: {len(elo_versions_list)} versions, Requests: {total_requests}, Time: {iter_time:.2f}s, Total: {total_time:.2f}s):")
