@@ -69,8 +69,8 @@ def iterative_improvement_elo(task, iterations=1000):
             current_version = current_version_obj['version']
         
         # Generate new version
-        new_version_str = chain_of_thought(task, current_version)
-        # new_version_str = predict(task, current_version)
+        # new_version_str = chain_of_thought(task, current_version)
+        new_version_str = predict(task, current_version)
         new_version_obj = {'version': new_version_str, 'elo': 1000}
         
         # Select opponent
