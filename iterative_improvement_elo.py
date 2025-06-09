@@ -9,6 +9,7 @@ import sys
 from rich.console import Console
 from rich.table import Table
 import concurrent.futures
+import time
 
 # Initialize console for rich output
 console = Console()
@@ -63,6 +64,10 @@ def iterative_improvement_elo(task, iterations=1000, parallel=10):
     console = Console()
     NUM_COMPARISONS_PER_GENERATION = 3  # Number of comparisons per new version
     
+    # Timing statistics
+    start_time = time.time()
+    iteration_times = []
+    
     # Function to run a single comparison
     def run_comparison(new_version_str, opponent_version):
         return predict(
@@ -71,6 +76,7 @@ def iterative_improvement_elo(task, iterations=1000, parallel=10):
         )
     
     for i in range(iterations):
+        iter_start = time.time()
         # Sample current version
         current_version_obj = sample_version(elo_versions_list)
         if current_version_obj is None:
@@ -124,12 +130,16 @@ def iterative_improvement_elo(task, iterations=1000, parallel=10):
         if not any(v['version'] == new_version_str for v in elo_versions_list):
             elo_versions_list.append(new_version_obj)
         
+        iter_time = time.time() - iter_start
+        iteration_times.append(iter_time)
+        total_time = time.time() - start_time
+        
         # Print top three versions with highest ELO first
         if elo_versions_list:
             sorted_versions_desc = sorted(elo_versions_list, key=lambda x: x['elo'], reverse=True)
             top_three = sorted_versions_desc[:3]
             
-            console.print(f"\nAfter iteration {i+1}: (Total versions: {len(elo_versions_list)})")
+            console.print(f"\nAfter iteration {i+1} (Total: {len(elo_versions_list)} versions, Time: {iter_time:.2f}s, Total: {total_time:.2f}s):")
             console.print("[bold]Top 3 Versions:[/bold]")
             for idx, version in enumerate(top_three, 1):
                 console.print(f"{idx}. [bold]ELO: {version['elo']:.2f}[/bold]")
@@ -164,6 +174,14 @@ def iterative_improvement_elo(task, iterations=1000, parallel=10):
                 console.print(f"  Lowest: {lowest:.2f}")
                 console.print(f"  Highest: {highest:.2f}")
                 console.print(f"  Standard Deviation: {std_dev:.2f}")
+            
+            # Print timing statistics
+            avg_time = np.mean(iteration_times) if iteration_times else 0
+            console.print(f"\nTiming Statistics:")
+            console.print(f"  Current Iteration: {iter_time:.2f}s")
+            console.print(f"  Average Iteration: {avg_time:.2f}s")
+            console.print(f"  Total Runtime: {total_time:.2f}s")
+            console.print(f"  Projected Remaining: {avg_time * (iterations - i - 1):.2f}s")
     
     return best_version['version']
 
