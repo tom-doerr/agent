@@ -59,6 +59,7 @@ def iterative_improvement_elo(task, iterations=1000):
     
     best_version = initial_version
     console = Console()
+    NUM_COMPARISONS_PER_GENERATION = 3  # Number of comparisons per new version
     
     for i in range(iterations):
         # Sample current version
@@ -73,38 +74,39 @@ def iterative_improvement_elo(task, iterations=1000):
         new_version_str = predict(task, current_version)
         new_version_obj = {'version': new_version_str, 'elo': 1000}
         
-        # Select opponent
-        opponent_obj = get_random_opponent(elo_versions_list, new_version_obj)
-        if opponent_obj is None:
-            # If no opponent available, add new version and continue
-            elo_versions_list.append(new_version_obj)
-            continue
-        
-        # Compare versions
-        better_version_num = predict(
-            f"Task: {task}\nVersion 1: {new_version_str}\nVersion 2: {opponent_obj['version']}",
-            description='Which version is better? Output only the number (1 or 2).'
-        )
-        
-        # Validate response
-        if better_version_num.strip() == '1':
-            winner, loser = new_version_obj, opponent_obj
-        elif better_version_num.strip() == '2':
-            winner, loser = opponent_obj, new_version_obj
-        else:
-            # Skip invalid responses
-            continue
-        
-        # Update ELO ratings (modifies winner/loser in-place)
-        update_elo_ratings(winner, loser)
+        # Do multiple comparisons for this new version
+        for comp_index in range(NUM_COMPARISONS_PER_GENERATION):
+            # Select opponent
+            opponent_obj = get_random_opponent(elo_versions_list, new_version_obj)
+            if opponent_obj is None:
+                # If no opponent available, skip this comparison
+                continue
+            
+            # Compare versions
+            better_version_num = predict(
+                f"Task: {task}\nVersion 1: {new_version_str}\nVersion 2: {opponent_obj['version']}",
+                description='Which version is better? Output only the number (1 or 2).'
+            )
+            
+            # Validate response
+            if better_version_num.strip() == '1':
+                winner, loser = new_version_obj, opponent_obj
+            elif better_version_num.strip() == '2':
+                winner, loser = opponent_obj, new_version_obj
+            else:
+                # Skip invalid responses
+                continue
+            
+            # Update ELO ratings (modifies winner/loser in-place)
+            update_elo_ratings(winner, loser)
+            
+            # Update best version if current winner is better
+            if winner['elo'] > best_version['elo']:
+                best_version = winner
         
         # Add new version to list if not already present
         if not any(v['version'] == new_version_str for v in elo_versions_list):
             elo_versions_list.append(new_version_obj)
-        
-        # Update best version if current winner is better
-        if winner['elo'] > best_version['elo']:
-            best_version = winner
         
         # Print top three versions with highest ELO first
         if elo_versions_list:
