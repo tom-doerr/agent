@@ -10,6 +10,8 @@ from rich.console import Console
 from rich.table import Table
 import concurrent.futures
 import time
+import threading
+
 # Initialize console for rich output
 console = Console()
 
@@ -183,6 +185,21 @@ def iterative_improvement_elo(task, iterations=1000, parallel=10, model_name="un
         iter_time = time.time() - iter_start
         iteration_times.append(iter_time)
         total_time = time.time() - start_time
+        
+        display_iteration_stats(
+            i,
+            iterations,
+            elo_versions_list,
+            total_requests,
+            gen_success,
+            gen_failures,
+            eval_success,
+            eval_failures,
+            iter_time,
+            total_time,
+            iteration_times,
+            model_name
+        )
         
 def display_iteration_stats(i, iterations, elo_versions_list, total_requests, gen_success, gen_failures, eval_success, eval_failures, iter_time, total_time, iteration_times, model_name):
     if elo_versions_list:
