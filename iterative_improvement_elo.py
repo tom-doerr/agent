@@ -123,7 +123,7 @@ def iterative_improvement_elo(task, iterations=1000):
             # Truncate long versions for display
             truncated_version = version['version'][:50] + '...' if len(version['version']) > 50 else version['version']
             table.add_row(truncated_version, f"{version['elo']:.2f}")
-        console.print(f"\nAfter iteration {i+1}:")
+        console.print(f"\nAfter iteration {i+1}: (Total versions: {len(elo_versions_list)})")
         console.print(table)
     
     return best_version['version']
