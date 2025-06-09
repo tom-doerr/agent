@@ -148,20 +148,7 @@ def iterative_improvement_elo(task, iterations=1000, parallel=10, model_name="un
                 console.print(version['version'])
                 console.print("-" * 80)
             
-            # Then print all versions in a table (sorted ascending)
-            sorted_versions = sorted(elo_versions_list, key=lambda x: x['elo'])
-            table = Table(show_header=True, header_style="bold magenta", expand=True)
-            table.add_column("Version", width=50)
-            table.add_column("ELO", justify="right")
-            for version in sorted_versions:
-                # Truncate long versions for display
-                truncated_version = version['version'][:50] + '...' if len(version['version']) > 50 else version['version']
-                table.add_row(truncated_version, f"{version['elo']:.2f}")
-            
-            console.print("\n[bold]All Versions (sorted by ELO ascending):[/bold]")
-            console.print(table)
-            
-            # Compute and print statistics separately
+            # Compute and print statistics
             elo_scores = [v['elo'] for v in elo_versions_list]
             if elo_scores:
                 mean = np.mean(elo_scores)
