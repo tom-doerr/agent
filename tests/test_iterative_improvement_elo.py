@@ -1,6 +1,10 @@
 #!/usr/bin/env python3
 
 import pytest
+import os
+import sys
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
 from iterative_improvement_elo import sample_version, get_random_opponent, update_elo_ratings
 from unittest.mock import patch, MagicMock
 import numpy as np
