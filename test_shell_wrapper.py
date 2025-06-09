@@ -3,6 +3,7 @@ import asyncio
 import os
 import tempfile
 import pytest
+pytestmark = pytest.mark.timeout(10)
 from shell_wrapper import ShellWrapper
 
 @pytest.fixture
