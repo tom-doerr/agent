@@ -19,7 +19,9 @@ def sample_version(elo_versions_list):
     elo_scores = np.array(elo_scores)
     elo_scores = elo_scores - np.min(elo_scores)  # shift to non-negative
     elo_scores = elo_scores + 1e-6  # avoid zero
-    probabilities = elo_scores / np.sum(elo_scores)
+    # Calculate probabilities using softmax
+    exp_scores = np.exp(elo_scores - np.max(elo_scores))
+    probabilities = exp_scores / np.sum(exp_scores)
     return random.choices(elo_versions_list, weights=probabilities, k=1)[0]
 
 
@@ -89,11 +91,15 @@ def iterative_improvement_elo(task, iterations=1000):
             # Skip invalid responses
             continue
         
-        # Update ELO ratings
-        update_elo_ratings(winner, loser)
+        # Update ELO ratings and update list entries
+        winner_index = next(i for i, v in enumerate(elo_versions_list) 
+                        if v['version'] == winner['version'])
+        loser_index = next(i for i, v in enumerate(elo_versions_list) 
+                       if v['version'] == loser['version'])
+        update_elo_ratings(elo_versions_list[winner_index], elo_versions_list[loser_index])
         
-        # Add new version to list
-        if new_version_obj not in [v['version'] for v in elo_versions_list]:
+        # Add new version to list if not already present
+        if new_version_str not in [v['version'] for v in elo_versions_list]:
             elo_versions_list.append(new_version_obj)
         
         # Track best version
