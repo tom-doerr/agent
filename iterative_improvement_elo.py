@@ -116,13 +116,12 @@ def iterative_improvement_elo(task, iterations=1000):
         
         # Print current versions sorted by ELO (highest last)
         sorted_versions = sorted(elo_versions_list, key=lambda x: x['elo'])
-        table = Table(show_header=True, header_style="bold magenta")
-        table.add_column("Version", width=50)
+        table = Table(show_header=True, header_style="bold magenta", expand=True)
+        table.add_column("Version", width=150)
         table.add_column("ELO", justify="right")
         for version in sorted_versions:
-            # Truncate long versions for display
-            truncated_version = version['version'][:50] + '...' if len(version['version']) > 50 else version['version']
-            table.add_row(truncated_version, f"{version['elo']:.2f}")
+            # Show full version text
+            table.add_row(version['version'], f"{version['elo']:.2f}")
         console.print(f"\nAfter iteration {i+1}: (Total versions: {len(elo_versions_list)})")
         console.print(table)
     
