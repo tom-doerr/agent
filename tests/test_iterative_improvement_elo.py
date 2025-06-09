@@ -189,8 +189,8 @@ def test_top_three_display_order(mock_console):
     
     # Verify top 3 are shown in descending order: v4 (1500), v2 (1200), v5 (1100)
     assert "1. [bold]ELO: 1500.00[/bold]" in output
-    assert "2. ELO: 1200.00" in output
-    assert "3. ELO: 1100.00" in output
+    assert "2. [bold]ELO: 1200.00[/bold]" in output
+    assert "3. [bold]ELO: 1100.00[/bold]" in output
     assert "v4" in output
     assert "v2" in output
     assert "v5" in output
