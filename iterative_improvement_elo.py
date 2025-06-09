@@ -5,6 +5,7 @@ from simpledspy import predict, chain_of_thought, configure
 from model_map import MODEL_MAP
 import numpy as np
 import random
+import sys
 
 model = 'flash'
 dspy.configure(lm=dspy.LM(MODEL_MAP[model], max_tokens=10000))
@@ -101,23 +102,34 @@ def iterative_improvement_elo(task, iterations=1000):
     
     return best_version['version']
 
+def parse_args():
+    import argparse
+    parser = argparse.ArgumentParser(description='Iterative Improvement with ELO Ratings')
+    parser.add_argument('task', type=str, help='The task to improve upon')
+    parser.add_argument('--iterations', type=int, default=1000, help='Number of iterations to run')
+    parser.add_argument('--lm', type=str, default='flash', help='Model to use for predictions')
+    return parser.parse_args()
 
 
+if __name__ == "__main__":
+    args = parse_args()
+    if args.lm in MODEL_MAP:
+        model_string = MODEL_MAP[args.lm]
+    else:
+        model_string = args.lm
 
-def iterative_improvement_elo(task, iterations=1000):
-    elo_versions_list = []
-    for i in range(iterations):
-        current_version = sample_version(elo_versions_list)
-        new_version = predict(task, current_version)
-        # elo_value, similar_elo_version = sorted([(elo, version, (version['elo'] - new_version['elo']) ** 2) for version in elo_versions_list if version['version'] != current_version['version']], key=lambda x: x[2])[0][:2])
-        closest_version = min(elo_versions_list, key=lambda version: abs(version['elo'] - elo_value))
-        # version_1 = new_version, version_2 = closest_version if random.random() < 0.5 else current_version
-        if random.random() < 0.5:
-            version_1 = new_version; version_2 = closest_version
-        else:
-            version_1 = closest_version; version_2 = new_version
+    lm = dspy.LM(model_string, max_tokens=10000)
+    dspy.configure(lm=lm)
+    
+    task = args.task
+    iterations = args.iterations
+    
+    best_version = iterative_improvement_elo(task, iterations)
+    
+    print(f"Best version after {iterations} iterations: {best_version}")
+    sys.exit(0)
 
-        better_version = predict(task, version_1, version_2, description='Which version is better? Output only the number of the better version (1 or 2).')
+
 
 
 
