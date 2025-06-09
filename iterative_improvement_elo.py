@@ -138,10 +138,12 @@ def iterative_improvement_elo(task, iterations=1000, parallel=10, model_name="un
         if elo_versions_list:
             sorted_versions_desc = sorted(elo_versions_list, key=lambda x: x['elo'], reverse=True)
             top_three = sorted_versions_desc[:3]
+            # Reverse the top_three list so best (highest ELO) is last
+            top_three_reversed = top_three[::-1]
             
             console.print(f"\nAfter iteration {i+1} (Total: {len(elo_versions_list)} versions, Time: {iter_time:.2f}s, Total: {total_time:.2f}s):")
             console.print("[bold]Top 3 Versions:[/bold]")
-            for idx, version in enumerate(top_three, 1):
+            for idx, version in enumerate(top_three_reversed, 1):
                 console.print(f"{idx}. [bold]ELO: {version['elo']:.2f}[/bold]")
                 console.print(version['version'])
                 console.print("-" * 80)
