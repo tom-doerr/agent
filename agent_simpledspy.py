@@ -10,6 +10,7 @@ import sys
 import termcolor
 import argparse
 from simpledspy import predict, chain_of_thought, configure
+from model_map import MODEL_MAP
 
 class Agent(dspy.Module):
     def __init__(self):
@@ -42,13 +43,21 @@ class Agent(dspy.Module):
                         output_frame,
                         description='Please generate a string that should be added to the context. The string should. The text_to_add_to_context string will be all that we know from the output, so make sure to include all important information but do not fill the context with garbage.  If you are done viewing the output, output "True". If you need to view more output, output "False" and the number of additional characters to view abouve the output you have already seen.',
                     )
-                    if bool(done_viewing_output):
+                    if done_viewing_output == 'True':
                         rich.print(f'[bold green]Done viewing output:[/bold green] {done_viewing_output}')
                         self.context += f'Done viewing output: {done_viewing_output}\n'
                         rich.print(f'[bold green]Text to add to context:[/bold green] {text_to_add_to_context}')
                         self.context += f'Text to add to context: {text_to_add_to_context}\n'
                         self.context += text_to_add_to_context + '\n'
                         break
+
+                    try:
+                        number_additional_chars = int(number_additional_chars)
+                    except ValueError:
+                        print(f'Error parsing number_additional_chars: {number_additional_chars}')
+                        self.context += f'Error parsing number_additional_chars: {number_additional_chars}\n'
+                        number_additional_chars = 0
+
 
                     rich.print(f'[bold red]Not done viewing output, need to view more:[/bold red] {done_viewing_output}, additional chars: {number_additional_chars}')
 
@@ -74,12 +83,6 @@ class Agent(dspy.Module):
                 self.context += f'Unknown option: {done}\n'
 
 
-
-MODEL_MAP = {
-        'flash': 'openrouter/google/gemini-2.5-flash-preview',
-        'r1': 'openrouter/deepseek/deepseek-r1-0528',
-        'dv3': 'openrouter/deepseek/deepseek-chat-v3-0324',
-}
 
 def parse_args():
     parser = argparse.ArgumentParser(description='Run a simple agent with dspy.')
