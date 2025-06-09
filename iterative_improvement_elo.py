@@ -218,6 +218,24 @@ def display_iteration_stats(i, iterations, elo_versions_list, total_requests, ge
         console.print(f"  Total Runtime: {total_time:.2f}s")
         console.print(f"  Projected Remaining: {avg_time * (iterations - i - 1):.2f}s")
     
+    # Display final statistics
+    if iteration_times:
+        total_time = time.time() - start_time
+        display_iteration_stats(
+            iterations-1,  # last iteration
+            iterations,
+            elo_versions_list,
+            total_requests,
+            gen_success,
+            gen_failures,
+            eval_success,
+            eval_failures,
+            iteration_times[-1],
+            total_time,
+            iteration_times,
+            model_name
+        )
+    
     # Return the version with highest ELO at the end
     if elo_versions_list:
         best_final = max(elo_versions_list, key=lambda x: x['elo'])
