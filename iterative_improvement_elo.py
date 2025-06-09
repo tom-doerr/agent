@@ -13,51 +13,93 @@ dspy.configure(lm=dspy.LM(MODEL_MAP[model], max_tokens=10000))
 def sample_version(elo_versions_list):
     # sample a version weighted by elo score (poisson distribution)
     if not elo_versions_list:
-        return ''
+        return None
     elo_scores = [version['elo'] for version in elo_versions_list]
     elo_scores = np.array(elo_scores)
     elo_scores = elo_scores - np.min(elo_scores)  # shift to non-negative
     elo_scores = elo_scores + 1e-6  # avoid zero
     probabilities = elo_scores / np.sum(elo_scores)
-    return np.random.choice(elo_versions_list, p=probabilities)['version']
+    return random.choices(elo_versions_list, weights=probabilities, k=1)[0]
 
 
-#def sample_version_with_closest_elo(elo_value, elo_versions_list):
-#    # sample a version with the closest elo value
-#    if not elo_versions_list:
-#        return ''
-#    # closest_version = min(elo_versions_list, key=lambda version: abs(version['elo'] - elo_value))
-#    elo_value
-#    return closest_version
+def get_random_opponent(elo_versions_list, current_version):
+    # get a random opponent from the list (excluding current_version)
+    if len(elo_versions_list) < 2:
+        return None
+    opponent = random.choice(elo_versions_list)
+    while opponent['version'] == current_version['version']:
+        opponent = random.choice(elo_versions_list)
+    return opponent
 
-def update_elo_versions_list(elo_versions_list, winner_version, loser_version):
-    # update the elo versions list with the new winner and loser versions
-    # winner_elo = winner_version['elo']
-    # winner_elo = winner_version.get('elo', 1000)  # default elo if not present
-    # get it from elo_versions_list if it exists
-    winner_elo = elo_versions_list[elo_versions_list.index(winner_version)].get('elo', 1000)  # default elo if not present
-    # loser_elo = loser_version['elo']
-    # loser_elo = loser_version.get('elo', 1000)  # default elo if not present
-    loser_elo = elo_versions_list[elo_versions_list.index(loser_version)].get('elo', 1000)  # default elo if not present
-    k = 32  # K-factor for Elo rating system
+
+def update_elo_ratings(winner_version, loser_version, k=32):
+    # update the elo ratings for winner and loser
+    winner_elo = winner_version['elo']
+    loser_elo = loser_version['elo']
+    
     expected_winner = 1 / (1 + 10 ** ((loser_elo - winner_elo) / 400))
     new_winner_elo = winner_elo + k * (1 - expected_winner)
     new_loser_elo = loser_elo + k * (0 - expected_winner)
     
-    # winner_version['elo'] = new_winner_elo
-    # loser_version['elo'] = new_loser_elo
-    
-    # elo_versions_list.append(winner_version)
-    # elo_versions_list.append(loser_version)
-    if winner_version not in elo_versions_list:
-        elo_versions_list.append({'version': winner_version, 'elo': new_winner_elo})
-    elif loser_version not in elo_versions_list:
-        elo_versions_list.append({'version': loser_version, 'elo': new_loser_elo})
+    winner_version['elo'] = new_winner_elo
+    loser_version['elo'] = new_loser_elo
+    return winner_version, loser_version
 
-    elo_versions_list
 
+def iterative_improvement_elo(task, iterations=1000):
+    elo_versions_list = []
+    # Create initial version
+    initial_version = {'version': predict(task, "", description='Create initial version'), 'elo': 1000}
+    elo_versions_list.append(initial_version)
     
-    return elo_versions_list
+    best_version = initial_version
+    
+    for i in range(iterations):
+        # Sample current version
+        current_version_obj = sample_version(elo_versions_list)
+        if current_version_obj is None:
+            current_version = ""
+        else:
+            current_version = current_version_obj['version']
+        
+        # Generate new version
+        new_version_str = predict(task, current_version)
+        new_version_obj = {'version': new_version_str, 'elo': 1000}
+        
+        # Select opponent
+        opponent_obj = get_random_opponent(elo_versions_list, new_version_obj)
+        if opponent_obj is None:
+            # If no opponent available, add new version and continue
+            elo_versions_list.append(new_version_obj)
+            continue
+        
+        # Compare versions
+        better_version_num = predict(
+            f"Task: {task}\nVersion 1: {new_version_str}\nVersion 2: {opponent_obj['version']}",
+            description='Which version is better? Output only the number (1 or 2).'
+        )
+        
+        # Validate response
+        if better_version_num.strip() == '1':
+            winner, loser = new_version_obj, opponent_obj
+        elif better_version_num.strip() == '2':
+            winner, loser = opponent_obj, new_version_obj
+        else:
+            # Skip invalid responses
+            continue
+        
+        # Update ELO ratings
+        update_elo_ratings(winner, loser)
+        
+        # Add new version to list
+        if new_version_obj not in [v['version'] for v in elo_versions_list]:
+            elo_versions_list.append(new_version_obj)
+        
+        # Track best version
+        if winner['elo'] > best_version['elo']:
+            best_version = winner
+    
+    return best_version['version']
 
 
 
