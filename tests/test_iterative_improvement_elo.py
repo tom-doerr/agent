@@ -89,7 +89,8 @@ def test_iterative_improvement_flow(mock_console, mock_chain, mock_predict):
 # Test ELO ranking display
 @patch('iterative_improvement_elo.predict')
 @patch('iterative_improvement_elo.chain_of_thought')
-def test_elo_ranking_order(mock_chain, mock_predict):
+@patch('iterative_improvement_elo.console')
+def test_elo_ranking_order(mock_console, mock_chain, mock_predict):
     # Mock LLM responses
     mock_chain.return_value = "Initial version"
     mock_predict.side_effect = [
@@ -97,35 +98,60 @@ def test_elo_ranking_order(mock_chain, mock_predict):
         "1", "1", "1"   # comparisons
     ]
 
-    # Import main function after mocks are set
-    from iterative_improvement_elo import iterative_improvement_elo
-    
-    # Run with 1 iteration
-    best_version = iterative_improvement_elo("test task", iterations=1, parallel=1)
-    
-    # Verify ranking order (best last)
-    assert "New version" in best_version
+    # Mock helper functions to control randomness and ensure opponents are from actual list
+    with patch('iterative_improvement_elo.sample_version') as mock_sample, \
+         patch('iterative_improvement_elo.get_random_opponent') as mock_opponent:
+        
+        # Set up mock returns: sample returns initial version, opponents return same initial version
+        mock_sample.return_value = {'version': "Initial version", 'elo': 1000}
+        mock_opponent.side_effect = [
+            {'version': "Initial version", 'elo': 1000},
+            {'version': "Initial version", 'elo': 1000},
+            {'version': "Initial version", 'elo': 1000}
+        ]
+
+        # Import main function after mocks are set
+        from iterative_improvement_elo import iterative_improvement_elo
+        
+        # Run with 1 iteration
+        best_version = iterative_improvement_elo("test task", iterations=1, parallel=1)
+        
+        # Verify new version is best
+        assert "New version" in best_version
 
 # Test exception handling
 @patch('iterative_improvement_elo.predict')
 @patch('iterative_improvement_elo.chain_of_thought')
-def test_exception_handling(mock_chain, mock_predict):
-    # Mock LLM to raise exception
+@patch('iterative_improvement_elo.console')
+def test_exception_handling(mock_console, mock_chain, mock_predict):
+    # Mock LLM to raise exception then succeed
     mock_chain.return_value = "Initial version"
     mock_predict.side_effect = [
-        Exception("Test error"),  # generation fails
-        "New version",            # next generation succeeds
+        Exception("Test error"),  # first generation fails
+        "New version",            # second generation succeeds
         "1", "1", "1"             # comparisons
     ]
 
-    # Import main function after mocks are set
-    from iterative_improvement_elo import iterative_improvement_elo
-    
-    # Run with 1 iteration
-    best_version = iterative_improvement_elo("test task", iterations=1, parallel=1)
-    
-    # Verify failure was counted but process continued
-    assert "New version" in best_version
+    # Mock helper functions to control randomness
+    with patch('iterative_improvement_elo.sample_version') as mock_sample, \
+         patch('iterative_improvement_elo.get_random_opponent') as mock_opponent:
+        
+        # Set up mock returns: sample returns initial version, opponents return same initial version
+        mock_sample.return_value = {'version': "Initial version", 'elo': 1000}
+        mock_opponent.side_effect = [
+            {'version': "Initial version", 'elo': 1000},
+            {'version': "Initial version", 'elo': 1000},
+            {'version': "Initial version", 'elo': 1000}
+        ]
+
+        # Import main function after mocks are set
+        from iterative_improvement_elo import iterative_improvement_elo
+        
+        # Run with 2 iterations to handle failure then success
+        best_version = iterative_improvement_elo("test task", iterations=2, parallel=1)
+        
+        # Verify new version is best
+        assert "New version" in best_version
 
 # Test top three display order
 @patch('iterative_improvement_elo.console')
