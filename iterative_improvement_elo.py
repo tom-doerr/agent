@@ -143,7 +143,7 @@ if __name__ == "__main__":
     else:
         model_string = args.lm
 
-    lm = dspy.LM(model_string, max_tokens=10000)
+    lm = dspy.LM(model_string, max_tokens=10000, cache=False)
     dspy.configure(lm=lm)
     
     task = args.task
