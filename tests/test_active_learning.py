@@ -1,4 +1,5 @@
 import pytest
+pytestmark = pytest.mark.timeout(10)
 import os
 import json
 import sys

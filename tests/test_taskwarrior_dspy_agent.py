@@ -1,4 +1,6 @@
 import os
+import pytest
+pytestmark = pytest.mark.timeout(10)
 import sys
 import pytest
 import subprocess
