@@ -122,6 +122,25 @@ def iterative_improvement_elo(task, iterations=1000):
         for version in sorted_versions:
             # Show full version text
             table.add_row(version['version'], f"{version['elo']:.2f}")
+        
+        # Compute statistics
+        elo_scores = [v['elo'] for v in elo_versions_list]
+        if elo_scores:
+            mean = np.mean(elo_scores)
+            median = np.median(elo_scores)
+            lowest = np.min(elo_scores)
+            highest = np.max(elo_scores)
+            std_dev = np.std(elo_scores)
+            
+            # Add separator and statistics rows
+            table.add_row("", "")  # empty row for spacing
+            table.add_row("[bold]Statistics[/bold]", "", style="bold")
+            table.add_row("Mean", f"{mean:.2f}")
+            table.add_row("Median", f"{median:.2f}")
+            table.add_row("Lowest", f"{lowest:.2f}")
+            table.add_row("Highest", f"{highest:.2f}")
+            table.add_row("Standard Deviation", f"{std_dev:.2f}")
+        
         console.print(f"\nAfter iteration {i+1}: (Total versions: {len(elo_versions_list)})")
         console.print(table)
     
