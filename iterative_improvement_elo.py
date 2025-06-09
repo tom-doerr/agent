@@ -106,8 +106,19 @@ def iterative_improvement_elo(task, iterations=1000):
         if winner['elo'] > best_version['elo']:
             best_version = winner
         
-        # Print current versions sorted by ELO (highest last)
+        # Print top three versions with highest ELO first
         if elo_versions_list:
+            sorted_versions_desc = sorted(elo_versions_list, key=lambda x: x['elo'], reverse=True)
+            top_three = sorted_versions_desc[:3]
+            
+            console.print(f"\nAfter iteration {i+1}: (Total versions: {len(elo_versions_list)})")
+            console.print("[bold]Top 3 Versions:[/bold]")
+            for idx, version in enumerate(top_three, 1):
+                console.print(f"{idx}. [bold]ELO: {version['elo']:.2f}[/bold]")
+                console.print(version['version'])
+                console.print("-" * 80)
+            
+            # Then print all versions in a table (sorted ascending)
             sorted_versions = sorted(elo_versions_list, key=lambda x: x['elo'])
             table = Table(show_header=True, header_style="bold magenta", expand=True)
             table.add_column("Version", width=50)
@@ -116,10 +127,10 @@ def iterative_improvement_elo(task, iterations=1000):
                 # Truncate long versions for display
                 truncated_version = version['version'][:50] + '...' if len(version['version']) > 50 else version['version']
                 table.add_row(truncated_version, f"{version['elo']:.2f}")
-        
-            console.print(f"\nAfter iteration {i+1}: (Total versions: {len(elo_versions_list)})")
+            
+            console.print("\n[bold]All Versions (sorted by ELO ascending):[/bold]")
             console.print(table)
-        
+            
             # Compute and print statistics separately
             elo_scores = [v['elo'] for v in elo_versions_list]
             if elo_scores:
