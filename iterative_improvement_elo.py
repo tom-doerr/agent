@@ -69,7 +69,8 @@ def iterative_improvement_elo(task, iterations=1000):
             current_version = current_version_obj['version']
         
         # Generate new version
-        new_version_str = predict(task, current_version)
+        new_version_str = chain_of_thought(task, current_version)
+        # new_version_str = predict(task, current_version)
         new_version_obj = {'version': new_version_str, 'elo': 1000}
         
         # Select opponent
@@ -143,7 +144,7 @@ if __name__ == "__main__":
     else:
         model_string = args.lm
 
-    lm = dspy.LM(model_string, max_tokens=10000, cache=False)
+    lm = dspy.LM(model_string, max_tokens=10000, cache=False, temperature=1.0)
     dspy.configure(lm=lm)
     
     task = args.task
