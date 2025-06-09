@@ -18,11 +18,8 @@ def sample_version(elo_versions_list):
     # sample a version weighted by elo score (poisson distribution)
     if not elo_versions_list:
         return None
-    elo_scores = [version['elo'] for version in elo_versions_list]
-    elo_scores = np.array(elo_scores)
-    elo_scores = elo_scores - np.min(elo_scores)  # shift to non-negative
-    elo_scores = elo_scores + 1e-6  # avoid zero
-    # Calculate probabilities using softmax
+    elo_scores = np.array([version['elo'] for version in elo_versions_list])
+    # Standard softmax to avoid overflow: subtract the max and then exp
     exp_scores = np.exp(elo_scores - np.max(elo_scores))
     probabilities = exp_scores / np.sum(exp_scores)
     return random.choices(elo_versions_list, weights=probabilities, k=1)[0]
@@ -43,9 +40,13 @@ def update_elo_ratings(winner_version, loser_version, k=32):
     winner_elo = winner_version['elo']
     loser_elo = loser_version['elo']
     
+    # Calculate expected scores
     expected_winner = 1 / (1 + 10 ** ((loser_elo - winner_elo) / 400))
+    expected_loser = 1 - expected_winner  # because expected_winner + expected_loser = 1
+    
+    # Update ratings
     new_winner_elo = winner_elo + k * (1 - expected_winner)
-    new_loser_elo = loser_elo + k * (0 - expected_winner)
+    new_loser_elo = loser_elo + k * (0 - expected_loser)
     
     winner_version['elo'] = new_winner_elo
     loser_version['elo'] = new_loser_elo
