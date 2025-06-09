@@ -54,7 +54,7 @@ def update_elo_ratings(winner_version, loser_version, k=32):
     return winner_version, loser_version
 
 
-def iterative_improvement_elo(task, iterations=1000, parallel=10):
+def iterative_improvement_elo(task, iterations=1000, parallel=10, model_name="unknown"):
     elo_versions_list = []
     # Create initial version
     initial_version = {'version': predict(task, "", description='Create initial version'), 'elo': 1000}
@@ -168,12 +168,8 @@ def iterative_improvement_elo(task, iterations=1000, parallel=10):
                 highest = np.max(elo_scores)
                 std_dev = np.std(elo_scores)
             
-                console.print(f"Statistics:")
-                console.print(f"  Mean: {mean:.2f}")
-                console.print(f"  Median: {median:.2f}")
-                console.print(f"  Lowest: {lowest:.2f}")
-                console.print(f"  Highest: {highest:.2f}")
-                console.print(f"  Standard Deviation: {std_dev:.2f}")
+                console.print(f"Model: {model_name}")
+                console.print(f"Statistics: Mean: {mean:.2f} | Median: {median:.2f} | Lowest: {lowest:.2f} | Highest: {highest:.2f} | StdDev: {std_dev:.2f}")
             
             # Print timing statistics
             avg_time = np.mean(iteration_times) if iteration_times else 0
@@ -208,7 +204,7 @@ if __name__ == "__main__":
     task = args.task
     iterations = args.iterations
     
-    best_version = iterative_improvement_elo(task, iterations, args.parallel)
+    best_version = iterative_improvement_elo(task, iterations, args.parallel, model_name=args.lm)
     
     print(f"Best version after {iterations} iterations: {best_version}")
     sys.exit(0)
