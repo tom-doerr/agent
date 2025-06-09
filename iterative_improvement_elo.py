@@ -6,6 +6,8 @@ from model_map import MODEL_MAP
 import numpy as np
 import random
 import sys
+from rich.console import Console
+from rich.table import Table
 
 model = 'flash'
 dspy.configure(lm=dspy.LM(MODEL_MAP[model], max_tokens=10000))
@@ -56,6 +58,7 @@ def iterative_improvement_elo(task, iterations=1000):
     elo_versions_list.append(initial_version)
     
     best_version = initial_version
+    console = Console()
     
     for i in range(iterations):
         # Sample current version
@@ -109,6 +112,18 @@ def iterative_improvement_elo(task, iterations=1000):
         # Track best version
         if winner['elo'] > best_version['elo']:
             best_version = winner
+        
+        # Print current versions sorted by ELO (highest last)
+        sorted_versions = sorted(elo_versions_list, key=lambda x: x['elo'])
+        table = Table(show_header=True, header_style="bold magenta")
+        table.add_column("Version", width=50)
+        table.add_column("ELO", justify="right")
+        for version in sorted_versions:
+            # Truncate long versions for display
+            truncated_version = version['version'][:50] + '...' if len(version['version']) > 50 else version['version']
+            table.add_row(truncated_version, f"{version['elo']:.2f}")
+        console.print(f"\nAfter iteration {i+1}:")
+        console.print(table)
     
     return best_version['version']
 
