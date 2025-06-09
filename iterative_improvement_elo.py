@@ -8,6 +8,7 @@ import random
 import sys
 from rich.console import Console
 from rich.table import Table
+import concurrent.futures
 
 # Initialize console for rich output
 console = Console()
@@ -51,7 +52,7 @@ def update_elo_ratings(winner_version, loser_version, k=32):
     return winner_version, loser_version
 
 
-def iterative_improvement_elo(task, iterations=1000):
+def iterative_improvement_elo(task, iterations=1000, parallel=10):
     elo_versions_list = []
     # Create initial version
     initial_version = {'version': predict(task, "", description='Create initial version'), 'elo': 1000}
@@ -60,6 +61,13 @@ def iterative_improvement_elo(task, iterations=1000):
     best_version = initial_version
     console = Console()
     NUM_COMPARISONS_PER_GENERATION = 3  # Number of comparisons per new version
+    
+    # Function to run a single comparison
+    def run_comparison(new_version_str, opponent_version):
+        return predict(
+            f"Task: {task}\nVersion 1: {new_version_str}\nVersion 2: {opponent_version}",
+            description='Which version is better? Output only the number (1 or 2).'
+        )
     
     for i in range(iterations):
         # Sample current version
@@ -74,35 +82,42 @@ def iterative_improvement_elo(task, iterations=1000):
         new_version_str = predict(task, current_version)
         new_version_obj = {'version': new_version_str, 'elo': 1000}
         
-        # Do multiple comparisons for this new version
-        for comp_index in range(NUM_COMPARISONS_PER_GENERATION):
-            # Select opponent
+        # Do multiple comparisons for this new version in parallel
+        opponents = []
+        for _ in range(NUM_COMPARISONS_PER_GENERATION):
             opponent_obj = get_random_opponent(elo_versions_list, new_version_obj)
             if opponent_obj is None:
-                # If no opponent available, skip this comparison
                 continue
+            opponents.append(opponent_obj)
+        
+        # Run comparisons in parallel
+        with concurrent.futures.ThreadPoolExecutor(max_workers=parallel) as executor:
+            futures = []
+            for opponent_obj in opponents:
+                futures.append(
+                    executor.submit(run_comparison, new_version_str, opponent_obj['version'])
+                )
             
-            # Compare versions
-            better_version_num = predict(
-                f"Task: {task}\nVersion 1: {new_version_str}\nVersion 2: {opponent_obj['version']}",
-                description='Which version is better? Output only the number (1 or 2).'
-            )
-            
-            # Validate response
-            if better_version_num.strip() == '1':
-                winner, loser = new_version_obj, opponent_obj
-            elif better_version_num.strip() == '2':
-                winner, loser = opponent_obj, new_version_obj
-            else:
-                # Skip invalid responses
-                continue
-            
-            # Update ELO ratings (modifies winner/loser in-place)
-            update_elo_ratings(winner, loser)
-            
-            # Update best version if current winner is better
-            if winner['elo'] > best_version['elo']:
-                best_version = winner
+            for future, opponent_obj in zip(futures, opponents):
+                try:
+                    better_version_num = future.result()
+                    # Validate response
+                    if better_version_num.strip() == '1':
+                        winner, loser = new_version_obj, opponent_obj
+                    elif better_version_num.strip() == '2':
+                        winner, loser = opponent_obj, new_version_obj
+                    else:
+                        # Skip invalid responses
+                        continue
+                    
+                    # Update ELO ratings (modifies winner/loser in-place)
+                    update_elo_ratings(winner, loser)
+                    
+                    # Update best version if current winner is better
+                    if winner['elo'] > best_version['elo']:
+                        best_version = winner
+                except Exception as e:
+                    console.print(f"[red]Error in comparison: {e}[/red]")
         
         # Add new version to list if not already present
         if not any(v['version'] == new_version_str for v in elo_versions_list):
@@ -157,6 +172,7 @@ def parse_args():
     parser.add_argument('task', type=str, help='The task to improve upon')
     parser.add_argument('--iterations', type=int, default=1000, help='Number of iterations to run')
     parser.add_argument('--lm', type=str, default='flash', help='Model to use for predictions')
+    parser.add_argument('--parallel', type=int, default=10, help='Number of parallel comparisons (default: 10)')
     return parser.parse_args()
 
 
@@ -173,7 +189,7 @@ if __name__ == "__main__":
     task = args.task
     iterations = args.iterations
     
-    best_version = iterative_improvement_elo(task, iterations)
+    best_version = iterative_improvement_elo(task, iterations, args.parallel)
     
     print(f"Best version after {iterations} iterations: {best_version}")
     sys.exit(0)
