@@ -9,8 +9,8 @@ import sys
 from rich.console import Console
 from rich.table import Table
 
-model = 'flash'
-dspy.configure(lm=dspy.LM(MODEL_MAP[model], max_tokens=10000))
+# Initialize console for rich output
+console = Console()
 
 
 def sample_version(elo_versions_list):
@@ -95,53 +95,46 @@ def iterative_improvement_elo(task, iterations=1000):
             # Skip invalid responses
             continue
         
-        # Update ELO ratings
+        # Update ELO ratings (modifies winner/loser in-place)
         update_elo_ratings(winner, loser)
         
-        # Update the opponent's ELO in the list (since opponent is in the list)
-        # For the new_version_obj, we'll add it to the list below
-        # Find the opponent in the list and update its ELO
-        for version in elo_versions_list:
-            if version['version'] == opponent_obj['version']:
-                version['elo'] = opponent_obj['elo']
-                break
-        
         # Add new version to list if not already present
-        if new_version_str not in [v['version'] for v in elo_versions_list]:
+        if not any(v['version'] == new_version_str for v in elo_versions_list):
             elo_versions_list.append(new_version_obj)
         
-        # Track best version
+        # Update best version if current winner is better
         if winner['elo'] > best_version['elo']:
             best_version = winner
         
         # Print current versions sorted by ELO (highest last)
-        sorted_versions = sorted(elo_versions_list, key=lambda x: x['elo'])
-        table = Table(show_header=True, header_style="bold magenta", expand=True)
-        table.add_column("Version", width=50)
-        table.add_column("ELO", justify="right")
-        for version in sorted_versions:
-            # Truncate long versions for display
-            truncated_version = version['version'][:50] + '...' if len(version['version']) > 50 else version['version']
-            table.add_row(truncated_version, f"{version['elo']:.2f}")
+        if elo_versions_list:
+            sorted_versions = sorted(elo_versions_list, key=lambda x: x['elo'])
+            table = Table(show_header=True, header_style="bold magenta", expand=True)
+            table.add_column("Version", width=50)
+            table.add_column("ELO", justify="right")
+            for version in sorted_versions:
+                # Truncate long versions for display
+                truncated_version = version['version'][:50] + '...' if len(version['version']) > 50 else version['version']
+                table.add_row(truncated_version, f"{version['elo']:.2f}")
         
-        console.print(f"\nAfter iteration {i+1}: (Total versions: {len(elo_versions_list)})")
-        console.print(table)
+            console.print(f"\nAfter iteration {i+1}: (Total versions: {len(elo_versions_list)})")
+            console.print(table)
         
-        # Compute and print statistics separately
-        elo_scores = [v['elo'] for v in elo_versions_list]
-        if elo_scores:
-            mean = np.mean(elo_scores)
-            median = np.median(elo_scores)
-            lowest = np.min(elo_scores)
-            highest = np.max(elo_scores)
-            std_dev = np.std(elo_scores)
+            # Compute and print statistics separately
+            elo_scores = [v['elo'] for v in elo_versions_list]
+            if elo_scores:
+                mean = np.mean(elo_scores)
+                median = np.median(elo_scores)
+                lowest = np.min(elo_scores)
+                highest = np.max(elo_scores)
+                std_dev = np.std(elo_scores)
             
-            console.print(f"Statistics:")
-            console.print(f"  Mean: {mean:.2f}")
-            console.print(f"  Median: {median:.2f}")
-            console.print(f"  Lowest: {lowest:.2f}")
-            console.print(f"  Highest: {highest:.2f}")
-            console.print(f"  Standard Deviation: {std_dev:.2f}")
+                console.print(f"Statistics:")
+                console.print(f"  Mean: {mean:.2f}")
+                console.print(f"  Median: {median:.2f}")
+                console.print(f"  Lowest: {lowest:.2f}")
+                console.print(f"  Highest: {highest:.2f}")
+                console.print(f"  Standard Deviation: {std_dev:.2f}")
     
     return best_version['version']
 
