@@ -126,3 +126,43 @@ def test_exception_handling(mock_chain, mock_predict):
     
     # Verify failure was counted but process continued
     assert "New version" in best_version
+
+# Test top three display order
+@patch('iterative_improvement_elo.console')
+def test_top_three_display_order(mock_console):
+    from iterative_improvement_elo import display_iteration_stats
+    
+    # Create test data
+    elo_versions_list = [
+        {'version': 'v1', 'elo': 1000},
+        {'version': 'v2', 'elo': 1200},
+        {'version': 'v3', 'elo': 800},
+        {'version': 'v4', 'elo': 1500},
+        {'version': 'v5', 'elo': 1100}
+    ]
+    
+    # Call display function
+    display_iteration_stats(
+        i=0,
+        elo_versions_list=elo_versions_list,
+        total_requests=0,
+        gen_success=0,
+        gen_failures=0,
+        eval_success=0,
+        eval_failures=0,
+        iter_time=1.0,
+        total_time=1.0,
+        iteration_times=[1.0],
+        model_name="test_model"
+    )
+    
+    # Get printed output
+    output = "\n".join(str(call[0][0]) for call in mock_console.print.call_args_list)
+    
+    # Verify top 3 are shown in descending order: v4 (1500), v2 (1200), v5 (1100)
+    assert "1. ELO: 1500.00" in output
+    assert "2. ELO: 1200.00" in output
+    assert "3. ELO: 1100.00" in output
+    assert "v4" in output
+    assert "v2" in output
+    assert "v5" in output
