@@ -60,11 +60,10 @@ def update_elo_ratings(winner_version, loser_version, k=32):
 
 def iterative_improvement_elo(task, iterations=1000, parallel=10, model_name="unknown"):
     elo_versions_list = []
-    # Create initial version
-    initial_version = {'version': predict(task, "", description='Create initial version'), 'elo': 1000}
+    # Create initial version using chain_of_thought for better reasoning
+    initial_version = {'version': chain_of_thought(task, "", description='Create initial version'), 'elo': 1000}
     elo_versions_list.append(initial_version)
     
-    best_version = initial_version
     console = Console()
     NUM_COMPARISONS_PER_GENERATION = 3  # Number of comparisons per new version
     
@@ -125,9 +124,6 @@ def iterative_improvement_elo(task, iterations=1000, parallel=10, model_name="un
                     # Update ELO ratings (modifies winner/loser in-place)
                     update_elo_ratings(winner, loser)
                     
-                    # Update best version if current winner is better
-                    if winner['elo'] > best_version['elo']:
-                        best_version = winner
                 except Exception as e:
                     console.print(f"[red]Error in comparison: {e}[/red]")
         
@@ -143,10 +139,12 @@ def iterative_improvement_elo(task, iterations=1000, parallel=10, model_name="un
         if elo_versions_list:
             sorted_versions_desc = sorted(elo_versions_list, key=lambda x: x['elo'], reverse=True)
             top_three = sorted_versions_desc[:3]
+            # Reverse the top_three list so best (highest ELO) is last
+            top_three_reversed = top_three[::-1]
             
             console.print(f"\nAfter iteration {i+1} (Total: {len(elo_versions_list)} versions, Time: {iter_time:.2f}s, Total: {total_time:.2f}s):")
             console.print("[bold]Top 3 Versions:[/bold]")
-            for idx, version in enumerate(top_three, 1):
+            for idx, version in enumerate(top_three_reversed, 1):
                 console.print(f"{idx}. [bold]ELO: {version['elo']:.2f}[/bold]")
                 console.print(version['version'])
                 console.print("-" * 80)
@@ -171,7 +169,9 @@ def iterative_improvement_elo(task, iterations=1000, parallel=10, model_name="un
             console.print(f"  Total Runtime: {total_time:.2f}s")
             console.print(f"  Projected Remaining: {avg_time * (iterations - i - 1):.2f}s")
     
-    return best_version['version']
+    # Return the version with highest ELO at the end
+    best_final = max(elo_versions_list, key=lambda x: x['elo'])
+    return best_final['version']
 
 def parse_args():
     import argparse
