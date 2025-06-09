@@ -10,13 +10,8 @@ from rich.console import Console
 from rich.table import Table
 import concurrent.futures
 import time
-import threading
-
 # Initialize console for rich output
 console = Console()
-
-# Lock for thread-safe predict calls
-predict_lock = threading.Lock()
 
 
 def sample_version(elo_versions_list):
@@ -73,11 +68,10 @@ def iterative_improvement_elo(task, iterations=1000, parallel=10, model_name="un
     
     # Function to run a single comparison
     def run_comparison(new_version_str, opponent_version):
-        with predict_lock:
-            return predict(
-                f"Task: {task}\nVersion 1: {new_version_str}\nVersion 2: {opponent_version}",
-                description='Which version is better? Output only the number (1 or 2).'
-            )
+        return predict(
+            f"Task: {task}\nVersion 1: {new_version_str}\nVersion 2: {opponent_version}",
+            description='Which version is better? Output only the number (1 or 2).'
+        )
     
     for i in range(iterations):
         iter_start = time.time()
