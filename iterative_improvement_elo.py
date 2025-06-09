@@ -151,7 +151,7 @@ def iterative_improvement_elo(task, iterations=1000, parallel=10, model_name="un
         iteration_times.append(iter_time)
         total_time = time.time() - start_time
         
-def display_iteration_stats(i, elo_versions_list, total_requests, gen_success, gen_failures, eval_success, eval_failures, iter_time, total_time, iteration_times, model_name):
+def display_iteration_stats(i, iterations, elo_versions_list, total_requests, gen_success, gen_failures, eval_success, eval_failures, iter_time, total_time, iteration_times, model_name):
     if elo_versions_list:
         # Sort in descending ELO order (best first)
         sorted_versions_desc = sorted(elo_versions_list, key=lambda x: x['elo'], reverse=True)
