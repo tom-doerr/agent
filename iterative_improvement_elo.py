@@ -117,13 +117,17 @@ def iterative_improvement_elo(task, iterations=1000):
         # Print current versions sorted by ELO (highest last)
         sorted_versions = sorted(elo_versions_list, key=lambda x: x['elo'])
         table = Table(show_header=True, header_style="bold magenta", expand=True)
-        table.add_column("Version", width=150)
+        table.add_column("Version", width=50)
         table.add_column("ELO", justify="right")
         for version in sorted_versions:
-            # Show full version text
-            table.add_row(version['version'], f"{version['elo']:.2f}")
+            # Truncate long versions for display
+            truncated_version = version['version'][:50] + '...' if len(version['version']) > 50 else version['version']
+            table.add_row(truncated_version, f"{version['elo']:.2f}")
         
-        # Compute statistics
+        console.print(f"\nAfter iteration {i+1}: (Total versions: {len(elo_versions_list)})")
+        console.print(table)
+        
+        # Compute and print statistics separately
         elo_scores = [v['elo'] for v in elo_versions_list]
         if elo_scores:
             mean = np.mean(elo_scores)
@@ -132,17 +136,12 @@ def iterative_improvement_elo(task, iterations=1000):
             highest = np.max(elo_scores)
             std_dev = np.std(elo_scores)
             
-            # Add separator and statistics rows
-            table.add_row("", "")  # empty row for spacing
-            table.add_row("[bold]Statistics[/bold]", "", style="bold")
-            table.add_row("Mean", f"{mean:.2f}")
-            table.add_row("Median", f"{median:.2f}")
-            table.add_row("Lowest", f"{lowest:.2f}")
-            table.add_row("Highest", f"{highest:.2f}")
-            table.add_row("Standard Deviation", f"{std_dev:.2f}")
-        
-        console.print(f"\nAfter iteration {i+1}: (Total versions: {len(elo_versions_list)})")
-        console.print(table)
+            console.print(f"Statistics:")
+            console.print(f"  Mean: {mean:.2f}")
+            console.print(f"  Median: {median:.2f}")
+            console.print(f"  Lowest: {lowest:.2f}")
+            console.print(f"  Highest: {highest:.2f}")
+            console.print(f"  Standard Deviation: {std_dev:.2f}")
     
     return best_version['version']
 
