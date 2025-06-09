@@ -1,7 +1,7 @@
 import os
 import re
 import pytest
-pytestmark = pytest.mark.timeout(10)
+pytestmark = pytest.mark.timeout(10, method='thread')
 import dspy
 from unittest.mock import patch, MagicMock
 from coding_agent_repl import CodingAgentREPL, configure_dspy

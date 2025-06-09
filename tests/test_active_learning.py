@@ -1,5 +1,5 @@
 import pytest
-pytestmark = pytest.mark.timeout(10)
+pytestmark = pytest.mark.timeout(10, method='thread')
 import os
 import json
 import sys
