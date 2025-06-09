@@ -184,6 +184,10 @@ if __name__ == "__main__":
     else:
         model_string = args.lm
 
+    if args.parallel < 1:
+        console.print("[red]Error: --parallel must be at least 1[/red]")
+        sys.exit(1)
+
     lm = dspy.LM(model_string, max_tokens=10000, cache=False, temperature=1.0)
     dspy.configure(lm=lm)
     
@@ -192,7 +196,7 @@ if __name__ == "__main__":
     
     best_version = iterative_improvement_elo(task, iterations, args.parallel, model_name=args.lm)
     
-    print(f"Best version after {iterations} iterations: {best_version}")
+    console.print(f"Best version after {iterations} iterations: {best_version}")
     sys.exit(0)
 
 
