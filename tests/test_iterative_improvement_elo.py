@@ -74,7 +74,7 @@ def test_iterative_improvement_flow(mock_console, mock_chain, mock_predict):
         best_version = iterative_improvement_elo("test task", iterations=1, parallel=1)
         
         # Verify results
-        assert "New version" in best_version
+        assert best_version == "New version"
         assert mock_chain.call_count == 1
         assert mock_predict.call_count == 4  # 1 gen + 3 comparisons
         
@@ -118,7 +118,7 @@ def test_elo_ranking_order(mock_console, mock_chain, mock_predict):
         best_version = iterative_improvement_elo("test task", iterations=1, parallel=1)
         
         # Verify new version is best
-        assert "New version" in best_version
+        assert best_version == "New version"
 
 # Test exception handling
 @patch('iterative_improvement_elo.predict')
@@ -152,7 +152,7 @@ def test_exception_handling(mock_console, mock_chain, mock_predict):
         best_version = iterative_improvement_elo("test task", iterations=2, parallel=1)
         
         # Verify new version is best
-        assert "New version" in best_version
+        assert best_version == "New version"
 
 # Test top three display order
 @patch('iterative_improvement_elo.console')
@@ -188,7 +188,7 @@ def test_top_three_display_order(mock_console):
     output = "\n".join(str(call[0][0]) for call in mock_console.print.call_args_list)
     
     # Verify top 3 are shown in descending order: v4 (1500), v2 (1200), v5 (1100)
-    assert "1. ELO: 1500.00" in output
+    assert "1. [bold]ELO: 1500.00[/bold]" in output
     assert "2. ELO: 1200.00" in output
     assert "3. ELO: 1100.00" in output
     assert "v4" in output

@@ -186,8 +186,10 @@ def display_iteration_stats(i, iterations, elo_versions_list, total_requests, ge
         console.print(f"  Projected Remaining: {avg_time * (iterations - i - 1):.2f}s")
     
     # Return the version with highest ELO at the end
-    best_final = max(elo_versions_list, key=lambda x: x['elo'])
-    return best_final['version']
+    if elo_versions_list:
+        best_final = max(elo_versions_list, key=lambda x: x['elo'])
+        return best_final['version']
+    return ""
 
 def parse_args():
     import argparse
