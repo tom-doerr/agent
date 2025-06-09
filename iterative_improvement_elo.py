@@ -10,8 +10,12 @@ from rich.console import Console
 from rich.table import Table
 import concurrent.futures
 import time
+import threading
 # Initialize console for rich output
 console = Console()
+
+# Lock for thread-safe predict calls
+predict_lock = threading.Lock()
 
 
 def sample_version(elo_versions_list):
@@ -59,7 +63,6 @@ def iterative_improvement_elo(task, iterations=1000, parallel=10, model_name="un
     initial_version = {'version': chain_of_thought(task, "", description='Create initial version'), 'elo': 1000}
     elo_versions_list.append(initial_version)
     
-    console = Console()
     NUM_COMPARISONS_PER_GENERATION = 3  # Number of comparisons per new version
     
     # Timing statistics
@@ -68,10 +71,11 @@ def iterative_improvement_elo(task, iterations=1000, parallel=10, model_name="un
     
     # Function to run a single comparison
     def run_comparison(new_version_str, opponent_version):
-        return predict(
-            f"Task: {task}\nVersion 1: {new_version_str}\nVersion 2: {opponent_version}",
-            description='Which version is better? Output only the number (1 or 2).'
-        )
+        with predict_lock:
+            return predict(
+                f"Task: {task}\nVersion 1: {new_version_str}\nVersion 2: {opponent_version}",
+                description='Which version is better? Output only the number (1 or 2).'
+            )
     
     for i in range(iterations):
         iter_start = time.time()
@@ -133,16 +137,14 @@ def iterative_improvement_elo(task, iterations=1000, parallel=10, model_name="un
         iteration_times.append(iter_time)
         total_time = time.time() - start_time
         
-        # Print top three versions with highest ELO first (best first)
+        # Print top three versions with highest ELO last
         if elo_versions_list:
-            sorted_versions_desc = sorted(elo_versions_list, key=lambda x: x['elo'], reverse=True)
-            top_three = sorted_versions_desc[:3]
-            # Reverse the top_three list so best (highest ELO) is last
-            top_three_reversed = top_three[::-1]
-            
+            sorted_versions_asc = sorted(elo_versions_list, key=lambda x: x['elo'])
+            top_three = sorted_versions_asc[-3:][::-1]  # Get top 3 and reverse to show best last
+                
             console.print(f"\nAfter iteration {i+1} (Total: {len(elo_versions_list)} versions, Time: {iter_time:.2f}s, Total: {total_time:.2f}s):")
             console.print("[bold]Top 3 Versions:[/bold]")
-            for idx, version in enumerate(top_three_reversed, 1):
+            for idx, version in enumerate(top_three, 1):
                 console.print(f"{idx}. [bold]ELO: {version['elo']:.2f}[/bold]")
                 console.print(version['version'])
                 console.print("-" * 80)
