@@ -65,6 +65,13 @@ def iterative_improvement_elo(task, iterations=1000, parallel=10, model_name="un
     
     NUM_COMPARISONS_PER_GENERATION = 3  # Number of comparisons per new version
     
+    # Counters for requests and outcomes
+    total_requests = 0
+    gen_success = 0
+    gen_failures = 0
+    eval_success = 0
+    eval_failures = 0
+    
     # Timing statistics
     start_time = time.time()
     iteration_times = []
@@ -88,14 +95,16 @@ def iterative_improvement_elo(task, iterations=1000, parallel=10, model_name="un
         
         with concurrent.futures.ThreadPoolExecutor(max_workers=parallel) as executor:
             # Generate new version in the thread pool
+            total_requests += 1
             try:
                 future_gen = executor.submit(predict, task, current_version)
                 new_version_str = future_gen.result()
+                gen_success += 1
+                new_version_obj = {'version': new_version_str, 'elo': 1000}
             except Exception as e:
                 console.print(f"[red]Error in generation: {e}[/red]")
+                gen_failures += 1
                 continue
-                
-            new_version_obj = {'version': new_version_str, 'elo': 1000}
             
             # Do multiple comparisons for this new version in parallel
             opponents = []
@@ -112,15 +121,19 @@ def iterative_improvement_elo(task, iterations=1000, parallel=10, model_name="un
                 )
             
             for future, opponent_obj in zip(futures, opponents):
+                total_requests += 1
                 try:
                     better_version_num = future.result()
                     # Validate response
                     if better_version_num.strip() == '1':
                         winner, loser = new_version_obj, opponent_obj
+                        eval_success += 1
                     elif better_version_num.strip() == '2':
                         winner, loser = opponent_obj, new_version_obj
+                        eval_success += 1
                     else:
                         # Skip invalid responses
+                        eval_failures += 1
                         continue
                     
                     # Update ELO ratings (modifies winner/loser in-place)
@@ -128,6 +141,7 @@ def iterative_improvement_elo(task, iterations=1000, parallel=10, model_name="un
                     
                 except Exception as e:
                     console.print(f"[red]Error in comparison: {e}[/red]")
+                    eval_failures += 1
             
             # Add new version to list if not already present
             if not any(v['version'] == new_version_str for v in elo_versions_list):
@@ -142,7 +156,8 @@ def iterative_improvement_elo(task, iterations=1000, parallel=10, model_name="un
             sorted_versions_asc = sorted(elo_versions_list, key=lambda x: x['elo'])
             top_three = sorted_versions_asc[-3:][::-1]  # Get top 3 and reverse to show best last
                 
-            console.print(f"\nAfter iteration {i+1} (Total: {len(elo_versions_list)} versions, Time: {iter_time:.2f}s, Total: {total_time:.2f}s):")
+            console.print(f"\nAfter iteration {i+1} (Total: {len(elo_versions_list)} versions, Requests: {total_requests}, Time: {iter_time:.2f}s, Total: {total_time:.2f}s):")
+            console.print(f"Requests: gen_success={gen_success}, gen_failures={gen_failures}, eval_success={eval_success}, eval_failures={eval_failures}")
             console.print("[bold]Top 3 Versions:[/bold]")
             for idx, version in enumerate(top_three, 1):
                 console.print(f"{idx}. [bold]ELO: {version['elo']:.2f}[/bold]")
