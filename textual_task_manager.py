@@ -70,8 +70,14 @@ class TaskManager(App):
     Screen {
         layout: vertical;
     }
+    #list-header {
+        text-align: center;
+        padding: 1;
+        border-bottom: solid $accent;
+        background: $surface-lighten-1;
+    }
     #task-list {
-        height: 70%;
+        height: 66%;
         border: solid $accent;
         padding: 1;
         overflow-y: auto;
@@ -107,6 +113,7 @@ class TaskManager(App):
     def compose(self) -> ComposeResult:
         yield Header()
         with Container(id="main-container"):
+            yield Label(id="list-header")
             yield ListView(id="task-list")
             with Container(id="input-container"):
                 yield Input(placeholder="Add new task...", id="new-task-input")
@@ -155,13 +162,18 @@ class TaskManager(App):
         filtered_tasks = []
         if self.current_filter == "all":
             filtered_tasks = self.tasks
+            header_text = f"All Tasks ({len(self.tasks)})"
         elif self.current_filter == "active":
             filtered_tasks = [t for t in self.tasks if not t.completed]
+            header_text = f"Active Tasks ({len(filtered_tasks)})"
         elif self.current_filter == "completed":
             filtered_tasks = [t for t in self.tasks if t.completed]
+            header_text = f"Completed Tasks ({len(filtered_tasks)})"
         
         for task in filtered_tasks:
             task_list.append(task)
+        
+        self.query_one("#list-header").update(header_text)
     
     def update_button_labels(self) -> None:
         all_count = len(self.tasks)

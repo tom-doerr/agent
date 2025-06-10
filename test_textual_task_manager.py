@@ -87,13 +87,37 @@ def test_filter_tasks(app):
     app.update_list()
     assert len(app.query_one("#task-list").children) == 1
 
-def test_button_labels_update(app):
-    """Test button label updates"""
+def test_list_header(app):
+    """Test that the task list header shows correct filter and count"""
     app.tasks = [
-        app.TaskItem("Task 1", completed=True),
-        app.TaskItem("Task 2", completed=False)
+        app.TaskItem("Active 1", completed=False),
+        app.TaskItem("Completed 1", completed=True),
+        app.TaskItem("Active 2", completed=False)
     ]
-    app.update_button_labels()
-    assert app.query_one("#filter-all").label == "All (2)"
-    assert app.query_one("#filter-active").label == "Active (1)"
-    assert app.query_one("#filter-completed").label == "Completed (1)"
+    
+    # Test all filter
+    app.current_filter = "all"
+    app.update_list()
+    assert app.query_one("#list-header").renderable == "All Tasks (3)"
+    
+    # Test active filter
+    app.current_filter = "active"
+    app.update_list()
+    assert app.query_one("#list-header").renderable == "Active Tasks (2)"
+    
+    # Test completed filter
+    app.current_filter = "completed"
+    app.update_list()
+    assert app.query_one("#list-header").renderable == "Completed Tasks (1)"
+    
+    # Test after toggling task
+    app.query_one("#task-list").index = 0
+    app.toggle_selected_task()
+    app.update_list()
+    assert app.query_one("#list-header").renderable == "Completed Tasks (2)"
+    
+    # Test after deleting task
+    app.query_one("#task-list").index = 0
+    app.on_key(events.Key("delete"))
+    app.update_list()
+    assert app.query_one("#list-header").renderable == "Completed Tasks (1)"
