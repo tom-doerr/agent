@@ -205,6 +205,13 @@ def iterative_improvement_elo(task, iterations=1000, parallel=10, model_name="un
             iteration_times,
             model_name
         )
+    
+    # After all iterations, return the best version (highest ELO)
+    if elo_versions_list:
+        best_version = max(elo_versions_list, key=lambda x: x['elo'])
+        return best_version['version']
+    else:
+        return ""
         
 
 def parse_args():
