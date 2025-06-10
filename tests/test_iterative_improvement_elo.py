@@ -6,7 +6,7 @@ import os
 import sys
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from iterative_improvement_elo import sample_version, get_random_opponent, update_elo_ratings
+from iterative_improvement_elo import sample_version, get_random_opponent, update_elo_ratings, iterative_improvement_elo
 from unittest.mock import patch, MagicMock
 import numpy as np
 import random
@@ -67,8 +67,6 @@ def test_iterative_improvement_flow(mock_console, mock_chain, mock_predict):
             {'version': "v3", 'elo': 1000}
         ]
 
-        # Import main function after mocks are set
-        from iterative_improvement_elo import iterative_improvement_elo
         
         # Run with 1 iteration
         best_version = iterative_improvement_elo("test task", iterations=1, parallel=1)
