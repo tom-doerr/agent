@@ -8,7 +8,7 @@ from contextlib import redirect_stdout
 
 # Centralized DSPy configuration
 def configure_dspy(model_name):
-    ll极 = dspy.LM(
+    llm = dspy.LM(
         model=model_name,
         max_tokens=4000
     )
