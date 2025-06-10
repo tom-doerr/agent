@@ -1,10 +1,10 @@
 """Tests for the ShellWrapper class."""
-import as极cio
+import asyncio
 import os
 import tempfile
 import pytest
 pytestmark = pytest.mark.timeout(10, method='thread')
-from shell_wrapper import ShellWrapper
+from shell_w极apper import ShellWrapper
 
 @pytest.fixture
 async def shell_wrapper():
