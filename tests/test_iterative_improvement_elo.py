@@ -101,12 +101,13 @@ def test_elo_ranking_order(mock_console, mock_chain, mock_predict):
     with patch('iterative_improvement_elo.sample_version') as mock_sample, \
          patch('iterative_improvement_elo.get_random_opponent') as mock_opponent:
         
-        # Set up mock returns: sample returns initial version, opponents return same initial version
-        mock_sample.return_value = {'version': "Initial version", 'elo': 1000}
+        # Set up mock returns with consistent object references
+        initial_version_obj = {'version': "Initial version", 'elo': 1000}
+        mock_sample.return_value = initial_version_obj
         mock_opponent.side_effect = [
-            {'version': "Initial version", 'elo': 1000},
-            {'version': "Initial version", 'elo': 1000},
-            {'version': "Initial version", 'elo': 1000}
+            initial_version_obj,
+            initial_version_obj,
+            initial_version_obj
         ]
 
         # Import main function after mocks are set
@@ -135,12 +136,13 @@ def test_exception_handling(mock_console, mock_chain, mock_predict):
     with patch('iterative_improvement_elo.sample_version') as mock_sample, \
          patch('iterative_improvement_elo.get_random_opponent') as mock_opponent:
         
-        # Set up mock returns: sample returns initial version, opponents return same initial version
-        mock_sample.return_value = {'version': "Initial version", 'elo': 1000}
+        # Set up mock returns with consistent object references
+        initial_version_obj = {'version': "Initial version", 'elo': 1000}
+        mock_sample.return_value = initial_version_obj
         mock_opponent.side_effect = [
-            {'version': "Initial version", 'elo': 1000},
-            {'version': "Initial version", 'elo': 1000},
-            {'version': "Initial version", 'elo': 1000}
+            initial_version_obj,
+            initial_version_obj,
+            initial_version_obj
         ]
 
         # Import main function after mocks are set
