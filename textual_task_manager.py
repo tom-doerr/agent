@@ -1,6 +1,7 @@
 from textual.app import App, ComposeResult
 from textual.containers import Container, Vertical
 from textual.widgets import Header, Footer, Button, Static, Input, ListView, ListItem, Label
+from textual.screen import ModalScreen
 from textual.reactive import reactive
 from textual import events
 import os
@@ -8,6 +9,51 @@ import json
 from datetime import datetime
 
 TASKS_FILE = "tasks.json"
+
+class HelpScreen(ModalScreen):
+    """Help screen with key bindings."""
+    CSS = """
+    HelpScreen {
+        align: center middle;
+    }
+    #help-dialog {
+        width: 60;
+        height: 24;
+        border: thick $accent;
+        background: $surface;
+        padding: 1 2;
+    }
+    #help-title {
+        text-align: center;
+        width: 100%;
+        padding: 1;
+        text-style: bold;
+    }
+    #help-content {
+        width: 100%;
+        height: 1fr;
+    }
+    #close-button {
+        width: 100%;
+    }
+    """
+
+    def compose(self) -> ComposeResult:
+        with Container(id="help-dialog"):
+            yield Label("Task Manager Help", id="help-title")
+            with Container(id="help-content"):
+                yield Label("Key bindings:")
+                yield Label("  ?: Toggle help")
+                yield Label("  Esc: Exit")
+                yield Label("  Ctrl+S: Save")
+                yield Label("  Delete: Delete selected task")
+                yield Label("  Space: Toggle completion of selected task")
+                yield Label("  Arrow keys: Navigate tasks")
+            yield Button("Close", id="close-button", variant="primary")
+    
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        if event.button.id == "close-button":
+            self.dismiss()
 
 class TaskItem(ListItem):
     def __init__(self, task_text, completed=False, created_at=None, **kwargs):
@@ -126,6 +172,16 @@ class TaskManager(App):
         self.query_one("#filter-active").label = f"Active ({active_count})"
         self.query_one("#filter-completed").label = f"Completed ({completed_count})"
     
+    def toggle_selected_task(self) -> None:
+        task_list = self.query_one("#task-list")
+        if task_list.index is not None:
+            selected_task = task_list.children[task_list.index]
+            if selected_task in self.tasks:
+                selected_task.completed = not selected_task.completed
+                self.save_tasks()
+                self.update_list()
+                self.update_button_labels()
+    
     def on_input_submitted(self, event: Input.Submitted) -> None:
         if event.input.id == "new-task-input" and event.value.strip():
             new_task = TaskItem(event.value.strip())
@@ -136,11 +192,7 @@ class TaskManager(App):
             event.input.value = ""
     
     def on_list_view_selected(self, event: ListView.Selected) -> None:
-        task = event.item
-        task.completed = not task.completed
-        self.save_tasks()
-        self.update_list()
-        self.update_button_labels()
+        self.toggle_selected_task()
     
     def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id == "filter-all":
@@ -172,6 +224,10 @@ class TaskManager(App):
                     self.save_tasks()
                     self.update_list()
                     self.update_button_labels()
+        elif event.key == "question_mark":
+            self.push_screen(HelpScreen())
+        elif event.key == "space":
+            self.toggle_selected_task()
 
 if __name__ == "__main__":
     app = TaskManager()
