@@ -10,7 +10,6 @@ from rich.console import Console
 import concurrent.futures
 import time
 import threading
-import threading
 
 # Initialize console for rich output
 console = Console()
@@ -133,8 +132,6 @@ def iterative_improvement_elo(task, iterations=1000, parallel=10, model_name="un
                 description='Which version is better? Output only the number (1 or 2).'
             )
     
-    predict_lock = threading.Lock()
-
     with concurrent.futures.ThreadPoolExecutor(max_workers=parallel) as executor:
         for i in range(iterations):
             iter_start = time.time()
