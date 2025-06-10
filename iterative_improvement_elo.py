@@ -44,13 +44,12 @@ def display_iteration_stats(i, iterations, elo_versions_list, total_requests, ge
             console.print(f"Model: {model_name}")
             console.print(f"Statistics: Mean: {mean:.2f} | Median: {median:.2f} | Lowest: {lowest:.2f} | Highest: {highest:.2f} | StdDev: {std_dev:.2f}")
         
-        # Print timing statistics
+        # Print timing statistics in one line
         avg_time = np.mean(iteration_times) if iteration_times else 0
-        console.print(f"\nTiming Statistics:")
-        console.print(f"  Current Iteration: {iter_time:.2f}s")
-        console.print(f"  Average Iteration: {avg_time:.2f}s")
-        console.print(f"  Total Runtime: {total_time:.2f}s")
-        console.print(f"  Projected Remaining: {avg_time * (iterations - i - 1):.2f}s")
+        console.print(f"Timing: Current: {iter_time:.2f}s, Avg: {avg_time:.2f}s, Total: {total_time:.2f}s, Projected: {avg_time * (iterations - i - 1):.2f}s")
+        
+        # Add summary at bottom
+        console.print(f"Summary: Versions: {len(elo_versions_list)}, Requests: {total_requests}")
 
 
 def sample_version(elo_versions_list):
