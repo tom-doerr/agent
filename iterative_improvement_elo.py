@@ -228,7 +228,7 @@ if __name__ == "__main__":
         console.print("[red]Error: --parallel must be at least 1[/red]")
         sys.exit(1)
 
-    lm = dspy.LM(model_string, max_tokens=10000, cache=False, temperature=1.0)
+    lm = dspy.LM(model_string, max_tokens=10000, cache=False, temperature=1.0, max_retries=5)
     dspy.configure(lm=lm)
     
     task = args.task
