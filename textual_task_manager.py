@@ -38,8 +38,8 @@ class TaskManager(App):
     #controls {
         height: 15%;
         layout: grid;
-        grid-size: 3;
-        grid-columns: 1fr 1fr 1fr;
+        grid-size: 4;
+        grid-columns: 1fr 1fr 1fr 1fr;
         padding: 1;
     }
     ListItem {
@@ -48,6 +48,10 @@ class TaskManager(App):
     }
     ListItem:hover {
         background: $accent 10%;
+    }
+    .delete-button {
+        width: auto;
+        min-width: 8;
     }
     """
     
@@ -64,12 +68,14 @@ class TaskManager(App):
                 yield Button("All", id="filter-all")
                 yield Button("Active", id="filter-active")
                 yield Button("Completed", id="filter-completed")
+                yield Button("Clear Completed", id="clear-completed", classes="delete-button")
         yield Footer()
     
     def on_mount(self) -> None:
         self.load_tasks()
         self.update_list()
         self.query_one("#new-task-input").focus()
+        self.update_button_labels()
     
     def load_tasks(self) -> None:
         if os.path.exists(TASKS_FILE):
@@ -111,12 +117,22 @@ class TaskManager(App):
         for task in filtered_tasks:
             task_list.append(task)
     
+    def update_button_labels(self) -> None:
+        all_count = len(self.tasks)
+        active_count = len([t for t in self.tasks if not t.completed])
+        completed_count = len([t for t in self.tasks if t.completed])
+        
+        self.query_one("#filter-all").label = f"All ({all_count})"
+        self.query_one("#filter-active").label = f"Active ({active_count})"
+        self.query_one("#filter-completed").label = f"Completed ({completed_count})"
+    
     def on_input_submitted(self, event: Input.Submitted) -> None:
         if event.input.id == "new-task-input" and event.value.strip():
             new_task = TaskItem(event.value.strip())
             self.tasks.append(new_task)
             self.save_tasks()
             self.update_list()
+            self.update_button_labels()
             event.input.value = ""
     
     def on_list_view_selected(self, event: ListView.Selected) -> None:
@@ -124,6 +140,7 @@ class TaskManager(App):
         task.completed = not task.completed
         self.save_tasks()
         self.update_list()
+        self.update_button_labels()
     
     def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id == "filter-all":
@@ -132,6 +149,12 @@ class TaskManager(App):
             self.current_filter = "active"
         elif event.button.id == "filter-completed":
             self.current_filter = "completed"
+        elif event.button.id == "clear-completed":
+            # Remove completed tasks
+            self.tasks = [t for t in self.tasks if not t.completed]
+            self.save_tasks()
+            self.update_list()
+            self.update_button_labels()
         self.update_list()
     
     def on_key(self, event: events.Key) -> None:
@@ -139,6 +162,16 @@ class TaskManager(App):
             self.exit()
         elif event.key == "ctrl+s":
             self.save_tasks()
+        elif event.key == "delete":
+            # Delete selected task
+            task_list = self.query_one("#task-list")
+            if task_list.index is not None:
+                selected_task = task_list.children[task_list.index]
+                if selected_task in self.tasks:
+                    self.tasks.remove(selected_task)
+                    self.save_tasks()
+                    self.update_list()
+                    self.update_button_labels()
 
 if __name__ == "__main__":
     app = TaskManager()
