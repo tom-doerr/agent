@@ -1,4 +1,5 @@
 import pytest
+from textual import events
 from textual_task_manager import TaskManager, TASKS_FILE
 from textual.widgets import ListView, Input, Button
 import os
