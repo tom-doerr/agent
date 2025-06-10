@@ -191,7 +191,7 @@ def iterative_improvement_elo(task, iterations=1000, parallel=10, model_name="un
                     eval_failures += 1
             
             # Add new version to list if not already present
-            if not any(v['version'] == new_version_str for v in elo_versions极list):
+            if not any(v['version'] == new_version_str for v in elo_versions_list):
                 elo_versions_list.append(new_version_obj)
             
             iter_time = time.time() - iter_start
