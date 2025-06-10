@@ -22,6 +22,9 @@ def test_sample_version():
     ]
     sampled = sample_version(versions)
     assert sampled in versions
+    
+def test_sample_version_empty_list():
+    assert sample_version([]) is None
 
 def test_get_random_opponent():
     versions = [
