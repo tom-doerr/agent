@@ -7,7 +7,6 @@ import numpy as np
 import random
 import sys
 from rich.console import Console
-from rich.table import Table
 import concurrent.futures
 import time
 import threading
@@ -192,12 +191,12 @@ def iterative_improvement_elo(task, iterations=1000, parallel=10, model_name="un
                     eval_failures += 1
             
             # Add new version to list if not already present
-            if not any(v['version'] == new_version_str for v in elo_versions_list):
+            if not any(v['version'] == new_version_str for v in elo_versions极list):
                 elo_versions_list.append(new_version_obj)
-        
-        iter_time = time.time() - iter_start
-        iteration_times.append(iter_time)
-        total_time = time.time() - start_time
+            
+            iter_time = time.time() - iter_start
+            iteration_times.append(iter_time)
+            total_time = time.time() - start_time
         
         display_iteration_stats(
             i,
