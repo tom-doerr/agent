@@ -15,7 +15,7 @@ class SelfReviewAgent(dspy.Module):
         self.generate = dspy.Predict("task -> response")
         self.criticize = dspy.Predict("task, response -> feedback")
         self.improve = dspy.Predict("task, response, feedback -> improved_response")
-        self.should_continue = dspy.Predict("feedback -> continue: 'yes' or 'no'")
+        self.should_continue = dspy.Predict("feedback -> should_continue: 'yes' or 'no'")
 
     def forward(self, task):
         history = []
