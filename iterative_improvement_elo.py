@@ -54,13 +54,16 @@ def display_iteration_stats(i, iterations, elo_versions_list, total_requests, ge
 
 
 def sample_version(elo_versions_list):
-    # sample a version weighted by elo score (poisson distribution)
+    # Heavily oversample high ELO versions using exponential weighting
     if not elo_versions_list:
         return None
     elo_scores = np.array([version['elo'] for version in elo_versions_list])
-    # Standard softmax to avoid overflow: subtract the max and then exp
-    exp_scores = np.exp(elo_scores - np.max(elo_scores))
-    probabilities = exp_scores / np.sum(exp_scores)
+    # Use exponential weighting to heavily favor high ELO scores
+    # Shift scores to be positive and apply power of 4 to increase weight of high scores
+    min_score = np.min(elo_scores)
+    shifted_scores = elo_scores - min_score + 1  # ensure positive
+    weights = shifted_scores ** 4  # power of 4 heavily favors high scores
+    probabilities = weights / np.sum(weights)
     return random.choices(elo_versions_list, weights=probabilities, k=1)[0]
 
 
