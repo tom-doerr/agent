@@ -111,10 +111,10 @@ def test_elo_ranking_order(mock_console, mock_chain, mock_predict):
 
         # Import main function after mocks are set
         from iterative_improvement_elo import iterative_improvement_elo
-        
+            
         # Run with 1 iteration
         best_version = iterative_improvement_elo("test task", iterations=1, parallel=1)
-        
+            
         # Verify new version is best
         assert best_version == "New version"
 
@@ -143,12 +143,12 @@ def test_exception_handling(mock_console, mock_chain, mock_predict):
             {'version': "Initial version", 'elo': 1000}
         ]
 
-        # Import main function after mocks are set
+        # Import main function after mocks are极et
         from iterative_improvement_elo import iterative_improvement_elo
-        
+            
         # Run with 2 iterations to handle failure then success
         best_version = iterative_improvement_elo("test task", iterations=2, parallel=1)
-        
+            
         # Verify new version is best
         assert best_version == "New version"
 
