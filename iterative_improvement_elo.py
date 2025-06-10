@@ -131,16 +131,16 @@ def iterative_improvement_elo(task, iterations=1000, parallel=10, model_name="un
                 description='Which version is better? Output only the number (1 or 2).'
             )
     
-    for i in range(iterations):
-        iter_start = time.time()
-        # Sample current version
-        current_version_obj = sample_version(elo_versions_list)
-        if current_version_obj is None:
-            current_version = ""
-        else:
-            current_version = current_version_obj['version']
-        
-        with concurrent.futures.ThreadPoolExecutor(max_workers=parallel) as executor:
+    with concurrent.futures.ThreadPoolExecutor(max_workers=parallel) as executor:
+        for i in range(iterations):
+            iter_start = time.time()
+            # Sample current version
+            current_version_obj = sample_version(elo_versions_list)
+            if current_version_obj is None:
+                current_version = ""
+            else:
+                current_version = current_version_obj['version']
+            
             # Generate new version in the thread pool
             total_requests += 1
             try:
