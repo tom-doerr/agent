@@ -143,7 +143,7 @@ def test_exception_handling(mock_console, mock_chain, mock_predict):
             {'version': "Initial version", 'elo': 1000}
         ]
 
-        # Import main function after mocks are极et
+        # Import main function after mocks are set
         from iterative_improvement_elo import iterative_improvement_elo
             
         # Run with 2 iterations to handle failure then success
