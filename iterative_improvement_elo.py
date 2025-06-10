@@ -56,9 +56,9 @@ def sample_version(elo_versions_list):
     # Heavily oversample high ELO versions using exponential weighting
     if not elo_versions_list:
         return None
-    if random.random() < 0.2:
-        # 10% chance to sample a random version
-        return ''
+    if random.random() < 0.1:
+        # 10% chance to sample a random version (without weighting)
+        return random.choice(elo_versions_list)
     elo_scores = np.array([version['elo'] for version in elo_versions_list])
     # Use exponential weighting to heavily favor high ELO scores
     # Shift scores to be positive and apply power of 4 to increase weight of high scores
@@ -85,8 +85,16 @@ def update_elo_ratings(winner_version, loser_version, k=32):
     loser_elo = loser_version['elo']
     
     # Calculate expected scores
-    expected_winner = 1 / (1 + 10 ** ((loser_elo - winner_elo) / 400))
-    expected_loser = 1 - expected_winner  # because expected_winner + expected_loser = 1
+    # Avoid division by zero by ensuring denominator isn't zero
+    diff = (loser_elo - winner_elo) / 400.0
+    # Cap the exponent to avoid overflow
+    if diff > 100:
+        expected_winner = 0.0
+    elif diff < -100:
+        expected_winner = 1.0
+    else:
+        expected_winner = 1 / (1 + 10 ** diff)
+    expected_loser = 1 - expected_winner
     
     # Update ratings
     new_winner_elo = winner_elo + k * (1 - expected_winner)
