@@ -20,7 +20,7 @@ class CodingAgentREPL(App):
     #output-container {
         height: 85%;
         border: solid $accent;
-        padding极 1;
+        padding: 1;
         overflow: hidden;
     }
     #output {
