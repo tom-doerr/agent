@@ -9,13 +9,10 @@ import sys
 from rich.console import Console
 import concurrent.futures
 import time
-import threading
 
 # Initialize console for rich output
 console = Console()
 
-# Lock for thread-safe predict calls
-predict_lock = threading.Lock()
 
 def display_iteration_stats(i, iterations, elo_versions_list, total_requests, gen_success, gen_failures, eval_success, eval_failures, iter_time, total_time, iteration_times, model_name):
     if elo_versions_list:
