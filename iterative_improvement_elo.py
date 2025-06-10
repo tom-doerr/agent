@@ -57,6 +57,9 @@ def sample_version(elo_versions_list):
     # Heavily oversample high ELO versions using exponential weighting
     if not elo_versions_list:
         return None
+    if random.random() < 0.2:
+        # 10% chance to sample a random version
+        return ''
     elo_scores = np.array([version['elo'] for version in elo_versions_list])
     # Use exponential weighting to heavily favor high ELO scores
     # Shift scores to be positive and apply power of 4 to increase weight of high scores
