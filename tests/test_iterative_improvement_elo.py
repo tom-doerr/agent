@@ -122,6 +122,38 @@ def test_elo_ranking_order(mock_console, mock_chain, mock_predict):
         # Verify new version is best
         assert best_version == "New version"
 
+    # Test thread safety
+    @patch('iterative_improvement_elo.predict')
+    @patch('iterative_improvement_elo.chain_of_thought')
+    @patch('iterative_improvement_elo.console')
+    def test_thread_safety(mock_console, mock_chain, mock_predict):
+        # Mock LLM responses
+        mock_chain.return_value = "Initial version"
+        mock_predict.side_effect = [
+            "New version",  # generation
+            "1", "1", "1"   # comparisons (all prefer new version)
+        ]
+
+        # Mock helper functions to control randomness
+        with patch('iterative_improvement_elo.sample_version') as mock_sample, \
+             patch('iterative_improvement_elo.get_random_opponent') as mock_opponent:
+        
+            # Set up mock responses
+            mock_sample.return_value = {'version': "Initial version", 'elo': 1000}
+            mock_opponent.side_effect = [
+                {'version': "v1", 'elo': 1000},
+                {'version': "v2", 'elo': 1000},
+                {'version': "v3", 'elo': 1000}
+            ]
+
+            # Run with 1 iteration and parallel=5
+            best_version = iterative_improvement_elo("test task", iterations=1, parallel=5)
+        
+            # Verify results
+            assert best_version == "New version"
+            assert mock_chain.call_count == 1
+            assert mock_predict.call_count == 4  # 1 gen + 3 comparisons
+
 # Test exception handling
 @patch('iterative_improvement_elo.predict')
 @patch('iterative_improvement_elo.chain_of_thought')
