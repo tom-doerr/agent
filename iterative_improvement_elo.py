@@ -9,6 +9,7 @@ import sys
 from rich.console import Console
 import concurrent.futures
 import time
+import threading
 
 # Initialize console for rich output
 console = Console()
@@ -119,6 +120,9 @@ def iterative_improvement_elo(task, iterations=1000, parallel=10, model_name="un
     # Timing statistics
     start_time = time.time()
     iteration_times = []
+    
+    # Create a lock for the predict function to ensure thread safety
+    predict_lock = threading.Lock()
     
     # Function to run a single comparison
     def run_comparison(new_version_str, opponent_version):
