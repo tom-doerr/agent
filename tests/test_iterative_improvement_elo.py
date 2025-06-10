@@ -40,8 +40,8 @@ def test_update_elo_ratings():
     update_elo_ratings(winner, loser)
     assert winner['elo'] > 1000
     assert loser['elo'] < 1000
-    assert abs(winner['elo'] - 1016) < 0.1
-    assert abs(loser['elo'] - 984) < 0.1
+    assert abs(winner['elo'] - 1016) < 0.01
+    assert abs(loser['elo'] - 984) < 0.01
 
 # Test main flow with mocked LLM
 @patch('iterative_improvement_elo.predict')
