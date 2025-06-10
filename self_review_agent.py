@@ -29,7 +29,7 @@ class SelfReviewAgent(dspy.Module):
             history.append(f"\n\nIteration {i+1} feedback: {feedback}")
             
             # Decide if we should continue
-            decision = self.should_continue(feedback=feedback).continue_.lower()
+            decision = self.should_continue(feedback=feedback).should_continue.lower()
             if 'no' in decision:
                 history.append("\nStopping: Feedback indicates no further improvements needed")
                 break
