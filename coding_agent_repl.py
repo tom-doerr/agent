@@ -32,12 +32,18 @@ class CodingAgentREPL(App):
         width: 100%;
         align: center top;
     }
-    Input {
-        width: 80%;
+    #request-input {
+        width: 70%;
         margin: 1 0;
     }
-    Button {
+    #execute-btn {
         width: 15%;
+    }
+    #mic-button {
+        width: 15%;
+    }
+    .mic-button {
+        font-size: 150%;
     }
     #loading {
         background: $accent;
@@ -83,6 +89,12 @@ class CodingAgentREPL(App):
         self.vim_mode = "insert"
         self.current_agent_thread = None
         self.agent_cancel_event = None
+        self.recognizer = None
+        try:
+            import speech_recognition as sr
+            self.recognizer = sr.Recognizer()
+        except ImportError:
+            pass
         self.set_focus(self.query_one("#request-input"))
         # Clear log file on startup
         with open(self.LOG_FILE, "w") as f:
