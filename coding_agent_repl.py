@@ -266,6 +266,13 @@ class CodingAgentREPL(App):
         
         # Set focus back to input immediately
         self.set_focus(request_input)
+        
+        if request.lower() == "/exit":
+            self.exit()
+            return
+        
+        if request:
+            self.execute_agent(request)
     
     def _record_voice(self) -> None:
         if not self.recognizer:
@@ -289,13 +296,6 @@ class CodingAgentREPL(App):
         input_field = self.query_one("#request-input")
         input_field.value = text
         self.set_focus(input_field)
-        
-        if request.lower() == "/exit":
-            self.exit()
-            return
-        
-        if request:
-            self.execute_agent(request)
 
 if __name__ == "__main__":
     app = CodingAgentREPL()
