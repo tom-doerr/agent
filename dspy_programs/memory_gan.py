@@ -21,7 +21,9 @@ from dspy.teleprompt import SIMBA
 from mlflow.models.signature import ModelSignature
 from mlflow.types.schema import Schema, ColSpec
 import time
+from tenacity import retry, stop_after_attempt, wait_exponential
 
+@retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10))
 def get_firecrawl_content(url):
     """Scrape a URL using Firecrawl and return the content."""
     api_key = os.getenv("FIRECRAWL_API_KEY")
@@ -150,8 +152,11 @@ def gan_metric(example, pred, trace=None):
         )
         
         # Parse score safely
-        score = float(assessment.assessment_score)
-        return max(0.0, min(1.0, score))  # Clamp to [0.0, 1.0]
+        try:
+            score = float(assessment.assessment_score.strip())
+            return max(0.0, min(1.0, score))  # Clamp to [0.0, 1.0]
+        except (ValueError, TypeError):
+            return 0.0
     except Exception as e:
         print(f"Error in gan_metric: {e}")
         return 0.0
@@ -244,8 +249,9 @@ def main():
             valid_count = 0
             for i, example in enumerate(validation_set):
                 try:
-                    if not example.source_text.strip():
+                    if not example.source_text or not example.source_text.strip():
                         print(f"Skipping validation example {i+1}: empty source_text", flush=True)
+                        mlflow.log_metric(f"validation_example_{i+1}_skipped", 1)
                         continue
                         
                     prediction = optimized_program(source_text=example.source_text)
@@ -273,6 +279,11 @@ def main():
                     print(f"Failed to log metric to MLflow: {e}")
             else:
                 print("No valid validation examples completed successfully", flush=True)
+                mlflow.log_param("validation_status", "no_valid_examples")
+            
+            # Log validation set size
+            mlflow.log_metric("validation_set_size", len(validation_set))
+            mlflow.log_metric("valid_validation_examples", valid_count)
         else:
             reason = "optimization failed" if not optimized_program else "no validation set"
             print(f"Skipping validation - {reason}", flush=True)
