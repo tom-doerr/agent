@@ -10,7 +10,6 @@ from iterative_improvement_elo import sample_version, get_random_opponent, updat
 from unittest.mock import patch, MagicMock
 import numpy as np
 import random
-import dspy
 from simpledspy import predict, chain_of_thought
 
 # Test helper functions
