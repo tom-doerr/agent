@@ -29,6 +29,7 @@ def mock_dspy(monkeypatch):
 @pytest.fixture
 def mock_mlflow(monkeypatch):
     # Mock MLflow
+    monkeypatch.setattr("memory_gan_optimizer.mlflow.set_experiment", MagicMock())
     monkeypatch.setattr("memory_gan_optimizer.mlflow.start_run", MagicMock())
     monkeypatch.setattr("memory_gan_optimizer.mlflow.log_params", MagicMock())
     monkeypatch.setattr("memory_gan_optimizer.mlflow.log_metric", MagicMock())
