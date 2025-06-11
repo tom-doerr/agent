@@ -47,8 +47,9 @@ async def test_delete_task(pilot):
     app.on_key(events.Key("delete"))
     assert len(app.tasks) == 0
 
-def test_clear_completed(app):
+async def test_clear_completed(pilot):
     """Test clearing completed tasks"""
+    app = pilot.app
     app.tasks = [
         TaskItem("Active task", completed=False),
         TaskItem("Completed task", completed=True)
