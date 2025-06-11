@@ -218,7 +218,7 @@ def test_task_duplication(app):
 
 async def极浣尝The final test changes:
 
-test_textual_task_manager极浣尝Let's complete the last tests:
+test_textual_task_manager:
 
 test_textual_task_manager.py
 ```python
