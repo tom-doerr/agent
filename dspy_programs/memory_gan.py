@@ -167,7 +167,7 @@ trainset = [
 
 # === Main Optimization Workflow ===
 def main():
-    print("--- Starting MemoryGAN SIMBA Optimization ---")
+    print("--- Starting MemoryGAN SIMBA Optimization ---", flush=True)
     
     # --- MLflow Experiment Setup ---
     MLFLOW_EXPERIMENT_NAME = "DSPy_MemoryGAN_Opt"
@@ -196,22 +196,22 @@ def main():
             "target_metric": "GAN_score"
         })
 
-        print(f"Optimizing MemoryGAN program with SIMBA...")
+        print(f"Optimizing MemoryGAN program with SIMBA...", flush=True)
         try:
             # Note: SIMBA expects trainset examples to have inputs matching the program's forward method.
             # Our MemoryGAN.forward takes 'source_text'.
             optimized_program = simba_optimizer.compile(program_to_optimize, trainset=trainset)
 
-            print("--- SIMBA Compilation Finished ---")
+            print("--- SIMBA Compilation Finished ---", flush=True)
             mlflow.set_tag("simba_compilation_status", "Success")
 
         except KeyboardInterrupt:
-            print("\nOptimization interrupted by user")
+            print("\nOptimization interrupted by user", flush=True)
             mlflow.set_tag("simba_compilation_status", "Interrupted")
             # Re-raise to exit
             raise
         except Exception as e:
-            print(f"Error during SIMBA compilation: {e}")
+            print(f"Error during SIMBA compilation: {e}", flush=True)
             mlflow.set_tag("simba_compilation_status", "Failed")
             mlflow.log_param("simba_compilation_error", str(e))
             optimized_program = None
@@ -224,28 +224,28 @@ def main():
         validation_set = []
         if os.getenv("FIRECRAWL_API_KEY"):
             try:
-                print("\nCreating Firecrawl validation set...")
+                print("\nCreating Firecrawl validation set...", flush=True)
                 validation_set = [
                     dspy.Example(source_text=get_firecrawl_content("https://en.wikipedia.org/wiki/List_of_unusual_animals")).with_inputs("source_text"),
                     dspy.Example(source_text=get_firecrawl_content("https://en.wikipedia.org/wiki/List_of_emerging_technologies")).with_inputs("source_text"),
                     dspy.Example(source_text=get_firecrawl_content("https://en.wikipedia.org/wiki/List_of_minor_planets")).with_inputs("source_text")
                 ]
-                print("Firecrawl validation set created.")
+                print("Firecrawl validation set created.", flush=True)
             except Exception as e:
-                print(f"Error creating Firecrawl validation set: {e}")
+                print(f"Error creating Firecrawl validation set: {e}", flush=True)
                 mlflow.log_param("firecrawl_validation_error", str(e))
         else:
-            print("FIRECRAWL_API_KEY not set. Skipping Firecrawl validation set.")
+            print("FIRECRAWL_API_KEY not set. Skipping Firecrawl validation set.", flush=True)
             mlflow.log_param("firecrawl_validation_status", "skipped")
 
         if validation_set and optimized_program:
-            print("\n--- Validation Results ---")
+            print("\n--- Validation Results ---", flush=True)
             total_score = 0
             valid_count = 0
             for i, example in enumerate(validation_set):
                 try:
                     if not example.source_text.strip():
-                        print(f"Skipping validation example {i+1}: empty source_text")
+                        print(f"Skipping validation example {i+1}: empty source_text", flush=True)
                         continue
                         
                     prediction = optimized_program(source_text=example.source_text)
@@ -253,29 +253,29 @@ def main():
                     total_score += score
                     valid_count += 1
             
-                    print(f"\nValidation Example {i+1}:")
-                    print(f"  Source: {example.source_text[:100]}{'...' if len(example.source_text) > 100 else ''}")
-                    print(f"  Question: {prediction.question[:100]}{'...' if len(prediction.question) > 100 else ''}")
-                    print(f"  Memory Answer: {prediction.memory_answer[:50]}{'...' if len(prediction.memory_answer) > 50 else ''}")
-                    print(f"  Reference Answer: {prediction.reference_answer[:50]}{'...' if len(prediction.reference_answer) > 50 else ''}")
-                    print(f"  Score: {score:.2f}")
+                    print(f"\nValidation Example {i+1}:", flush=True)
+                    print(f"  Source: {example.source_text[:100]}{'...' if len(example.source_text) > 100 else ''}", flush=True)
+                    print(f"  Question: {prediction.question[:100]}{'...' if len(prediction.question) > 100 else ''}", flush=True)
+                    print(f"  Memory Answer: {prediction.memory_answer[:50]}{'...' if len(prediction.memory_answer) > 50 else ''}", flush=True)
+                    print(f"  Reference Answer: {prediction.reference_answer[:50]}{'...' if len(prediction.reference_answer) > 50 else ''}", flush=True)
+                    print(f"  Score: {score:.2f}", flush=True)
                 except Exception as e:
-                    print(f"Validation failed for example {i+1}: {e}")
+                    print(f"Validation failed for example {i+1}: {e}", flush=True)
                     # Log the specific error for debugging
-                    print(f"  Error details: {str(e)}")
+                    print(f"  Error details: {str(e)}", flush=True)
         
             if valid_count > 0:
                 avg_score = total_score / valid_count
-                print(f"\nAverage Validation Score: {avg_score}")
+                print(f"\nAverage Validation Score: {avg_score}", flush=True)
                 try:
                     mlflow.log_metric("avg_validation_score", avg_score)
                 except Exception as e:
                     print(f"Failed to log metric to MLflow: {e}")
             else:
-                print("No valid validation examples completed successfully")
+                print("No valid validation examples completed successfully", flush=True)
         else:
             reason = "optimization failed" if not optimized_program else "no validation set"
-            print(f"Skipping validation - {reason}")
+            print(f"Skipping validation - {reason}", flush=True)
             
     # Ensure MLflow run is properly closed
     try:
@@ -283,7 +283,7 @@ def main():
     except Exception:
         pass
 
-    print("Script finished.")
+    print("Script finished.", flush=True)
 
 if __name__ == "__main__":
     main()
