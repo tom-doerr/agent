@@ -1,8 +1,8 @@
 import dspy
 import os
 import json
-from dspy_programs.value_network import ValueNetwork
-from dspy_programs.generator_module import GeneratorModule
+from dspy_modules.value_network import ValueNetwork, optimize_value_network
+from dspy_modules.generator_module import GeneratorModule, optimize_generator
 
 # Training data storage
 TRAINING_DATA_FILE = "value_net_training_data.json"
@@ -99,7 +99,10 @@ def active_learning_loop():
     
     # Retrain value network
     if training_data:
-        print("Value network updated with new training data")
+        print("Optimizing value network with new training data")
+        value_net = optimize_value_network(training_data)
+        print("Optimizing generator with new training data")
+        generator = optimize_generator(training_data)
 
 if __name__ == "__main__":
     active_learning_loop()
