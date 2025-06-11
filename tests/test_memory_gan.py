@@ -11,7 +11,7 @@ def mock_firecrawl(monkeypatch):
     # Mock Firecrawl responses
     mock_app = MagicMock()
     mock_app.scrape_url.return_value = {"content": "Test content"}
-    monkeypatch.setattr("dspy_modules.memory_gan.firecrawl.FirecrawlApp", lambda *args, **kwargs: mock_app)
+    monkeypatch.setattr("dspy_programs.memory_gan.firecrawl.FirecrawlApp", lambda *args, **kwargs: mock_app)
 
 @pytest.fixture
 def mock_dspy(monkeypatch):
@@ -27,19 +27,19 @@ def mock_dspy(monkeypatch):
     mock_simba = MagicMock()
     mock_simba.return_value.train.return_value = MagicMock()
     
-    monkeypatch.setattr("dspy_modules.memory_gan.dspy.Predict", mock_predict)
-    monkeypatch.setattr("dspy_modules.memory_gan.dspy.settings.configure", MagicMock())
-    monkeypatch.setattr("dspy_modules.memory_gan.SIMBA", mock_simba)
+    monkeypatch.setattr("dspy_programs.memory_gan.dspy.Predict", mock_predict)
+    monkeypatch.setattr("dspy_programs.memory_gan.dspy.settings.configure", MagicMock())
+    monkeypatch.setattr("dspy_programs.memory_gan.SIMBA", mock_simba)
 
 @pytest.fixture(autouse=True)
 def mock_mlflow(monkeypatch):
     """Mock all MLflow operations to prevent external connections"""
-    monkeypatch.setattr("dspy_modules.memory_gan.mlflow.set_experiment", MagicMock())
-    monkeypatch.setattr("dspy_modules.memory_gan.mlflow.start_run", MagicMock())
-    monkeypatch.setattr("dspy_modules.memory_gan.mlflow.log_params", MagicMock())
-    monkeypatch.setattr("dspy_modules.memory_gan.mlflow.log_metric", MagicMock())
-    monkeypatch.setattr("dspy_modules.memory_gan.mlflow.set_tag", MagicMock())
-    monkeypatch.setattr("dspy_modules.memory_gan.mlflow.end_run", MagicMock())
+    monkeypatch.setattr("dspy_programs.memory_gan.mlflow.set_experiment", MagicMock())
+    monkeypatch.setattr("dspy_programs.memory_gan.mlflow.start_run", MagicMock())
+    monkeypatch.setattr("dspy_programs.memory_gan.mlflow.log_params", MagicMock())
+    monkeypatch.setattr("dspy_programs.memory_gan.mlflow.log_metric", MagicMock())
+    monkeypatch.setattr("dspy_programs.memory_gan.mlflow.set_tag", MagicMock())
+    monkeypatch.setattr("dspy_programs.memory_gan.mlflow.end_run", MagicMock())
 
 def test_main(mock_firecrawl, mock_dspy, capsys):
     # Run the optimizer
@@ -71,18 +71,18 @@ def test_gan_metric():
     mock_assess = MagicMock()
     mock_assess.assessment_score = "1.0"
     
-    with patch("dspy_modules.memory_gan.dspy.Predict", return_value=mock_assess):
+    with patch("dspy_programs.memory_gan.dspy.Predict", return_value=mock_assess):
         score = gan_metric(example, pred)
         assert score == 1.0
     
     # Test error handling
-    with patch("dspy_modules.memory_gan.dspy.Predict", side_effect=Exception):
+    with patch("dspy_programs.memory_gan.dspy.Predict", side_effect=Exception):
         score = gan_metric(example, pred)
         assert score == 0.0
         
     # Test invalid score parsing
     mock_assess.assessment_score = "invalid"
-    with patch("dspy_modules.memory_gan.dspy.Predict", return_value=mock_assess):
+    with patch("dspy_programs.memory_gan.dspy.Predict", return_value=mock_assess):
         score = gan_metric(example, pred)
         assert score == 0.0
 
