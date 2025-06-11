@@ -34,6 +34,7 @@ def mock_mlflow(monkeypatch):
     monkeypatch.setattr("dspy_programs.memory_gan.mlflow.log_params", MagicMock())
     monkeypatch.setattr("dspy_programs.memory_gan.mlflow.log_metric", MagicMock())
     monkeypatch.setattr("dspy_programs.memory_gan.mlflow.set_tag", MagicMock())
+    monkeypatch.setattr("dspy_programs.memory_gan.mlflow.end_run", MagicMock())
 
 def test_main(mock_firecrawl, mock_dspy, capsys):
     # Run the optimizer
@@ -71,5 +72,11 @@ def test_gan_metric():
     
     # Test error handling
     with patch("dspy_programs.memory_gan.dspy.Predict", side_effect=Exception):
+        score = gan_metric(example, pred)
+        assert score == 0.0
+        
+    # Test invalid score parsing
+    mock_assess.assessment_score = "invalid"
+    with patch("dspy_programs.memory_gan.dspy.Predict", return_value=mock_assess):
         score = gan_metric(example, pred)
         assert score == 0.0

@@ -9,8 +9,13 @@ TRAINING_DATA_FILE = "value_net_training_data.json"
 
 def load_training_data():
     if os.path.exists(TRAINING_DATA_FILE):
-        with open(TRAINING_DATA_FILE, 'r') as f:
-            return [dspy.Example(**ex) for ex in json.load(f)]
+        try:
+            with open(TRAINING_DATA_FILE, 'r') as f:
+                data = json.load(f)
+                return [dspy.Example(data_point=ex['data_point'], score=ex['score']) for ex in data]
+        except json.JSONDecodeError:
+            print(f"Error: Invalid JSON in {TRAINING_DATA_FILE}")
+            return []
     return []
 
 def save_training_data(data):
