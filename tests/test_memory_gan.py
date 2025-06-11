@@ -23,8 +23,13 @@ def mock_dspy(monkeypatch):
         reference_answer="Test reference"
     )
     
+    # Mock SIMBA optimizer
+    mock_simba = MagicMock()
+    mock_simba.return_value.train.return_value = MagicMock()
+    
     monkeypatch.setattr("dspy_modules.memory_gan.dspy.Predict", mock_predict)
     monkeypatch.setattr("dspy_modules.memory_gan.dspy.settings.configure", MagicMock())
+    monkeypatch.setattr("dspy_modules.memory_gan.SIMBA", mock_simba)
 
 @pytest.fixture(autouse=True)
 def mock_mlflow(monkeypatch):
