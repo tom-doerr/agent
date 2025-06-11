@@ -20,7 +20,8 @@ def test_app_initialization():
 
 # Test single message flow
 @patch('interactive_chat.predict')
-def test_single_message_flow(mock_predict):
+@pytest.mark.asyncio
+async def test_single_message_flow(mock_predict):
     app = InteractiveChat()
     mock_predict.return_value = "Test response"
     
@@ -44,7 +45,8 @@ def test_single_message_flow(mock_predict):
 
 # Test multiple messages without waiting
 @patch('interactive_chat.predict')
-def test_multiple_messages(mock_predict):
+@pytest.mark.asyncio
+async def test_multiple_messages(mock_predict):
     app = InteractiveChat()
     responses = ["Response 1", "Response 2"]
     mock_predict.side_effect = responses
@@ -70,7 +72,8 @@ def test_multiple_messages(mock_predict):
 
 # Test error handling
 @patch('interactive_chat.predict')
-def test_error_handling(mock_predict):
+@pytest.mark.asyncio
+async def test_error_handling(mock_predict):
     app = InteractiveChat()
     mock_predict.side_effect = Exception("Test error")
     
