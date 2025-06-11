@@ -123,13 +123,13 @@ class AssessAnswers(dspy.Signature):
     1. Validity: Is the reference answer correct and derived from the source text? (0.5 if yes, 0.0 if no)
     2. Stumping: Is the memory answer incorrect or significantly different from the reference? (0.5 if yes, 0.0 if no)
     Total score = Validity + Stumping.
-    Only output the numerical score.
+    Output only the numerical score without any additional text.
     """
     source_text = dspy.InputField()
     question = dspy.InputField()
     reference_answer = dspy.InputField()
     memory_answer = dspy.InputField()
-    assessment_score = dspy.OutputField(desc="A numerical score from 0.0 to 1.0")
+    assessment_score = dspy.OutputField(desc="A numerical score from 0.0 to 1.0. Output only the number.")
 
 def gan_metric(example, pred, trace=None):
     try:
@@ -151,11 +151,14 @@ def gan_metric(example, pred, trace=None):
             memory_answer=memory_answer
         )
         
-        # Parse score safely
+        # Parse score safely with better error handling
         try:
-            score = float(assessment.assessment_score.strip())
+            # Extract first number from string using split
+            num_str = assessment.assessment_score.split()[0]
+            score = float(num_str)
             return max(0.0, min(1.0, score))  # Clamp to [0.0, 1.0]
-        except (ValueError, TypeError):
+        except (ValueError, TypeError) as e:
+            print(f"Failed to parse assessment_score: '{assessment.assessment_score}' - {e}")
             return 0.0
     except Exception as e:
         print(f"Error in gan_metric: {e}")
@@ -265,10 +268,17 @@ def main():
                     print(f"  Memory Answer: {prediction.memory_answer[:50]}{'...' if len(prediction.memory_answer) > 50 else ''}", flush=True)
                     print(f"  Reference Answer: {prediction.reference_answer[:50]}{'...' if len(prediction.reference_answer) > 50 else ''}", flush=True)
                     print(f"  Score: {score:.2f}", flush=True)
+                    
+                    # Log individual validation scores
+                    try:
+                        mlflow.log_metric(f"validation_example_{i+1}_score", score)
+                    except Exception as e:
+                        print(f"Failed to log example score to MLflow: {e}")
                 except Exception as e:
                     print(f"Validation failed for example {i+1}: {e}", flush=True)
                     # Log the specific error for debugging
                     print(f"  Error details: {str(e)}", flush=True)
+                    mlflow.log_metric(f"validation_example_{i+1}_error", 1)
         
             if valid_count > 0:
                 avg_score = total_score / valid_count
@@ -281,9 +291,23 @@ def main():
                 print("No valid validation examples completed successfully", flush=True)
                 mlflow.log_param("validation_status", "no_valid_examples")
             
-            # Log validation set size
+            # Log validation set size and example details
             mlflow.log_metric("validation_set_size", len(validation_set))
             mlflow.log_metric("valid_validation_examples", valid_count)
+            
+            # Log raw validation examples for debugging
+            try:
+                validation_data = [
+                    {"source": ex.source_text[:500], 
+                     "question": pred.question[:500],
+                     "memory_answer": pred.memory_answer[:500],
+                     "reference_answer": pred.reference_answer[:500],
+                     "score": score}
+                    for ex, pred in zip(validation_set, predictions)
+                ]
+                mlflow.log_dict({"validation_data": validation_data}, "validation_data.json")
+            except Exception as e:
+                print(f"Failed to log validation data: {e}")
         else:
             reason = "optimization failed" if not optimized_program else "no validation set"
             print(f"Skipping validation - {reason}", flush=True)
