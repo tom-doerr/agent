@@ -40,8 +40,17 @@ def execute_taskwarrior_command(command_str):
 
     try:
         args = shlex.split(command_str)
-        result = subprocess.run(args, capture_output=True, text=True, check=False)
+        # Add timeout to prevent hanging commands
+        result = subprocess.run(
+            args, 
+            capture_output=True, 
+            text=True,
+            check=False,
+            timeout=10  # 10 second timeout
+        )
         return result.stdout, result.stderr
+    except subprocess.TimeoutExpired:
+        return "", "Error: Command timed out after 10 seconds"
     except FileNotFoundError:
         return "", "Error: 'task' command not found. Is Taskwarrior installed?"
     except Exception as e:
@@ -63,28 +72,39 @@ def load_optimization_data():
 
 def optimize_module(module, data):
     """Optimize the DSPy module using SIMBA."""
-    if not data:
-        print("No optimization data available yet")
+    # Filter to only successful examples
+    successful_data = [ex for ex in data if ex.get("success", False)]
+    
+    if not successful_data:
+        print("No successful optimization data available yet")
         return module
 
-    print(f"Optimizing module with {len(data)} examples...")
+    print(f"Optimizing module with {len(successful_data)} successful examples...")
     trainset = [
         dspy.Example(user_request=ex["request"], taskwarrior_command=ex["command"])
-        for ex in data
+        for ex in successful_data
     ]
     
-    optimizer = SIMBA(
-        metric=lambda example, pred, trace=None: 1.0 if pred.taskwarrior_command == example.taskwarrior_command else 0.0,
-        max_steps=12,
-        max_demos=10
-    )
+    # Use a more robust metric that handles partial matches
+    def command_metric(example, pred, trace=None):
+        gold_command = example.taskwarrior_command.lower().replace("  ", " ").strip()
+        pred_command = pred.taskwarrior_command.lower().replace("  ", " ").strip()
+        return 1.0 if gold_command == pred_command else 0.0
     
     try:
+        optimizer = SIMBA(
+            metric=command_metric,
+            max_steps=12,
+            max_demos=min(10, len(trainset))
+        )
+        
         optimized_module = optimizer.compile(module, trainset=trainset)
         print("Optimization complete!")
         return optimized_module
     except Exception as e:
         print(f"Optimization failed: {e}")
+        import traceback
+        traceback.print_exc()
         return module
 
 # --- Main Agent Loop ---
@@ -100,6 +120,7 @@ def main():
     optimized_module = optimize_module(base_module, optimization_data)
     
     print("\nEnhanced TaskWarrior Assistant")
+    print(f"Loaded {len(optimization_data)} optimization examples ({len([d for d in optimization_data if d.get('success', False)])} successful)")
     print("Type 'exit' or 'quit' to end. Type 'optimize' to force optimization")
 
     while True:
@@ -137,15 +158,18 @@ def main():
             
             # Collect data for optimization
             execution_time = time.time() - start_time
-            optimization_data.append({
+            success = stderr == ""
+            data_point = {
                 "request": user_input,
                 "command": generated_command,
                 "execution_time": execution_time,
-                "success": stderr == ""
-            })
-            save_optimization_data(optimization_data[-1])
+                "success": success
+            }
+            optimization_data.append(data_point)
+            save_optimization_data(data_point)
             
             print(f"\nExecution time: {execution_time:.2f}s")
+            print(f"Command {'succeeded' if success else 'failed'}")
             
         except Exception as e:
             print(f"Error during processing: {e}")
