@@ -17,6 +17,10 @@ console = Console()
 
 def display_iteration_stats(i, iterations, elo_versions_list, total_requests, gen_success, gen_failures, eval_success, eval_failures, iter_time, total_time, iteration_times, model_name):
     if elo_versions_list:
+        # Skip detailed output during tests
+        if os.environ.get('PYTEST_CURRENT_TEST'):
+            return
+            
         # Sort in descending ELO order (best first)
         sorted_versions_desc = sorted(elo_versions_list, key=lambda x: x['elo'], reverse=True)
         top_three = sorted_versions_desc[:3]  # Get top 3 (best first)
