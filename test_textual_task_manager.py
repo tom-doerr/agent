@@ -1,6 +1,6 @@
 import pytest
 from textual import events
-from textual_task_manager import TaskManager, TASKS_FILE
+from textual_task_manager import TaskManager, TASKS_FILE, TaskItem
 from textual.widgets import ListView, Input, Button
 import os
 import json
@@ -11,6 +11,8 @@ def app(tmp_path):
     global TASKS_FILE
     TASKS_FILE = str(tmp_path / "tasks.json")
     app = TaskManager()
+    # Manually compose the app for testing
+    app._compose()
     return app
 
 def test_add_task(app):
@@ -23,7 +25,7 @@ def test_add_task(app):
 
 def test_toggle_task(app):
     """Test toggling task completion"""
-    app.tasks = [app.TaskItem("Test task")]
+    app.tasks = [TaskItem("Test task")]
     app.query_one("#task-list").index = 0
     app.toggle_selected_task()
     assert app.tasks[0].completed
@@ -32,7 +34,7 @@ def test_toggle_task(app):
 
 def test_delete_task(app):
     """Test deleting a task"""
-    app.tasks = [app.TaskItem("Task to delete")]
+    app.tasks = [TaskItem("Task to delete")]
     app.query_one("#task-list").index = 0
     app.on_key(events.Key("delete"))
     assert len(app.tasks) == 0
@@ -40,8 +42,8 @@ def test_delete_task(app):
 def test_clear_completed(app):
     """Test clearing completed tasks"""
     app.tasks = [
-        app.TaskItem("Active task", completed=False),
-        app.TaskItem("Completed task", completed=True)
+        TaskItem("Active task", completed=False),
+        TaskItem("Completed task", completed=True)
     ]
     app.query_one("#clear-completed").press()
     assert len(app.tasks) == 1
@@ -50,13 +52,14 @@ def test_clear_completed(app):
 def test_save_load_tasks(app, tmp_path):
     """Test saving and loading tasks"""
     app.tasks = [
-        app.TaskItem("Task 1", completed=True),
-        app.TaskItem("Task 2", completed=False)
+        TaskItem("Task 1", completed=True),
+        TaskItem("Task 2", completed=False)
     ]
     app.save_tasks()
     
     # Create new app instance to test loading
     app2 = TaskManager()
+    app2._compose()  # Manually compose for testing
     app2.load_tasks()
     assert len(app2.tasks) == 2
     assert app2.tasks[0].task_text == "Task 1"
@@ -67,9 +70,9 @@ def test_save_load_tasks(app, tmp_path):
 def test_filter_tasks(app):
     """Test task filtering"""
     app.tasks = [
-        app.TaskItem("Active 1", completed=False),
-        app.TaskItem("Completed 1", completed=True),
-        app.TaskItem("Active 2", completed=False)
+        TaskItem("Active 1", completed=False),
+        TaskItem("Completed 1", completed=True),
+        TaskItem("Active 2", completed=False)
     ]
     
     # Test all filter
@@ -90,9 +93,9 @@ def test_filter_tasks(app):
 def test_list_header(app):
     """Test that the task list header shows correct filter and count"""
     app.tasks = [
-        app.TaskItem("Active 1", completed=False),
-        app.TaskItem("Completed 1", completed=True),
-        app.TaskItem("Active 2", completed=False)
+        TaskItem("Active 1", completed=False),
+        TaskItem("Completed 1", completed=True),
+        TaskItem("Active 2", completed=False)
     ]
     
     # Test all filter
@@ -143,6 +146,7 @@ def test_task_editing(app):
     """Test that tasks can be edited by deleting and re-adding"""
     # Add task
     app.on_input_submitted(Input.Submitted(Input(), "Original task"))
+    assert len(app.tasks) == 1
     original_task = app.tasks[0]
     
     # Delete task
@@ -172,8 +176,8 @@ def test_task_duplication(app):
 def test_clear_completed_with_no_completed(app):
     """Test clearing completed when there are no completed tasks"""
     app.tasks = [
-        app.TaskItem("Active 1", completed=False),
-        app.TaskItem("Active 2", completed=False)
+        TaskItem("Active 1", completed=False),
+        TaskItem("Active 2", completed=False)
     ]
     
     # Clear completed should do nothing
