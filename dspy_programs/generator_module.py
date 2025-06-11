@@ -1,15 +1,35 @@
 import dspy
 import random
+import numpy as np
 
 class GeneratorSignature(dspy.Signature):
-    """Generate a data point for evaluation."""
+    """Generate a diverse data point for evaluation."""
     topic = dspy.InputField(desc="Topic for data point generation.")
+    context = dspy.InputField(desc="Context to ensure diversity.")
     data_point = dspy.OutputField(desc="Generated data point.")
 
 class GeneratorModule(dspy.Module):
     def __init__(self):
         super().__init__()
-        self.generate = dspy.Predict(GeneratorSignature)
+        self.generate = dspy.ChainOfThought(GeneratorSignature)
+        self.contexts = []
 
     def forward(self, topic):
-        return self.generate(topic=topic)
+        # Create context based on previous generations
+        context = self._create_context()
+        result = self.generate(topic=topic, context=context)
+        
+        # Update context for next generation
+        self.contexts.append(result.data_point)
+        if len(self.contexts) > 5:
+            self.contexts.pop(0)
+            
+        return result
+
+    def _create_context(self):
+        if not self.contexts:
+            return "No previous context"
+            
+        # Select 2 random previous contexts
+        sample = random.sample(self.contexts, min(2, len(self.contexts)))
+        return "Avoid similar to: " + ", ".join(sample)
