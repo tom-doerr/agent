@@ -68,7 +68,7 @@ class InteractiveChat(App):
         yield Footer()
     
     def on_mount(self) -> None:
-        self.query_one(Input).focus()
+        self.query_one("#input-field", Input).focus()
     
     async def on_input_submitted(self, event: Input.Submitted) -> None:
         await self._process_input()
