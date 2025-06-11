@@ -93,7 +93,6 @@ class TaskManager(App):
     }
     #mic-button {
         width: 20%;
-        font-size: 150%;
     }
     #controls {
         height: 15%;

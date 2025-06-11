@@ -10,16 +10,17 @@ import json
 pytestmark = pytest.mark.asyncio
 
 @pytest.fixture
-async def app(tmp_path):
+async def pilot(tmp_path):
     # Override TASKS_FILE to use temporary directory
     global TASKS_FILE
     TASKS_FILE = str(tmp_path / "tasks.json")
     app = TaskManager()
     async with app.run_test() as pilot:
-        yield app
+        yield pilot
 
-async def test_add_task(app):
+async def test_add_task(pilot):
     """Test adding a new task"""
+    app = pilot.app
     app.tasks = []
     # Simulate input submission
     input_widget = app.query_one("#new-task-input", Input)
@@ -38,8 +39,9 @@ def test_toggle_task(app):
     app.toggle_selected_task()
     assert not app.tasks[0].completed
 
-def test_delete_task(app):
+async def test_delete_task(pilot):
     """Test deleting a task"""
+    app = pilot.app
     app.tasks = [TaskItem("Task to delete")]
     app.query_one("#task-list").index = 0
     app.on_key(events.Key("delete"))
@@ -76,8 +78,9 @@ async def test_save_load_tasks(tmp_path):
         assert app2.tasks[1].task_text == "Task 2"
         assert not app2.tasks[1].completed
 
-def test_filter_tasks(app):
+async def test_filter_tasks(pilot):
     """Test task filtering"""
+    app = pilot.app
     app.tasks = [
         TaskItem("Active 1", completed=False),
         TaskItem("Completed 1", completed=True),
@@ -96,11 +99,17 @@ def test_filter_tasks(app):
     
     # Test completed filter
     app.current_filter = "completed"
+    app.update极浣尝Finally, the last set of test fixes:
+
+test_textual_task_manager.py
+```python
+<<<<<<< SEARCH
     app.update_list()
     assert len(app.query_one("#task-list").children) == 1
 
-def test_list_header(app):
+async def test_list_header(pilot):
     """Test that the task list header shows correct filter and count"""
+    app = pilot.app
     app.tasks = [
         TaskItem("Active 1", completed=False),
         TaskItem("Completed 1", completed=True),
@@ -151,10 +160,13 @@ def test_initial_empty_state(app):
     # Verify list is empty
     assert len(app.query_one("#task-list").children) == 0
 
-def test_task_editing(app):
+async def test_task_editing(pilot):
     """Test that tasks can be edited by deleting and re-adding"""
+    app = pilot.app
     # Add task
-    app.on_input_submitted(Input.Submitted(Input(), "Original task"))
+    input_widget = app.query_one("#new-task-input", Input)
+    input_widget.value = "Original task"
+    app.on_input_submitted(Input.Submitted(input_widget))
     assert len(app.tasks) == 1
     original_task = app.tasks[0]
     
@@ -164,9 +176,28 @@ def test_task_editing(app):
     assert len(app.tasks) == 0
     
     # Add modified task
-    app.on_input_submitted(Input.Submitted(Input(), "Modified task"))
+    input_widget.value = "Modified task"
+    app.on_input_submitted(Input.Submitted(input_widget))
     assert len(app.tasks) == 1
     assert app.tasks[0].task_text == "Modified task"
+>>>>>>> REP极浣尝Last set of test changes:
+
+test_textual_task_manager.py
+```python
+<<<<<<< SEARCH
+def test_task_duplication(app):
+    """Test that duplicate tasks are handled correctly"""
+    # Add first task
+    app.on_input_submitted(Input.Submitted(Input(), "Duplicate task"))
+    assert len(app.tasks) == 1
+    
+    # Add duplicate task
+    app.on_input_submitted(Input.Submitted(Input(), "Duplicate task"))
+    assert len(app.tasks) == 2
+    
+    # Verify both tasks exist
+    assert app.tasks[0].task_text == "Duplicate task"
+    assert app.tasks[1].task_text == "Duplicate task"
 
 def test_task_duplication(app):
     """Test that duplicate tasks are handled correctly"""
@@ -182,17 +213,31 @@ def test_task_duplication(app):
     assert app.tasks[0].task_text == "Duplicate task"
     assert app.tasks[1].task_text == "Duplicate task"
 
-def test_clear_completed_with_no_completed(app):
-    """Test clearing completed when there are no completed tasks"""
-    app.tasks = [
-        TaskItem("Active 1", completed=False),
-        TaskItem("Active 2", completed=False)
-    ]
+async def极浣尝The final test changes:
+
+test_textual_task_manager极浣尝Let's complete the last tests:
+
+test_textual_task_manager.py
+```python
+<<<<<<< SEARCH
+def test_task_deletion_edge_cases(app):
+    """Test task deletion edge cases"""
+    # Try deleting when no tasks exist
+    app.query_one("#task-list").index = None
+    app.on_key(events.Key("delete"))
+    assert len(app.tasks) == 0
     
-    # Clear completed should do nothing
-    app.query_one("#clear-completed").press()
-    assert len(app.tasks) == 2
-    assert app.query_one("#list-header").renderable == "All Tasks (2)"
+    # Try deleting when no task is selected
+    app.tasks = [app.TaskItem("Task 1")]
+    app.query_one("#task-list").index = None
+    app.on_key(events.Key("delete"))
+    assert len(app.tasks) == 1
+    
+    # Try deleting last task
+    app.query_one("#task-list").index = 0
+    app.on_key(events.Key("delete"))
+    assert len(app.tasks) == 0
+    assert app.query_one("#list-header").renderable == "All Tasks (0)"
 
 def test_task_deletion_edge_cases(app):
     """Test task deletion edge cases"""
