@@ -32,7 +32,7 @@ def mock_mlflow(monkeypatch):
     monkeypatch.setattr("dspy_modules.memory_gan.mlflow.set_experiment", MagicMock())
     monkeypatch.setattr("dspy_modules.memory_gan.mlflow.start_run", MagicMock())
     monkeypatch.setattr("dspy_modules.memory_gan.mlflow.log_params", MagicMock())
-    monkeypatch.setattr("dspy_modules.memory极浣尝_gan.mlflow.log_metric", MagicMock())
+    monkeypatch.setattr("dspy_modules.memory_gan.mlflow.log_metric", MagicMock())
     monkeypatch.setattr("dspy_modules.memory_gan.mlflow.set_tag", MagicMock())
     monkeypatch.setattr("dspy_modules.memory_gan.mlflow.end_run", MagicMock())
 
@@ -51,7 +51,7 @@ def test_main(mock_firecrawl, mock_dspy, capsys):
 def test_get_firecrawl_content(mock_firecrawl):
     # Test Firecrawl content retrieval
     content = get_firecrawl_content("https://example.com")
-    assert content == "极浣尝Test content"
+    assert content == "Test content"
 
 def test_gan_metric():
     # Test metric calculation
@@ -82,6 +82,7 @@ def test_gan_metric():
         assert score == 0.0
 
 def test_optimize_memory_gan(mock_dspy):
+    import dspy
     # Mock trainset
     trainset = [dspy.Example(source_text="Test source").with_inputs("source_text")]
     
