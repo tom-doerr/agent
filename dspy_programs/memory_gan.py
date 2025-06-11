@@ -242,6 +242,7 @@ def main():
             print("\n--- Validation Results ---", flush=True)
             total_score = 0
             valid_count = 0
+            all_predictions = []  # Store all predictions for later logging
             for i, example in enumerate(validation_set):
                 try:
                     if not example.source_text or not example.source_text.strip():
@@ -250,6 +251,7 @@ def main():
                         continue
                         
                     prediction = optimized_program(source_text=example.source_text)
+                    all_predictions.append(prediction)  # Store prediction
                     score = gan_metric(example, prediction)
                     total_score += score
                     valid_count += 1
@@ -271,6 +273,7 @@ def main():
                     # Log the specific error for debugging
                     print(f"  Error details: {str(e)}", flush=True)
                     mlflow.log_metric(f"validation_example_{i+1}_error", 1)
+                    all_predictions.append(None)  # Keep list aligned with validation_set
         
             if valid_count > 0:
                 avg_score = total_score / valid_count
@@ -289,14 +292,20 @@ def main():
             
             # Log raw validation examples for debugging
             try:
-                validation_data = [
-                    {"source": ex.source_text[:500], 
-                     "question": pred.question[:500],
-                     "memory_answer": pred.memory_answer[:500],
-                     "reference_answer": pred.reference_answer[:500],
-                     "score": score}
-                    for ex, pred in zip(validation_set, predictions)
-                ]
+                validation_data = []
+                for ex, pred in zip(validation_set, all_predictions):
+                    if pred is None:
+                        continue  # Skip failed predictions
+                    try:
+                        validation_data.append({
+                            "source": ex.source_text[:500], 
+                            "question": pred.question[:500],
+                            "memory_answer": pred.memory_answer[:500],
+                            "reference_answer": pred.reference_answer[:500],
+                            "score": gan_metric(ex, pred)  # Recompute score for logging
+                        })
+                    except Exception:
+                        continue  # Skip problematic entries
                 mlflow.log_dict({"validation_data": validation_data}, "validation_data.json")
             except Exception as e:
                 print(f"Failed to log validation data: {e}")
