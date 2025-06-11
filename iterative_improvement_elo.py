@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import os
 import dspy
 from simpledspy import predict, chain_of_thought, configure
 from model_map import MODEL_MAP
