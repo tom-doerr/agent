@@ -7,6 +7,14 @@ from dspy_programs.generator_module import GeneratorModule
 # Training data storage
 TRAINING_DATA_FILE = "value_net_training_data.json"
 
+def configure_dspy(model_name="deepseek/deepseek-chat"):
+    llm = dspy.LM(
+        model=model_name,
+        max_tokens=1000
+    )
+    dspy.settings.configure(lm=llm)
+    return llm
+
 def load_training_data():
     if os.path.exists(TRAINING_DATA_FILE):
         try:
@@ -40,6 +48,9 @@ def manual_scoring_interface(data_point):
             print("Invalid input. Please enter a number between 0 and 9.")
 
 def active_learning_loop():
+    # Configure DSPy
+    configure_dspy()
+    
     # Initialize modules
     value_net = ValueNetwork()
     generator = GeneratorModule()
