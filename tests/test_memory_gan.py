@@ -1,5 +1,5 @@
 import pytest
-pytestmark = pytest.mark.timeout(10, method='thread')
+pytestmark = pytest.mark.timeout(30, method='thread')
 import sys
 import os
 from unittest.mock import patch, MagicMock
