@@ -8,6 +8,7 @@ class CodingAgentSignature(dspy.Signature):
     commands = dspy.OutputField(desc="Shell commands to execute. Use 'firebase:query' for Firebase searches.")
     edits = dspy.OutputField(desc="File edits in SEARCH/REPLACE block format")
     done = dspy.OutputField(desc="'DONE' when task is complete, 'CONTINUE' to process next step autonomously")
+    uncertainty = dspy.OutputField(desc="Confidence score between 0.0 and 1.0, 1.0 being most confident")
 
 class CodingAgent(dspy.Module):
     def __init__(self):
