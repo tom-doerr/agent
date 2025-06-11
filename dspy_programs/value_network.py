@@ -20,8 +20,8 @@ class ValueNetwork(dspy.Module):
         )
         try:
             # Try to convert to floats immediately
-            score = min(1.0, max(0.0, float(prediction.score)))
-            uncertainty = min(1.0, max(0.0, float(prediction.uncertainty)))
+            score = min(1.0, max(0.0, float(prediction.score))
+            uncertainty = min(1.0, max(0.0, float(prediction.uncertainty))
         except (TypeError, ValueError):
             # Use safe defaults on conversion failure
             score = 0.5
