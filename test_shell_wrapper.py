@@ -4,7 +4,7 @@ import os
 import tempfile
 import pytest
 pytestmark = pytest.mark.timeout(10, method='thread')
-from shell_w极apper import ShellWrapper
+from shell_wrapper import ShellWrapper
 
 @pytest.fixture
 async def shell_wrapper():
