@@ -97,7 +97,7 @@ def parse_args():
 
 def main():
     args = parse_args()
-    dspy.configure(lm=dspy.LM(MODEL_MAP[args.lm], max_tokens=args.max_tokens))
+    dspy.configure(lm=dspy.LM(MODEL_MAP[args.lm], max_tokens=args.max_tokens, cache=False))
     configure(logging_enabled=args.logging)
 
     agent = Agent()
