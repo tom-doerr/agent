@@ -26,16 +26,16 @@ def mock_dspy(monkeypatch):
     monkeypatch.setattr("dspy_programs.memory_gan.dspy.Predict", mock_predict)
     monkeypatch.setattr("dspy_programs.memory_gan.dspy.settings.configure", MagicMock())
 
-@pytest.fixture
+@pytest.fixture(autouse=True)
 def mock_mlflow(monkeypatch):
-    # Mock MLflow
+    """Mock all MLflow operations to prevent external connections"""
     monkeypatch.setattr("dspy_programs.memory_gan.mlflow.set_experiment", MagicMock())
     monkeypatch.setattr("dspy_programs.memory_gan.mlflow.start_run", MagicMock())
     monkeypatch.setattr("dspy_programs.memory_gan.mlflow.log_params", MagicMock())
     monkeypatch.setattr("dspy_programs.memory_gan.mlflow.log_metric", MagicMock())
     monkeypatch.setattr("dspy_programs.memory_gan.mlflow.set_tag", MagicMock())
 
-def test_main(mock_firecrawl, mock_dspy, mock_mlflow, capsys):
+def test_main(mock_firecrawl, mock_dspy, capsys):
     # Run the optimizer
     main()
     
