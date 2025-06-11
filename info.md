@@ -1,3 +1,20 @@
+# dspy rl
+there should be a reward function that i can call at any point and assign reward that gets applied, discounted, to all previous steps to a episode
+should have some way of marking the end or beginning of a new episode
+should provide a cli tool that restarts the program up to max number of times, applying a negative reward every time the program crashes, fails and applying a positive reward if it exits succesfully
+the reward should be used to determine which few-shot examples to use for dspy modules
+every inference, input output pair, should be a candidate for a few-shot example
+maybe use bayesian optimization for picking few-shot examples to try
+we should use multiple few-shot examples for each inference so we can gather more data
+i think it should be possible for bayesian optimization to result in no few-shot examples so we make it possible for the agent to figure things out and not be misguided by previous attempts if no attempt succeeded yet
+this dspy rl system should be a module itself so i can easily use it in dspy workflows
+it should automatically load the best few-shot examples for normal inferenceit 
+should be possible to keep optimizing few-shot examlples during normal execution
+
+
+
+
+
 # simpledspy agent
 i would want to later have it ran many operations in parallel, like consolidating memory, reflecting, research, while messaging the user and looking for releveant information to load into short term memory 
 i would like to have a fast model and a slower reasoning model like deepseek r1 for reasoning
