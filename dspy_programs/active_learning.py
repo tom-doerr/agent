@@ -69,6 +69,11 @@ def active_learning_loop():
     # Sort by uncertainty (highest first)
     predictions.sort(key=lambda x: x[2], reverse=True)
     
+    print("\nCandidates sorted by uncertainty:")
+    for i, (data_point, score, uncertainty) in enumerate(predictions):
+        print(f"{i+1}. Uncertainty: {uncertainty:.2f}, Score: {score:.2f}")
+        print(f"   Data: {data_point[:100]}...")
+    
     # Score top 3 most uncertain
     for data_point, _, _ in predictions[:3]:
         true_score = manual_scoring_interface(data_point)
@@ -79,7 +84,7 @@ def active_learning_loop():
     
     # Save updated training data
     save_training_data(training_data)
-    print(f"Saved {len(training_data)} training examples")
+    print(f"\nSaved {len(training_data)} training examples")
     
     # Retrain value network
     if training_data:
