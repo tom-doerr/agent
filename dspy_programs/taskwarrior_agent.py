@@ -89,7 +89,14 @@ def optimize_module(module, data):
     def command_metric(example, pred, trace=None):
         gold_command = example.taskwarrior_command.lower().replace("  ", " ").strip()
         pred_command = pred.taskwarrior_command.lower().replace("  ", " ").strip()
-        return 1.0 if gold_command == pred_command else 0.0
+        
+        # Give partial credit for matching command structure
+        if gold_command == pred_command:
+            return 1.0
+        elif gold_command.split()[0] == pred_command.split()[0]:
+            return 0.5  # partial credit for matching command type
+        else:
+            return 0.0
     
     try:
         optimizer = SIMBA(
@@ -146,7 +153,18 @@ def main():
                 generated_command = f"task {generated_command}"
                 
             print(f"\nGenerated command: {generated_command}")
-
+            
+            # Validate command format
+            if not generated_command.startswith("task "):
+                print("Error: Generated command must start with 'task'")
+                continue
+                
+            # Confirm execution
+            confirm = input("Execute command? [Y/n]: ").strip().lower()
+            if confirm not in ['', 'y', 'yes']:
+                print("Command execution canceled")
+                continue
+                
             # Execute command
             stdout, stderr = execute_taskwarrior_command(generated_command)
             
@@ -165,14 +183,55 @@ def main():
                 "execution_time": execution_time,
                 "success": success
             }
-            optimization_data.append(data_point)
-            save_optimization_data(data_point)
+            
+            # Only save successful commands for optimization
+            if success:
+                optimization_data.append(data_point)
+                save_optimization_data(data_point)
+                print(f"Saved optimization data point")
+            else:
+                # Allow retry for failed commands
+                retry = input("Retry with new command? [Y/n]: ").strip().lower()
+                if retry in ['', 'y', 'yes']:
+                    # Generate new command
+                    prediction = optimized_module.forward(user_request=user_input)
+                    generated_command = prediction.taskwarrior_command.strip()
+                    
+                    if not generated_command.startswith("task "):
+                        generated_command = f"task {generated_command}"
+                        
+                    print(f"\nRetry command: {generated_command}")
+                    
+                    # Execute retry command
+                    stdout, stderr = execute_taskwarrior_command(generated_command)
+                    
+                    # Show results
+                    if stderr:
+                        print(f"\nError:\n{stderr}")
+                    if stdout:
+                        print(f"\nOutput:\n{stdout}")
+                    
+                    # Update success status
+                    success = stderr == ""
+                    data_point = {
+                        "request": user_input,
+                        "command": generated_command,
+                        "execution_time": time.time() - start_time,
+                        "success": success
+                    }
+                    
+                    if success:
+                        optimization_data.append(data_point)
+                        save_optimization_data(data_point)
+                        print(f"Saved optimization data point")
             
             print(f"\nExecution time: {execution_time:.2f}s")
             print(f"Command {'succeeded' if success else 'failed'}")
             
         except Exception as e:
             print(f"Error during processing: {e}")
+            import traceback
+            traceback.print_exc()
 
 if __name__ == "__main__":
     main()
