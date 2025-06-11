@@ -144,8 +144,9 @@ async def test_list_header(pilot):
     app.update_list()
     assert app.query_one("#list-header").renderable == "Completed Tasks (1)"
     
-def test_initial_empty_state(app):
+async def test_initial_empty_state(pilot):
     """Test that the app handles empty state correctly"""
+    app = pilot.app
     app.tasks = []
     app.update_list()
     app.update_button_labels()
