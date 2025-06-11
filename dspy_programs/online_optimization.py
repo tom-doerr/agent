@@ -166,7 +166,7 @@ class OptimizationEngine:
             simba = dspy.SIMBA(
                 metric=self.metric_fn,
                 max_steps=1,      # Single step for micro-batches
-                max_demos=max(1, min(2, len(training_data))
+                max_demos=max(1, min(2, len(training_data)))
             
             # Convert data to DSPy format
             trainset = self._prepare_trainset(training_data)
