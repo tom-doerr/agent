@@ -121,3 +121,81 @@ def test_list_header(app):
     app.on_key(events.Key("delete"))
     app.update_list()
     assert app.query_one("#list-header").renderable == "Completed Tasks (1)"
+    
+def test_initial_empty_state(app):
+    """Test that the app handles empty state correctly"""
+    app.tasks = []
+    app.update_list()
+    app.update_button_labels()
+    
+    # Verify counts are zero
+    assert app.query_one("#filter-all").label == "All (0)"
+    assert app.query_one("#filter-active").label == "Active (0)"
+    assert app.query_one("#filter-completed").label == "Completed (0)"
+    
+    # Verify header shows zero tasks
+    assert app.query_one("#list-header").renderable == "All Tasks (0)"
+    
+    # Verify list is empty
+    assert len(app.query_one("#task-list").children) == 0
+
+def test_task_editing(app):
+    """Test that tasks can be edited by deleting and re-adding"""
+    # Add task
+    app.on_input_submitted(Input.Submitted(Input(), "Original task"))
+    original_task = app.tasks[0]
+    
+    # Delete task
+    app.query_one("#task-list").index = 0
+    app.on_key(events.Key("delete"))
+    assert len(app.tasks) == 0
+    
+    # Add modified task
+    app.on_input_submitted(Input.Submitted(Input(), "Modified task"))
+    assert len(app.tasks) == 1
+    assert app.tasks[0].task_text == "Modified task"
+
+def test_task_duplication(app):
+    """Test that duplicate tasks are handled correctly"""
+    # Add first task
+    app.on_input_submitted(Input.Submitted(Input(), "Duplicate task"))
+    assert len(app.tasks) == 1
+    
+    # Add duplicate task
+    app.on_input_submitted(Input.Submitted(Input(), "Duplicate task"))
+    assert len(app.tasks) == 2
+    
+    # Verify both tasks exist
+    assert app.tasks[0].task_text == "Duplicate task"
+    assert app.tasks[1].task_text == "Duplicate task"
+
+def test_clear_completed_with_no_completed(app):
+    """Test clearing completed when there are no completed tasks"""
+    app.tasks = [
+        app.TaskItem("Active 1", completed=False),
+        app.TaskItem("Active 2", completed=False)
+    ]
+    
+    # Clear completed should do nothing
+    app.query_one("#clear-completed").press()
+    assert len(app.tasks) == 2
+    assert app.query_one("#list-header").renderable == "All Tasks (2)"
+
+def test_task_deletion_edge_cases(app):
+    """Test task deletion edge cases"""
+    # Try deleting when no tasks exist
+    app.query_one("#task-list").index = None
+    app.on_key(events.Key("delete"))
+    assert len(app.tasks) == 0
+    
+    # Try deleting when no task is selected
+    app.tasks = [app.TaskItem("Task 1")]
+    app.query_one("#task-list").index = None
+    app.on_key(events.Key("delete"))
+    assert len(app.tasks) == 1
+    
+    # Try deleting last task
+    app.query_one("#task-list").index = 0
+    app.on_key(events.Key("delete"))
+    assert len(app.tasks) == 0
+    assert app.query_one("#list-header").renderable == "All Tasks (0)"
