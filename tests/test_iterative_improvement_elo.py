@@ -26,6 +26,11 @@ def test_sample_version():
 def test_sample_version_empty_list():
     assert sample_version([]) is None
 
+def test_sample_version_single_item():
+    versions = [{'version': 'v1', 'elo': 1000}]
+    sampled = sample_version(versions)
+    assert sampled == versions[0]
+
 def test_get_random_opponent():
     versions = [
         {'version': 'v1', 'elo': 1000},
@@ -37,6 +42,15 @@ def test_get_random_opponent():
     assert opponent != current
     assert opponent in versions
 
+def test_get_random_opponent_only_two():
+    versions = [
+        {'version': 'v1', 'elo': 1000},
+        {'version': 'v2', 'elo': 1200}
+    ]
+    current = versions[0]
+    opponent = get_random_opponent(versions, current)
+    assert opponent == versions[1]
+
 def test_update_elo_ratings():
     winner = {'version': 'v1', 'elo': 1000}
     loser = {'version': 'v2', 'elo': 1000}
@@ -45,6 +59,27 @@ def test_update_elo_ratings():
     assert loser['elo'] < 1000
     assert abs(winner['elo'] - 1016) < 0.01
     assert abs(loser['elo'] - 984) < 0.01
+
+def test_update_elo_ratings_high_k():
+    winner = {'version': 'v1', 'elo': 1000}
+    loser = {'version': 'v2', 'elo': 1000}
+    update_elo_ratings(winner, loser, k=64)
+    assert abs(winner['elo'] - 1032) < 0.01
+    assert abs(loser['elo'] - 968) < 0.01
+
+def test_update_elo_ratings_expected_win():
+    winner = {'version': 'v1', 'elo': 1200}
+    loser = {'version': 'v2', 'elo': 1000}
+    update_elo_ratings(winner, loser)
+    assert 1200 < winner['elo'] < 1201
+    assert 999 < loser['elo'] < 1000
+
+def test_update_elo_ratings_upset():
+    winner = {'version': 'v1', 'elo': 1000}
+    loser = {'version': 'v2', 'elo': 1200}
+    update_elo_ratings(winner, loser)
+    assert winner['elo'] > 1020
+    assert loser['elo'] < 1180
 
 # Test main flow with mocked LLM
 @patch('iterative_improvement_elo.predict')
@@ -115,37 +150,37 @@ def test_elo_ranking_order(mock_console, mock_chain, mock_predict):
         # Verify new version is best
         assert best_version == "New version"
 
-    # Test thread safety
-    @patch('iterative_improvement_elo.predict')
-    @patch('iterative_improvement_elo.chain_of_thought')
-    @patch('iterative_improvement_elo.console')
-    def test_thread_safety(mock_console, mock_chain, mock_predict):
-        # Mock LLM responses
-        mock_chain.return_value = "Initial version"
-        mock_predict.side_effect = [
-            "New version",  # generation
-            "1", "1", "1"   # comparisons (all prefer new version)
+# Test thread safety
+@patch('iterative_improvement_elo.predict')
+@patch('iterative_improvement_elo.chain_of_thought')
+@patch('iterative_improvement_elo.console')
+def test_thread_safety(mock_console, mock_chain, mock_predict):
+    # Mock LLM responses
+    mock_chain.return_value = "Initial version"
+    mock_predict.side_effect = [
+        "New version",  # generation
+        "1", "1", "1"   # comparisons (all prefer new version)
+    ]
+
+    # Mock helper functions to control randomness
+    with patch('iterative_improvement_elo.sample_version') as mock_sample, \
+         patch('iterative_improvement_elo.get_random_opponent') as mock_opponent:
+    
+        # Set up mock responses
+        mock_sample.return_value = {'version': "Initial version", 'elo': 1000}
+        mock_opponent.side_effect = [
+            {'version': "v1", 'elo': 1000},
+            {'version': "v2", 'elo': 1000},
+            {'version': "v3", 'elo': 1000}
         ]
 
-        # Mock helper functions to control randomness
-        with patch('iterative_improvement_elo.sample_version') as mock_sample, \
-             patch('iterative_improvement_elo.get_random_opponent') as mock_opponent:
-        
-            # Set up mock responses
-            mock_sample.return_value = {'version': "Initial version", 'elo': 1000}
-            mock_opponent.side_effect = [
-                {'version': "v1", 'elo': 1000},
-                {'version': "v2", 'elo': 1000},
-                {'version': "v3", 'elo': 1000}
-            ]
-
-            # Run with 1 iteration and parallel=5
-            best_version = iterative_improvement_elo("test task", iterations=1, parallel=5)
-        
-            # Verify results
-            assert best_version == "New version"
-            assert mock_chain.call_count == 1
-            assert mock_predict.call_count == 4  # 1 gen + 3 comparisons
+        # Run with 1 iteration and parallel=5
+        best_version = iterative_improvement_elo("test task", iterations=1, parallel=5)
+    
+        # Verify results
+        assert best_version == "New version"
+        assert mock_chain.call_count == 1
+        assert mock_predict.call_count == 4  # 1 gen + 3 comparisons
 
 # Test exception handling
 @patch('iterative_improvement_elo.predict')
@@ -182,33 +217,30 @@ def test_exception_handling(mock_console, mock_chain, mock_predict):
         # Verify new version is best
         assert best_version == "New version"
 
+# Test large iterations
 @patch('iterative_improvement_elo.predict')
 @patch('iterative_improvement_elo.chain_of_thought')
 @patch('iterative_improvement_elo.console')
-def test_thread_safety(mock_console, mock_chain, mock_predict):
+def test_large_iterations(mock_console, mock_chain, mock_predict):
     # Mock LLM responses
     mock_chain.return_value = "Initial version"
     mock_predict.side_effect = [
         "New version",  # generation
         "1", "1", "1"   # comparisons (all prefer new version)
-    ]
+    ] * 100  # 100 iterations
 
     # Mock helper functions to control randomness
     with patch('iterative_improvement_elo.sample_version') as mock_sample, \
          patch('iterative_improvement_elo.get_random_opponent') as mock_opponent:
-    
+        
         # Set up mock responses
         mock_sample.return_value = {'version': "Initial version", 'elo': 1000}
-        mock_opponent.side_effect = [
-            {'version': "v1", 'elo': 1000},
-            {'version': "v2", 'elo': 1000},
-            {'version': "v3", 'elo': 1000}
-        ]
+        mock_opponent.return_value = {'version': "v1", 'elo': 1000}
 
-        # Run with 1 iteration and parallel=5
-        best_version = iterative_improvement_elo("test task", iterations=1, parallel=5)
-    
+        # Run with 100 iterations
+        best_version = iterative_improvement_elo("test task", iterations=100, parallel=5)
+        
         # Verify results
         assert best_version == "New version"
-        assert mock_chain.call_count == 1
-        assert mock_predict.call_count == 4  # 1 gen + 3 comparisons
+        assert mock_chain.call_count == 100
+        assert mock_predict.call_count == 400  # 100 gen + 300 comparisons
