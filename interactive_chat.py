@@ -26,10 +26,16 @@ class InteractiveChat(App):
         layout: horizontal;
     }
     #input-field {
-        width: 80%;
+        width: 70%;
     }
     #send-button {
-        width: 20%;
+        width: 15%;
+    }
+    #mic-button {
+        width: 15%;
+    }
+    .mic-button {
+        font-size: 150%;
     }
     .user-msg {
         color: green;
@@ -58,6 +64,13 @@ class InteractiveChat(App):
         # Configure DSPy with deepseek v3
         configure(model=self.model_name)
         self.llm = MODEL_MAP.get(self.model_name, self.model_name)
+        self.recording = False
+        self.recognizer = None
+        try:
+            import speech_recognition as sr
+            self.recognizer = sr.Recognizer()
+        except ImportError:
+            pass
     
     def compose(self) -> ComposeResult:
         yield Header()
@@ -65,6 +78,7 @@ class InteractiveChat(App):
         with Container(id="input-container"):
             yield Input(placeholder="Type your message...", id="input-field")
             yield Button("Send", id="send-button")
+            yield Button("🎤", id="mic-button", classes="mic-button")
         yield Footer()
     
     def on_mount(self) -> None:
@@ -74,7 +88,10 @@ class InteractiveChat(App):
         await self._process_input()
     
     async def on_button_pressed(self, event: Button.Pressed) -> None:
-        await self._process_input()
+        if event.button.id == "send-button":
+            await self._process_input()
+        elif event.button.id == "mic-button":
+            await self._record_voice()
     
     async def _process_input(self) -> None:
         input_field = self.query_one(Input)
@@ -107,6 +124,27 @@ class InteractiveChat(App):
             self._add_message(f"LLM: {response}", "llm-msg")
         except Exception as e:
             self._add_message(f"Error processing request: {str(e)}", "error-msg")
+    
+    async def _record_voice(self) -> None:
+        if not self.recognizer:
+            self._add_message("Voice input requires SpeechRecognition and PyAudio", "error-msg")
+            return
+            
+        self.recording = True
+        self._add_message("Listening...", "info")
+        
+        loop = asyncio.get_event_loop()
+        try:
+            with sr.Microphone() as source:
+                audio = await loop.run_in_executor(None, self.recognizer.listen, source, 5)
+                text = await loop.run_in_executor(None, self.recognizer.recognize_google, audio)
+                input_field = self.query_one("#input-field")
+                input_field.value = text
+                self._add_message(f"Recognized: {text}", "info")
+        except Exception as e:
+            self._add_message(f"Voice error: {str(e)}", "error-msg")
+        finally:
+            self.recording = False
 
 if __name__ == "__main__":
     app = InteractiveChat()
