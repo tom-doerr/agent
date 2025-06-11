@@ -173,6 +173,17 @@ trainset = [
     dspy.Example(source_text="The human brain contains approximately 86 billion neurons, each connected to thousands of other neurons through synapses. This complex network enables processes like learning, memory, and consciousness. Neuroplasticity allows the brain to reorganize itself by forming new neural connections throughout life.").with_inputs("source_text"),
 ]
 
+def optimize_memory_gan(trainset, max_steps=12, max_demos=4, bsize=2):
+    program_to_optimize = MemoryGAN()
+    simba_optimizer = SIMBA(
+        metric=gan_metric,
+        max_steps=max_steps,
+        max_demos=max_demos,
+        bsize=bsize
+    )
+    optimized_program = simba_optimizer.compile(program_to_optimize, trainset=trainset)
+    return optimized_program
+
 # === Main Optimization Workflow ===
 def main():
     print("--- Starting MemoryGAN SIMBA Optimization ---", flush=True)
@@ -181,14 +192,12 @@ def main():
     MLFLOW_EXPERIMENT_NAME = "DSPy_MemoryGAN_Opt"
     mlflow.set_experiment(MLFLOW_EXPERIMENT_NAME)
     
-    program_to_optimize = MemoryGAN()
-
     # Configure SIMBA with increased steps and demos
     # Detect if running in pytest and reduce steps
     max_steps = 2 if 'pytest' in sys.modules else 12
     
-    simba_optimizer = SIMBA(
-        metric=gan_metric,
+    optimized_program = optimize_memory_gan(
+        trainset, 
         max_steps=max_steps,
         max_demos=4,
         bsize=2
@@ -197,36 +206,19 @@ def main():
     with mlflow.start_run(run_name="SIMBA_MemoryGAN_Run") as run:
         mlflow.log_params({
             "llm_model_name": LLM_MODEL_NAME,
-            "simba_max_steps": simba_optimizer.max_steps,
-            "simba_max_demos": simba_optimizer.max_demos,
+            "simba_max_steps": max_steps,
+            "simba_max_demos": 4,
             "num_train_examples": len(trainset),
             "optimization_type": "SIMBA",
             "target_metric": "GAN_score"
         })
 
-        print(f"Optimizing MemoryGAN program with SIMBA...", flush=True)
-        try:
-            # Note: SIMBA expects trainset examples to have inputs matching the program's forward method.
-            # Our MemoryGAN.forward takes 'source_text'.
-            optimized_program = simba_optimizer.compile(program_to_optimize, trainset=trainset)
-
+        if optimized_program:
             print("--- SIMBA Compilation Finished ---", flush=True)
             mlflow.set_tag("simba_compilation_status", "Success")
-
-        except KeyboardInterrupt:
-            print("\nOptimization interrupted by user", flush=True)
-            mlflow.set_tag("simba_compilation_status", "Interrupted")
-            # Re-raise to exit
-            raise
-        except Exception as e:
-            print(f"Error during SIMBA compilation: {e}", flush=True)
-            mlflow.set_tag("simba_compilation_status", "Failed")
-            mlflow.log_param("simba_compilation_error", str(e))
-            optimized_program = None
-        else:
-            # Log the optimized program (if possible, or its prompts)
-            # For now, just log a success metric or a tag
             mlflow.log_metric("optimization_completed", 1)
+        else:
+            mlflow.set_tag("simba_compilation_status", "Failed")
 
         # Create harder validation set with Firecrawl only if API key is available
         validation_set = []
