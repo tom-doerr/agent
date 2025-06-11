@@ -4,14 +4,14 @@ import sys
 import os
 from unittest.mock import patch, MagicMock
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-from memory_gan_optimizer import main, get_firecrawl_content, gan_metric
+from dspy_programs.memory_gan import main, get_firecrawl_content, gan_metric
 
 @pytest.fixture
 def mock_firecrawl(monkeypatch):
     # Mock Firecrawl responses
     mock_app = MagicMock()
     mock_app.scrape_url.return_value = {"content": "Test content"}
-    monkeypatch.setattr("memory_gan_optimizer.firecrawl.FirecrawlApp", lambda *args, **kwargs: mock_app)
+    monkeypatch.setattr("dspy_programs.memory_gan.firecrawl.FirecrawlApp", lambda *args, **kwargs: mock_app)
 
 @pytest.fixture
 def mock_dspy(monkeypatch):
@@ -23,17 +23,17 @@ def mock_dspy(monkeypatch):
         reference_answer="Test reference"
     )
     
-    monkeypatch.setattr("memory_gan_optimizer.dspy.Predict", mock_predict)
-    monkeypatch.setattr("memory_gan_optimizer.dspy.settings.configure", MagicMock())
+    monkeypatch.setattr("dspy_programs.memory_gan.dspy.Predict", mock_predict)
+    monkeypatch.setattr("dspy_programs.memory_gan.dspy.settings.configure", MagicMock())
 
 @pytest.fixture
 def mock_mlflow(monkeypatch):
     # Mock MLflow
-    monkeypatch.setattr("memory_gan_optimizer.mlflow.set_experiment", MagicMock())
-    monkeypatch.setattr("memory_gan_optimizer.mlflow.start_run", MagicMock())
-    monkeypatch.setattr("memory_gan_optimizer.mlflow.log_params", MagicMock())
-    monkeypatch.setattr("memory_gan_optimizer.mlflow.log_metric", MagicMock())
-    monkeypatch.setattr("memory_gan_optimizer.mlflow.set_tag", MagicMock())
+    monkeypatch.setattr("dspy_programs.memory_gan.mlflow.set_experiment", MagicMock())
+    monkeypatch.setattr("dspy_programs.memory_gan.mlflow.start_run", MagicMock())
+    monkeypatch.setattr("dspy_programs.memory_gan.mlflow.log_params", MagicMock())
+    monkeypatch.setattr("dspy_programs.memory_gan.mlflow.log_metric", MagicMock())
+    monkeypatch.setattr("dspy_programs.memory_gan.mlflow.set_tag", MagicMock())
 
 def test_main(mock_firecrawl, mock_dspy, mock_mlflow, capsys):
     # Run the optimizer
