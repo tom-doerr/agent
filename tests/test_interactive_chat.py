@@ -27,19 +27,22 @@ def test_single_message_flow(mock_predict):
     async def run_test():
         # Simulate mounting the app
         await app.on_mount()
+        # Give time for widgets to mount
+        await asyncio.sleep(0.1)
         
         # Simulate user input
-        app.query_one(Input).value = "Hello"
+        input_field = app.query_one("#input-field", Input)
+        input_field.value = "Hello"
         await app.on_input_submitted(None)
         
         # Check input was cleared
-        assert app.query_one(Input).value == ""
+        assert input_field.value == ""
         
         # Let async tasks run
         await asyncio.sleep(0.1)
         
         # Check response was added
-        output = app.query_one("#output-container", Container)
+        output = app.query_one("#output-container", Static)
         assert "Hello" in output.renderable
         assert "Test response" in output.renderable
 
@@ -54,20 +57,23 @@ def test_multiple_messages(mock_predict):
     
     async def run_test():
         await app.on_mount()
+        # Give time for widgets to mount
+        await asyncio.sleep(0.1)
         
         # Send first message
-        app.query_one(Input).value = "Message 1"
+        input_field = app.query_one("#input-field", Input)
+        input_field.value = "Message 1"
         await app.on_input_submitted(None)
         
         # Immediately send second message
-        app.query_one(Input).value = "Message 2"
+        input_field.value = "Message 2"
         await app.on_input_submitted(None)
         
         # Let async tasks run
         await asyncio.sleep(0.1)
         
         # Check both responses present
-        output = app.query_one("#output-container", Container)
+        output = app.query_one("#output-container", Static)
         rendered = output.renderable
         for msg in ["Message 1", "Message 2"] + responses:
             assert msg in rendered
@@ -82,13 +88,16 @@ def test_error_handling(mock_predict):
     
     async def run_test():
         await app.on_mount()
+        # Give time for widgets to mount
+        await asyncio.sleep(0.1)
         
-        app.query_one(Input).value = "Error test"
+        input_field = app.query_one("#input-field", Input)
+        input_field.value = "Error test"
         await app.on_input_submitted(None)
         
         await asyncio.sleep(0.1)
         
-        output = app.query_one("#output-container", Container)
+        output = app.query_one("#output-container", Static)
         assert "Error processing request" in output.renderable
 
     asyncio.run(run_test())
