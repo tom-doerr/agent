@@ -76,6 +76,7 @@ class CodingAgentREPL(App):
             with Container(id="input-container"):
                 yield Input(placeholder="Enter request", id="request-input")
                 yield Button("Execute", id="execute-btn")
+                yield Button("🎤", id="mic-button", classes="mic-button")
         yield Footer()
     
     def on_mount(self) -> None:
@@ -232,6 +233,8 @@ class CodingAgentREPL(App):
     def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id == "execute-btn":
             self.process_request()
+        elif event.button.id == "mic-button":
+            self._record_voice()
     
     def on_input_submitted(self, event: Input.Submitted) -> None:
         self.process_request()
@@ -251,6 +254,29 @@ class CodingAgentREPL(App):
         
         # Set focus back to input immediately
         self.set_focus(request_input)
+    
+    def _record_voice(self) -> None:
+        if not self.recognizer:
+            self.update_output("Voice input requires SpeechRecognition and PyAudio", "error")
+            return
+            
+        def record_thread():
+            try:
+                with sr.Microphone() as source:
+                    self.call_from_thread(self.update_output, "Listening...", "info")
+                    audio = self.recognizer.listen(source, timeout=5)
+                    text = self.recognizer.recognize_google(audio)
+                    self.call_from_thread(self._set_input_text, text)
+                    self.call_from_thread(self.update_output, f"Recognized: {text}", "info")
+            except Exception as e:
+                self.call_from_thread(self.update_output, f"Voice error: {str(e)}", "error")
+        
+        threading.Thread(target=record_thread, daemon=True).start()
+    
+    def _set_input_text(self, text: str) -> None:
+        input_field = self.query_one("#request-input")
+        input_field.value = text
+        self.set_focus(input_field)
         
         if request.lower() == "/exit":
             self.exit()
