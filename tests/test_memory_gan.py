@@ -94,3 +94,17 @@ def test_optimize_memory_gan(mock_dspy):
     # Test optimization
     optimized = optimize_memory_gan(trainset)
     assert optimized is not None
+    
+    # Get the SIMBA mock from the fixture setup
+    mock_simba = mock_dspy.args[0].return_value  # The mock_simba instance
+    
+    # Verify SIMBA was instantiated with expected parameters
+    mock_dspy.args[0].assert_called_once_with(
+        metric=gan_metric,
+        max_steps=2,
+        max_demos=4,
+        bsize=2
+    )
+    
+    # Verify train was called with the trainset
+    mock_simba.train.assert_called_once_with(trainset=trainset)
