@@ -155,3 +155,8 @@ def optimize_memory_gan(trainset):
         bsize=2
     )
     return simba_optimizer.compile(MemoryGAN(), trainset=trainset)
+
+# Main function for testing
+def main():
+    """Main function for testing MemoryGAN"""
+    print("MemoryGAN module loaded successfully")
