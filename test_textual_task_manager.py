@@ -11,8 +11,9 @@ def app(tmp_path):
     global TASKS_FILE
     TASKS_FILE = str(tmp_path / "tasks.json")
     app = TaskManager()
-    # Manually compose the app for testing
-    app._compose()
+    # Manually mount the app's components for testing
+    app.mount(*app.compose())
+    app.on_mount()
     return app
 
 def test_add_task(app):
