@@ -238,13 +238,12 @@ def main():
             print("FIRECRAWL_API_KEY not set. Skipping Firecrawl validation set.")
             mlflow.log_param("firecrawl_validation_status", "skipped")
 
-        if validation_set:
+        if validation_set and optimized_program:
             print("\n--- Validation Results ---")
             total_score = 0
             valid_count = 0
             for i, example in enumerate(validation_set):
                 try:
-                    # Skip if source_text is empty
                     if not example.source_text.strip():
                         print(f"Skipping validation example {i+1}: empty source_text")
                         continue
@@ -270,7 +269,8 @@ def main():
             else:
                 print("No valid validation examples completed successfully")
         else:
-            print("Skipping validation - no validation set available")
+            reason = "optimization failed" if not optimized_program else "no validation set"
+            print(f"Skipping validation - {reason}")
 
     print("Script finished.")
 

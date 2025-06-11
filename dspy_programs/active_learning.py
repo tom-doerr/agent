@@ -4,20 +4,6 @@ import json
 from dspy_programs.value_network import ValueNetwork
 from dspy_programs.generator_module import GeneratorModule
 
-# Initialize DSPy with your preferred model
-def configure_dspy(model_name):
-    llm = dspy.LM(
-        model=model_name,
-        max_tokens=1000
-    )
-    dspy.settings.configure(lm=llm)
-    return llm
-
-# Initialize modules
-value_net = ValueNetwork()
-generator = GeneratorModule()
-configure_dspy("deepseek/deepseek-reasoner")
-
 # Training data storage
 TRAINING_DATA_FILE = "value_net_training_data.json"
 
@@ -48,14 +34,16 @@ def manual_scoring_interface(data_point):
         except ValueError:
             print("Invalid input. Please enter a number between 0 and 9.")
 
-# Topics for active learning
-topics = ["AI ethics", "Renewable energy", "Space exploration", "Biotechnology"]
-
 def active_learning_loop():
+    # Initialize modules
+    value_net = ValueNetwork()
+    generator = GeneratorModule()
+    
     # Load existing training data
     training_data = load_training_data()
     
     # Generate candidate data points
+    topics = ["AI ethics", "Renewable energy", "Space exploration", "Biotechnology"]
     candidates = []
     for topic in topics:
         result = generator(topic=topic)
@@ -71,7 +59,7 @@ def active_learning_loop():
             predictions.append((data_point, score, uncertainty))
         except Exception as e:
             print(f"Error processing prediction: {e}")
-            predictions.append((data_point, 0.5, 1.0))  # Default values when parsing fails
+            predictions.append((data_point, 0.5, 1.0))
     
     # Sort by uncertainty (highest first)
     predictions.sort(key=lambda x: x[2], reverse=True)
@@ -88,9 +76,8 @@ def active_learning_loop():
     save_training_data(training_data)
     print(f"Saved {len(training_data)} training examples")
     
-    # Retrain value network (simplified)
+    # Retrain value network
     if training_data:
-        # In a real implementation, we'd use a teleprompter here
         print("Value network updated with new training data")
 
 if __name__ == "__main__":

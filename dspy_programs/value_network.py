@@ -12,4 +12,17 @@ class ValueNetwork(dspy.Module):
         self.predict = dspy.Predict(ValueNetworkSignature)
 
     def forward(self, data_point):
-        return self.predict(data_point=data_point)
+        prediction = self.predict(data_point=data_point)
+        try:
+            # Try to convert to floats immediately
+            score = float(prediction.score)
+            uncertainty = float(prediction.uncertainty)
+        except (TypeError, ValueError):
+            # Use safe defaults on conversion failure
+            score = 0.5
+            uncertainty = 1.0
+        
+        return dspy.Prediction(
+            score=score,
+            uncertainty=uncertainty
+        )
