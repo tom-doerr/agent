@@ -1,25 +1,30 @@
 import pytest
+import asyncio
 from textual import events
 from textual_task_manager import TaskManager, TASKS_FILE, TaskItem
-from textual.widgets import ListView, Input, Button
+from textual.widgets import ListView, Input, Button, Label
 import os
 import json
 
+# Mark all tests in this file as asyncio tests
+pytestmark = pytest.mark.asyncio
+
 @pytest.fixture
-def app(tmp_path):
+async def app(tmp_path):
     # Override TASKS_FILE to use temporary directory
     global TASKS_FILE
     TASKS_FILE = str(tmp_path / "tasks.json")
     app = TaskManager()
-    # Manually mount the app's components for testing
-    app.mount(*app.compose())
-    app.on_mount()
-    return app
+    async with app.run_test() as pilot:
+        yield app
 
-def test_add_task(app):
+async def test_add_task(app):
     """Test adding a new task"""
     app.tasks = []
-    app.on_input_submitted(Input.Submitted(Input(), "New task"))
+    # Simulate input submission
+    input_widget = app.query_one("#new-task-input", Input)
+    input_widget.value = "New task"
+    app.on_input_submitted(Input.Submitted(input_widget))
     assert len(app.tasks) == 1
     assert app.tasks[0].task_text == "New task"
     assert not app.tasks[0].completed
@@ -50,23 +55,26 @@ def test_clear_completed(app):
     assert len(app.tasks) == 1
     assert app.tasks[0].task_text == "Active task"
 
-def test_save_load_tasks(app, tmp_path):
+async def test_save_load_tasks(tmp_path):
     """Test saving and loading tasks"""
-    app.tasks = [
-        TaskItem("Task 1", completed=True),
-        TaskItem("Task 2", completed=False)
-    ]
-    app.save_tasks()
+    # Create first app instance to save tasks
+    async with TaskManager().run_test() as app1:
+        app1.tasks = [
+            TaskItem("Task 1", completed=True),
+            TaskItem("Task 2", completed=False)
+        ]
+        app1.save_tasks()
     
-    # Create new app instance to test loading
-    app2 = TaskManager()
-    app2._compose()  # Manually compose for testing
-    app2.load_tasks()
-    assert len(app2.tasks) == 2
-    assert app2.tasks[0].task_text == "Task 1"
-    assert app2.tasks[0].completed
-    assert app2.tasks[1].task_text == "Task 2"
-    assert not app2.tasks[1].completed
+    # Create second app instance to test loading
+    async with TaskManager().run_test() as app2:
+        global TASKS_FILE
+        TASKS_FILE = str(tmp_path / "tasks.json")
+        app2.load_tasks()
+        assert len(app2.tasks) == 2
+        assert app2.tasks[0].task_text == "Task 1"
+        assert app2.tasks[0].completed
+        assert app2.tasks[1].task_text == "Task 2"
+        assert not app2.tasks[1].completed
 
 def test_filter_tasks(app):
     """Test task filtering"""
