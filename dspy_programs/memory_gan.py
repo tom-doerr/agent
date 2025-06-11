@@ -261,16 +261,27 @@ def main():
                     print(f"  Score: {score}")
                 except Exception as e:
                     print(f"Validation failed for example {i+1}: {e}")
+                    # Log the specific error for debugging
+                    print(f"  Error details: {str(e)}")
         
             if valid_count > 0:
                 avg_score = total_score / valid_count
                 print(f"\nAverage Validation Score: {avg_score}")
-                mlflow.log_metric("avg_validation_score", avg_score)
+                try:
+                    mlflow.log_metric("avg_validation_score", avg_score)
+                except Exception as e:
+                    print(f"Failed to log metric to MLflow: {e}")
             else:
                 print("No valid validation examples completed successfully")
         else:
             reason = "optimization failed" if not optimized_program else "no validation set"
             print(f"Skipping validation - {reason}")
+            
+    # Ensure MLflow run is properly closed
+    try:
+        mlflow.end_run()
+    except Exception:
+        pass
 
     print("Script finished.")
 
