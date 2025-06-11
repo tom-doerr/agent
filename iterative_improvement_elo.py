@@ -109,9 +109,14 @@ def update_elo_ratings(winner_version, loser_version, k=32):
 
 def iterative_improvement_elo(task, iterations=1000, parallel=10, model_name="unknown"):
     elo_versions_list = []
+    from dspy_programs.dataset_manager import DatasetManager
+
     # Create initial version using chain_of_thought for better reasoning
     initial_version = {'version': chain_of_thought(task, "", description='Create initial version'), 'elo': 1000}
     elo_versions_list.append(initial_version)
+    
+    # Create dataset manager for optimization data
+    dataset_manager = DatasetManager("optimization_dataset.json")
     
     NUM_COMPARISONS_PER_GENERATION = 3  # Number of comparisons per new version
     
