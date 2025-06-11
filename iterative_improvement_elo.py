@@ -18,10 +18,6 @@ console = Console()
 
 def display_iteration_stats(i, iterations, elo_versions_list, total_requests, gen_success, gen_failures, eval_success, eval_failures, iter_time, total_time, iteration_times, model_name):
     if elo_versions_list:
-        # Skip detailed output during tests
-        if os.environ.get('PYTEST_CURRENT_TEST'):
-            return
-            
         # Sort in descending ELO order (best first)
         sorted_versions_desc = sorted(elo_versions_list, key=lambda x: x['elo'], reverse=True)
         top_three = sorted_versions_desc[:3]  # Get top 3 (best first)
@@ -112,8 +108,11 @@ def iterative_improvement_elo(task, iterations=1000, parallel=10, model_name="un
     from dspy_programs.dataset_manager import DatasetManager
 
     # Create initial version using chain_of_thought for better reasoning
-    initial_version = {'version': chain_of_thought(task, "", description='Create initial version'), 'elo': 1000}
+    console.print("[bold yellow]Generating initial version...[/bold yellow]")
+    initial_version_str = chain_of_thought(task, "", description='Create initial version')
+    initial_version = {'version': initial_version_str, 'elo': 1000}
     elo_versions_list.append(initial_version)
+    console.print(f"[green]Initial version created:[/green] {initial_version_str}")
     
     # Create dataset manager for optimization data
     dataset_manager = DatasetManager("optimization_dataset.json")
@@ -259,10 +258,16 @@ if __name__ == "__main__":
     task = args.task
     iterations = args.iterations
     
-    best_version = iterative_improvement_elo(task, iterations, args.parallel, model_name=args.lm)
-    
-    console.print(f"Best version after {iterations} iterations: {best_version}")
-    sys.exit(0)
+    try:
+        console.print(f"[bold green]Starting iterative improvement for task: {task}[/bold green]")
+        best_version = iterative_improvement_elo(task, iterations, args.parallel, model_name=args.lm)
+        console.print(f"[bold green]Best version after {iterations} iterations:[/bold green] {best_version}")
+        sys.exit(0)
+    except Exception as e:
+        console.print(f"[bold red]Error occurred: {e}[/bold red]")
+        import traceback
+        traceback.print_exc()
+        sys.exit(1)
 
 
 
