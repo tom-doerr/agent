@@ -47,9 +47,6 @@ LLM = dspy.LM(
 )
 dspy.settings.configure(lm=LLM)
 
-# --- MLflow Experiment Setup ---
-MLFLOW_EXPERIMENT_NAME = "DSPy_MemoryGAN_Opt"
-mlflow.set_experiment(MLFLOW_EXPERIMENT_NAME)
 
 # === DSPy Signatures ===
 
@@ -171,6 +168,10 @@ trainset = [
 # === Main Optimization Workflow ===
 def main():
     print("--- Starting MemoryGAN SIMBA Optimization ---")
+    
+    # --- MLflow Experiment Setup ---
+    MLFLOW_EXPERIMENT_NAME = "DSPy_MemoryGAN_Opt"
+    mlflow.set_experiment(MLFLOW_EXPERIMENT_NAME)
     
     program_to_optimize = MemoryGAN()
 
