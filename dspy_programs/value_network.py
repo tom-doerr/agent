@@ -15,12 +15,8 @@ class ValueNetwork(dspy.Module):
         prediction = self.predict(data_point=data_point)
         try:
             # Try to convert to floats immediately
-            score = float(prediction.score)
-            uncertainty = float(prediction.uncertainty)
-            
-            # Clamp values to valid range
-            score = max(0.0, min(1.0, score))
-            uncertainty = max(0.0, min(1.0, uncertainty))
+            score = min(1.0, max(0.0, float(prediction.score)))
+            uncertainty = min(1.0, max(0.0, float(prediction.uncertainty)))
         except (TypeError, ValueError):
             # Use safe defaults on conversion failure
             score = 0.5

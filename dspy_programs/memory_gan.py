@@ -254,11 +254,11 @@ def main():
                     valid_count += 1
             
                     print(f"\nValidation Example {i+1}:")
-                    print(f"  Source: {example.source_text[:100]}...")
-                    print(f"  Question: {prediction.question}")
-                    print(f"  Memory Answer: {prediction.memory_answer[:50]}...")
-                    print(f"  Reference Answer: {prediction.reference_answer[:50]}...")
-                    print(f"  Score: {score}")
+                    print(f"  Source: {example.source_text[:100]}{'...' if len(example.source_text) > 100 else ''}")
+                    print(f"  Question: {prediction.question[:100]}{'...' if len(prediction.question) > 100 else ''}")
+                    print(f"  Memory Answer: {prediction.memory_answer[:50]}{'...' if len(prediction.memory_answer) > 50 else ''}")
+                    print(f"  Reference Answer: {prediction.reference_answer[:50]}{'...' if len(prediction.reference_answer) > 50 else ''}")
+                    print(f"  Score: {score:.2f}")
                 except Exception as e:
                     print(f"Validation failed for example {i+1}: {e}")
                     # Log the specific error for debugging
