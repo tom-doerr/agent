@@ -6,6 +6,7 @@ from textual.reactive import reactive
 from textual import events
 import os
 import json
+import threading
 from datetime import datetime
 
 TASKS_FILE = "tasks.json"
@@ -237,7 +238,9 @@ class TaskManager(App):
             
         def record_thread():
             try:
-                with sr.Microphone() as source:
+                if not self.recognizer or not self.sr:
+                    return
+                with self.sr.Microphone() as source:
                     audio = self.recognizer.listen(source, timeout=5)
                     text = self.recognizer.recognize_google(audio)
                     self.call_from_thread(self._set_input_text, text)

@@ -90,8 +90,10 @@ class CodingAgentREPL(App):
         self.current_agent_thread = None
         self.agent_cancel_event = None
         self.recognizer = None
+        self.sr = None
         try:
             import speech_recognition as sr
+            self.sr = sr
             self.recognizer = sr.Recognizer()
         except ImportError:
             pass
@@ -281,7 +283,9 @@ class CodingAgentREPL(App):
             
         def record_thread():
             try:
-                with sr.Microphone() as source:
+                if not self.recognizer or not self.sr:
+                    return
+                with self.sr.Microphone() as source:
                     self.call_from_thread(self.update_output, "Listening...", "info")
                     audio = self.recognizer.listen(source, timeout=5)
                     text = self.recognizer.recognize_google(audio)
