@@ -100,7 +100,8 @@ async def test_filter_tasks(pilot):
     
     # Test completed filter
     app.current_filter = "completed"
-    app.update极浣尝Finally, the last set of test fixes:
+    app.update_list()
+    assert len(app.query_one("#task-list").children) == 1
 
 test_textual_task_manager.py
 ```python
