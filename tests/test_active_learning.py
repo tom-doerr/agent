@@ -5,7 +5,7 @@ import json
 import sys
 from unittest.mock import patch, MagicMock
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-from active_learning_loop import active_learning_loop, load_training_data, save_training_data
+from dspy_programs.active_learning import active_learning_loop, load_training_data, save_training_data
 import dspy
 
 @pytest.fixture
@@ -26,21 +26,21 @@ def mock_dspy(monkeypatch):
         data_point="Test data point"
     )
         
-    monkeypatch.setattr("active_learning_loop.ValueNetwork", mock_value_net)
-    monkeypatch.setattr("active_learning_loop.GeneratorModule", mock_generator)
+    monkeypatch.setattr("dspy_programs.active_learning.ValueNetwork", mock_value_net)
+    monkeypatch.setattr("dspy_programs.active_learning.GeneratorModule", mock_generator)
 
     # Mock configure_dspy
-    monkeypatch.setattr("active_learning_loop.configure_dspy", MagicMock())
+    monkeypatch.setattr("dspy_programs.active_learning.configure_dspy", MagicMock())
         
     # Reduce topics and mock LM
-    monkeypatch.setattr("active_learning_loop.topics", ["Test topic"])
+    monkeypatch.setattr("dspy_programs.active_learning.topics", ["Test topic"])
         
     # Mock LM to avoid real API calls
     mock_lm = MagicMock()
-    monkeypatch.setattr("active_learning_loop.dspy.settings.configure", MagicMock(return_value=mock_lm))
+    monkeypatch.setattr("dspy_programs.active_learning.dspy.settings.configure", MagicMock(return_value=mock_lm))
         
     # Also mock the generator instance to return our test data point
-    monkeypatch.setattr("active_learning_loop.generator", MagicMock(return_value=MagicMock(data_point="Test data point")))
+    monkeypatch.setattr("dspy_programs.active_learning.generator", MagicMock(return_value=MagicMock(data_point="Test data point")))
 
 @pytest.fixture
 def mock_input(monkeypatch):
@@ -65,6 +65,8 @@ def test_active_learning_loop(mock_dspy, mock_input, cleanup_files, capsys):
     # Verify expected output
     assert "Test data point" in output
     assert "training examples" in output
+    assert "Optimizing value network" in output
+    assert "Optimizing generator" in output
     
     # Verify training data was saved
     training_data = load_training_data()
