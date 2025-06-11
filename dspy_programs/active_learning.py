@@ -1,8 +1,8 @@
 import dspy
 import os
 import json
-from dspy_modules.value_network import ValueNetwork, optimize_value_network
-from dspy_modules.generator_module import GeneratorModule, optimize_generator
+from dspy_programs.value_network import ValueNetwork, optimize_value_network
+from dspy_programs.generator_module import GeneratorModule, optimize_generator
 
 # Training data storage
 TRAINING_DATA_FILE = "value_net_training_data.json"
