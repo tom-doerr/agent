@@ -86,6 +86,14 @@ class TaskManager(App):
         height: 15%;
         border: solid $accent;
         padding: 1;
+        layout: horizontal;
+    }
+    #new-task-input {
+        width: 80%;
+    }
+    #mic-button {
+        width: 20%;
+        font-size: 150%;
     }
     #controls {
         height: 15%;
@@ -117,6 +125,7 @@ class TaskManager(App):
             yield ListView(id="task-list")
             with Container(id="input-container"):
                 yield Input(placeholder="Add new task...", id="new-task-input")
+                yield Button("🎤", id="mic-button", classes="mic-button")
             with Container(id="controls"):
                 yield Button("All", id="filter-all")
                 yield Button("Active", id="filter-active")
@@ -219,7 +228,32 @@ class TaskManager(App):
             self.save_tasks()
             self.update_list()
             self.update_button_labels()
+        elif event.button.id == "mic-button":
+            self._record_voice()
         self.update_list()
+    
+    def _record_voice(self) -> None:
+        if not self.recognizer:
+            return
+            
+        def record_thread():
+            try:
+                with sr.Microphone() as source:
+                    audio = self.recognizer.listen(source, timeout=5)
+                    text = self.recognizer.recognize_google(audio)
+                    self.call_from_thread(self._set_input_text, text)
+            except Exception as e:
+                self.call_from_thread(self._show_error, f"Voice error: {str(e)}")
+        
+        threading.Thread(target=record_thread, daemon=True).start()
+    
+    def _set_input_text(self, text: str) -> None:
+        input_field = self.query_one("#new-task-input")
+        input_field.value = text
+        self.set_focus(input_field)
+    
+    def _show_error(self, message: str) -> None:
+        self.notify(message, title="Voice Error", severity="error")
     
     def on_key(self, event: events.Key) -> None:
         if event.key == "escape":
