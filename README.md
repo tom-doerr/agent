@@ -4,9 +4,10 @@ This project features a DSPy-based agent that can run commands and interact with
 
 ## Setup
 
-1.  **Ensure you are in the project root directory: `/home/tom/git/agent/`**
+1.  **Ensure you are in the project root directory.**
 
-2.  **Run the setup script**
+2.  **Run the setup script** (optionally set `PYTHON` to choose a specific
+    Python version)
     ```bash
     ./setup_env.sh
     ```
@@ -61,3 +62,14 @@ The agent's performance depends on quality training data stored in `.simpledspy/
     ```bash
     python agent_simpledspy.py --lm r1
     ```
+
+## Running Tests
+
+After setting up the environment you can run the project's test suite with
+`pytest`. The virtual environment created by `setup_env.sh` already includes all
+test dependencies.
+
+```bash
+source .venv/bin/activate
+pytest -q
+```

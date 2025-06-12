@@ -25,7 +25,8 @@ else
     pip install -r requirements.txt
 fi
 
-if [ ! -f .env ]; then
+# Provide a template environment file if one doesn't already exist
+if [ ! -f .env.example ]; then
     cat > .env.example <<'ENV'
 # Example environment variables for the Agent project
 # Copy this file to `.env` and fill in your own values.
