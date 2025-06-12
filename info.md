@@ -1,4 +1,5 @@
 # dspy rl
+    # lm = dspy.LM(model_string, max_tokens=10000, cache=False, temperature=1.0, max_retries=5)
 there should be a reward function that i can call at any point and assign reward that gets applied, discounted, to all previous steps to a episode
 should have some way of marking the end or beginning of a new episode
 should provide a cli tool that restarts the program up to max number of times, applying a negative reward every time the program crashes, fails and applying a positive reward if it exits succesfully

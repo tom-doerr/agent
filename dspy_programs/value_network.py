@@ -9,14 +9,20 @@ class ValueNetworkSignature(dspy.Signature):
 class ValueNetwork(dspy.Module):
     def __init__(self):
         super().__init__()
-        self.predict = dspy.ChainOfThought(ValueNetworkSignature)
+        self._predict_model = None
+
+    @property
+    def predict_model(self):
+        if self._predict_model is None:
+            self._predict_model = dspy.ChainOfThought(ValueNetworkSignature)
+        return self._predict_model
 
     def forward(self, data_point):
-        prediction = self.predict(data_point=data_point)
+        prediction = self.predict_model(data_point=data_point)
         try:
             # Try to convert to floats immediately
-            score = min(1.0, max(0.0, float(prediction.score))
-            uncertainty = min(1.0, max(0.0, float(prediction.uncertainty))
+            score = min(1.0, max(0.0, float(prediction.score)))
+            uncertainty = min(1.0, max(0.0, float(prediction.uncertainty)))
         except (TypeError, ValueError):
             # Use safe defaults on conversion failure
             score = 0.5
