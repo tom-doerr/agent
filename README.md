@@ -6,18 +6,21 @@ This project features a DSPy-based agent that can run commands and interact with
 
 1.  **Ensure you are in the project root directory: `/home/tom/git/agent/`**
 
-2.  **Create and activate a Python virtual environment (if you haven't already for this project):**
+2.  **Run the setup script**
+    ```bash
+    ./setup_env.sh
+    ```
+    This creates a Python virtual environment in `.venv`, installs the requirements and
+    generates an `.env.example` file. Copy `.env.example` to `.env` and fill in your
+    API keys.
+
+3.  **(Manual setup)** If you prefer to do things manually, create and activate the virtual
+    environment and install dependencies yourself:
     ```bash
     python3.11 -m venv .venv
     source .venv/bin/activate
-    ```
-
-3.  **Install or update dependencies:**
-    If `requirements.txt` is new or you've just created it:
-    ```bash
     uv pip install -r requirements.txt
     ```
-    If you are adding to an existing `requirements.txt`, ensure the new packages are installed.
 
 4.  **Set up OpenRouter API key:**
     *   Create a free account at [OpenRouter](https://openrouter.ai/)
