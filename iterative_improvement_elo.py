@@ -30,6 +30,12 @@ def display_iteration_stats(i, iterations, elo_versions_list, total_requests, ge
             console.print(version['version'])
             console.print("-" * 80)
         
+        # Highlight the current best version again at the bottom for quick reference
+        best_version_current = sorted_versions_desc[0]
+        console.print("[bold yellow]Best Version (current):[/bold yellow]")
+        console.print(best_version_current['version'])
+        console.print("=" * 80)
+        
         # Compute and print statistics
         elo_scores = [v['elo'] for v in elo_versions_list]
         if elo_scores:
@@ -143,6 +149,7 @@ def iterative_improvement_elo(task, iterations=1000, parallel=10, model_name="un
     
     with concurrent.futures.ThreadPoolExecutor(max_workers=parallel) as executor:
         for i in range(iterations):
+            console.print(f"[cyan]Starting iteration {i+1}/{iterations}...[/cyan]")
             iter_start = time.time()
             # Sample current version
             current_version_obj = sample_version(elo_versions_list)
@@ -150,19 +157,32 @@ def iterative_improvement_elo(task, iterations=1000, parallel=10, model_name="un
                 current_version = ""
             else:
                 current_version = current_version_obj['version']
-            
-            # Generate new version in the thread pool
+            console.print(f"  [cyan]Iteration {i+1}: Sampling a version to improve...[/cyan]")
+            # Generate a new version based on a sampled existing version
             total_requests += 1
+            # Determine the version string to use for generation prompt
+            current_version_for_gen = ""
+            if current_version_obj and 'version' in current_version_obj: # current_version_obj comes from sample_version earlier in the loop
+                current_version_for_gen = current_version_obj['version']
+            
             try:
-                future_gen = executor.submit(predict, task, current_version)
-                new_version_str = future_gen.result()
+                console.print(f"    [cyan]Iteration {i+1}: Generating new version with chain_of_thought (using sampled version as base)...[/cyan]")
+                new_version_str = chain_of_thought(
+                    f"Task: {task}\nExisting version: {current_version_for_gen}",
+                    "", # No specific input field, context is in the prompt
+                    description='Create a new version based on the existing one'
+                )
+                console.print(f"    [magenta]Iteration {i+1}: New candidate version generated (first 200 chars):[/magenta] {new_version_str[:200]}...")
                 gen_success += 1
-                new_version_obj = {'version': new_version_str, 'elo': 1000}
+                new_version_obj = {'version': new_version_str, 'elo': 1000} # Initialize the new version object
+                console.print(f"  [cyan]Iteration {i+1}: Preparing for parallel comparisons...[/cyan]") # This print can stay
             except Exception as e:
-                console.print(f"[red]Error in generation: {e}[/red]")
+                console.print(f"    [red]Iteration {i+1}: Error in chain_of_thought generation: {e}[/red]")
                 gen_failures += 1
                 continue
             
+            console.print(f"[magenta]New candidate version generated:[/magenta] {new_version_str[:200]}...")
+            console.print(f"  [cyan]Iteration {i+1}: Preparing for parallel comparisons...[/cyan]")
             # Do multiple comparisons for this new version in parallel
             opponents = []
             for _ in range(NUM_COMPARISONS_PER_GENERATION):
@@ -177,6 +197,7 @@ def iterative_improvement_elo(task, iterations=1000, parallel=10, model_name="un
                     executor.submit(run_comparison, new_version_str, opponent_obj['version'])
                 )
             
+            console.print(f"  [cyan]Iteration {i+1}: Submitted {len(futures)} comparisons to thread pool. Waiting for results...[/cyan]")
             for future, opponent_obj in zip(futures, opponents):
                 total_requests += 1
                 try:
@@ -252,7 +273,12 @@ if __name__ == "__main__":
         console.print("[red]Error: --parallel must be at least 1[/red]")
         sys.exit(1)
 
-    lm = dspy.LM(model_string, max_tokens=8000, cache=False, temperature=1.0)
+    if args.lm in ['d/v3', 'dv3']:
+        max_tokens = 8000
+    else:
+        max_tokens = 20000
+
+    lm = dspy.LM(model_string, max_tokens=max_tokens, cache=False, temperature=1.0)
     dspy.configure(lm=lm)
     
     task = args.task
@@ -268,11 +294,3 @@ if __name__ == "__main__":
         import traceback
         traceback.print_exc()
         sys.exit(1)
-
-
-
-
-
-
-
-
