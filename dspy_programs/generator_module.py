@@ -11,13 +11,19 @@ class GeneratorSignature(dspy.Signature):
 class GeneratorModule(dspy.Module):
     def __init__(self):
         super().__init__()
-        self.generate = dspy.ChainOfThought(GeneratorSignature)
+        self._generate_model = None
         self.contexts = []
+
+    @property
+    def generate_model(self):
+        if self._generate_model is None:
+            self._generate_model = dspy.ChainOfThought(GeneratorSignature)
+        return self._generate_model
 
     def forward(self, topic):
         # Create context based on previous generations
         context = self._create_context()
-        result = self.generate(topic=topic, context=context)
+        result = self.generate_model(topic=topic, context=context)
         
         # Update context for next generation
         self.contexts.append(result.data_point)
