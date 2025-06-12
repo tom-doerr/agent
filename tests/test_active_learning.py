@@ -18,3 +18,17 @@ def test_save_and_load_training_data(training_path):
     assert len(loaded) == 1
     assert loaded[0].data_point == "x"
     assert loaded[0].score == 0.8
+
+
+def test_manual_scoring_interface_valid(monkeypatch):
+    inputs = iter(["-1", "foo", "5"])
+    monkeypatch.setattr("builtins.input", lambda _: next(inputs))
+    score = active_learning.manual_scoring_interface("test")
+    assert score == pytest.approx(5 / 9.0)
+
+
+def test_manual_scoring_interface_quit(monkeypatch):
+    inputs = iter(["invalid", "q"])
+    monkeypatch.setattr("builtins.input", lambda _: next(inputs))
+    score = active_learning.manual_scoring_interface("test")
+    assert score is None
