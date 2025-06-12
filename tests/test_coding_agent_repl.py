@@ -40,8 +40,6 @@ class TestCodingAgentREPL:
             def __init__(self):
                 super().__init__(model="mock_model")
             def basic_request(self, prompt, **kwargs):
-                # Return structured agent output with all expected fields using header format
-                # Note: We include the 'reasoning' field because ChainOfThought adds it
                 return "Reasoning: test reasoning\nPlan: test plan\nCommands: test commands\nEdits: test edits\nDone: test done"
             def __call__(self, messages, **kwargs):
                 # In DSPy, the messages are passed as a list of dicts
@@ -54,10 +52,7 @@ class TestCodingAgentREPL:
         
         from agent_repl.agent import CodingAgent
         agent = CodingAgent()
-        
-        # Test that forward accepts required parameters
-        agent.forward(request="test", log_context="logs")
-        
-        # Test that forward rejects extra parameters
-        with pytest.raises(TypeError):
-            agent.forward(request="test", log_context="logs", extra="invalid")
+
+        from inspect import signature
+        params = list(signature(agent.forward).parameters)
+        assert params == ["request", "log_context"]

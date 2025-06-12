@@ -3,10 +3,11 @@ import asyncio
 import os
 import tempfile
 import pytest
+import pytest_asyncio
 pytestmark = pytest.mark.timeout(10, method='thread')
 from shell_wrapper import ShellWrapper
 
-@pytest.fixture
+@pytest_asyncio.fixture
 async def shell_wrapper():
     """Fixture to create and start a ShellWrapper instance."""
     shell = ShellWrapper()
