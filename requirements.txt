@@ -6,6 +6,7 @@ firecrawl-py>=0.1.0
 numpy>=1.0
 pytest>=7.0
 pytest-asyncio>=0.21
+pytest-timeout>=2.2
 rich>=13.0.0
 termcolor>=2.0.0
 tenacity>=8.2.0
