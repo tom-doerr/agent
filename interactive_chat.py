@@ -34,9 +34,6 @@ class InteractiveChat(App):
     #mic-button {
         width: 15%;
     }
-    .mic-button {
-        font-size: 150%;
-    }
     .user-msg {
         color: green;
         padding: 1;
