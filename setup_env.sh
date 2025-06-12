@@ -27,7 +27,8 @@ fi
 
 if [ ! -f .env ]; then
     cat > .env.example <<'ENV'
-# Copy to .env and fill in your secrets
+# Example environment variables for the Agent project
+# Copy this file to `.env` and fill in your own values.
 OPENROUTER_API_KEY=
 FIRECRAWL_API_KEY=
 OLLAMA_MODEL=phi3
