@@ -3,8 +3,12 @@
 set -euo pipefail
 
 PYTHON=${PYTHON:-python3.11}
-if ! command -v "$PYTHON" >/dev/null 2>&1; then
-    echo "$PYTHON not found, falling back to python3" >&2
+# If the configured python version isn't available or fails to run, fall back to
+# `python3` which should be present on most systems. Simply checking for the
+# command is insufficient when tools like `pyenv` provide shims that may be
+# present but not functional, so we attempt to execute `--version`.
+if ! "$PYTHON" --version >/dev/null 2>&1; then
+    echo "$PYTHON not found or not functional, falling back to python3" >&2
     PYTHON=python3
 fi
 
