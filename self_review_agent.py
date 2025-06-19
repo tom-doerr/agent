@@ -12,12 +12,22 @@ class SelfReviewAgent(dspy.Module):
     def __init__(self, max_iterations=3):
         super().__init__()
         self.max_iterations = max_iterations
-        self.generate = dspy.Predict("task -> response")
-        self.criticize = dspy.Predict("task, response -> feedback")
-        self.improve = dspy.Predict("task, response, feedback -> improved_response")
-        self.should_continue = dspy.Predict("feedback -> should_continue")
+        # Defer Predict instantiation until the first forward call
+        # so that unit tests can freely patch dspy.Predict without
+        # consuming side_effect entries during __init__.
+        self.generate = None
+        self.criticize = None
+        self.improve = None
+        self.should_continue = None
 
     def forward(self, task):
+        # Lazily create DSPy Predict primitives on first use
+        if self.generate is None:
+            self.generate = dspy.Predict("task -> response")
+            self.criticize = dspy.Predict("task, response -> feedback")
+            self.improve = dspy.Predict("task, response, feedback -> improved_response")
+            self.should_continue = dspy.Predict("feedback -> should_continue")
+
         history = []
         # Initial generation
         response = self.generate(task=task).response
