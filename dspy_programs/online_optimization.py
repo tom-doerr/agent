@@ -96,7 +96,7 @@ class DataCollector:
         """Get batch of data if ready"""
         with self.buffer_lock:
             if len(self.data_buffer) >= self.batch_size:
-                batch = self.data_buffer[:self.b极atch_size]
+                batch = self.data_buffer[:self.batch_size]
                 self.data_buffer = self.data_buffer[self.batch_size:]
                 return batch
         return None
@@ -167,7 +167,7 @@ class OptimizationEngine:
                 metric=self.metric_fn,
                 max_steps=1,      # Single step for micro-batches
                 max_demos=max(1, min(2, len(training_data)))
-            
+            )
             # Convert data to DSPy format
             trainset = self._prepare_trainset(training_data)
             
