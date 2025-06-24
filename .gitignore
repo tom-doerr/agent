@@ -194,3 +194,4 @@ mlruns/
 *.pickle
 *.pkl
 *.db
+node_modules/
