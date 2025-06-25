@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Autocomplete on Steroids (Gemini Flash 2.5 Lite)</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header>
+    <h1>Autocomplete&nbsp;on Steroids <small>keyboard‑only edition</small></h1>
+  </header>
+
+  <!-- Status / assertive announcements for screen‑readers -->
+  <div id="live" role="status" aria-live="polite" class="visually-hidden"></div>
+
+  <section id="controls">
+    <label>OpenRouter API Key
+      <input id="apiKey" type="password" placeholder="sk-or-…" autocomplete="off" />
+    </label>
+
+    <label>Max completion tokens
+      <input id="maxTokens" type="number" value="60" min="1" max="1024" />
+    </label>
+
+    <label>Completions per request
+      <input id="nCompletions" type="number" value="8" min="2" max="20" />
+    </label>
+
+    <label>Requests per node
+      <input id="reqPerNode" type="number" value="1" min="1" max="5" />
+    </label>
+  </section>
+
+  <section id="composer">
+    <textarea id="prompt" rows="4" placeholder="Start typing…"></textarea>
+    <button id="seedBtn" aria-label="Seed autocompletion tree (Ctrl Enter)">Seed Tree ⇨</button>
+  </section>
+
+  <main id="treeContainer"
+        role="tree"
+        aria-label="Completions tree">
+  </main>
+
+  <!-- Keyboard help overlay -->
+  <dialog id="helpDialog">
+    <h2>Keyboard Shortcuts</h2>
+    <ul>
+      <li><kbd>Ctrl +/</kbd> Show / hide this help</li>
+      <li><kbd>Ctrl Enter</kbd> Seed tree from composer</li>
+      <li><kbd>Tab / Shift Tab</kbd> Next / prev visible node</li>
+      <li><kbd>↑ / ↓</kbd> Sibling up / down</li>
+      <li><kbd>→</kbd> Expand focused node</li>
+      <li><kbd>←</kbd> Collapse node or go to parent</li>
+      <li><kbd>Enter / Space</kbd> Accept node text into composer</li>
+      <li><kbd>Esc</kbd> Return focus to composer</li>
+    </ul>
+    <form method="dialog"><button>Close</button></form>
+  </dialog>
+
+  <script src="script.js"></script>
+</body>
+</html>

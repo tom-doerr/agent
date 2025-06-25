@@ -1,0 +1,111 @@
+/* ---- Base ---- */
+body {
+  font-family: system-ui, sans-serif;
+  margin: 0;
+  padding: 1rem 2rem;
+  line-height: 1.4;
+}
+
+header h1 {
+  margin: 0 0 .5rem 0;
+}
+header small {
+  font-size: .6em;
+  font-weight: 500;
+  opacity: .7;
+}
+
+#controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.2rem;
+  margin-bottom: 1rem;
+}
+#controls label { font-size: .9rem; }
+#controls input { margin-left: .3rem; }
+
+#composer {
+  display: flex;
+  gap: .8rem;
+  margin-bottom: 1.5rem;
+}
+
+textarea#prompt {
+  flex: 1;
+  font-family: inherit;
+  font-size: 1rem;
+  padding: .6rem;
+}
+
+button {
+  cursor: pointer;
+  padding: .6rem 1rem;
+  border: 1px solid #555;
+  background: #f3f3f3;
+}
+
+.visually-hidden {
+  position: absolute !important;
+  height: 1px; width: 1px;
+  overflow: hidden;
+  clip: rect(1px, 1px, 1px, 1px);
+}
+
+/* ---- Tree ---- */
+main#treeContainer {
+  position: relative;
+  padding-left: .5rem;
+  border-left: 2px solid #ccc;   /* shared Y‑axis */
+  font-family: "Fira Mono", monospace;
+  max-height: 70vh;
+  overflow: auto;
+  outline: none;          /* focus ring handled on nodes */
+}
+
+/* node */
+.node {
+  position: relative;
+  padding: .2rem .4rem;
+  margin: .2rem 0;
+  cursor: pointer;
+  transition: background .15s;
+  border-radius: 3px;
+}
+
+.node[tabindex="0"] {
+  outline: 2px solid #1a73e8;    /* keyboard focus ring */
+}
+
+.node:hover {
+  background: #e8f0ff;
+}
+
+.node::before {
+  content: "";
+  position: absolute;
+  left: -8px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 6px; height: 6px;
+  background: #555;
+  border-radius: 50%;
+}
+
+.children {
+  margin-left: 1.5rem;
+}
+
+/* Help dialog */
+dialog {
+  border: none;
+  border-radius: 8px;
+  padding: 1rem 1.5rem;
+  box-shadow: 0 6px 24px rgba(0,0,0,.18);
+}
+dialog::backdrop { background: rgba(0,0,0,.4); }
+kbd {
+  background: #eee;
+  padding: 2px 4px;
+  border-radius: 3px;
+  font-family: monospace;
+}
