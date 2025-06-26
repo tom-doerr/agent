@@ -37,8 +37,8 @@ while True:
     command_is_safe_to_execute, reasoning = result.command_is_safe_to_execute, result.reasoning
     color = 'green' if command_is_safe_to_execute else 'red'
     print(f'[cyan]command_is_safe_to_execute:[/] [{color}] {command_is_safe_to_execute} [/]')
-    print('reasoning: ', reasoning)
-    if command_is_safe_to_execute:
+    # print('reasoning: ', reasoning)
+    # if command_is_safe_to_execute:
         try:
             #return_value = exec(python_code_to_run)
             result = subprocess.run(command, shell=True, capture_output=True, text=True)
@@ -51,6 +51,22 @@ while True:
     print('return_value: ', return_value)
     # python_code_run_history.append({'code': python_code_to_run, 'return_value': return_value})
     command_run_history.append({'command': command, 'return_value': return_value})
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
