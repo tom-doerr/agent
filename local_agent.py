@@ -12,8 +12,8 @@ mlflow.set_experiment('local_agent')
 mlflow.dspy.autolog()
 
 # lm = dspy.LM('ollama_chat/deepseek-r1:7b', api_base='http://localhost:11434',api_key='')
-# lm = dspy.LM('openrouter/deepseek/deepseek-r1-0528')
-lm = dspy.LM('openrouter/google/gemini-2.5-flash-lite-preview-06-17')
+lm = dspy.LM('openrouter/deepseek/deepseek-r1-0528')
+# lm = dspy.LM('openrouter/google/gemini-2.5-flash-lite-preview-06-17')
 dspy.configure(lm=lm)
 
 python_code_generator = dspy.Predict('user_request, system_state_info, python_code_to_run_history, return_value -> python_code_to_run')
