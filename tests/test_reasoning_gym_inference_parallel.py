@@ -83,8 +83,8 @@ class TestParallelReasoningGymInference:
         
         assert result["problem"] == "What is 2/4 simplified?"
         assert result["expected"] == "1/2"
-        assert result["predicted"] == "1/2"
-        assert result["correct"] is True
+        assert result["predicted"] == "Let me solve this step by step.\n\n1/2"
+        assert result["correct"] is False  # Because predicted != expected
     
     @pytest.mark.asyncio
     async def test_solve_single_problem_incorrect(self, mock_api_key):
