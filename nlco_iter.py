@@ -4,6 +4,7 @@ import datetime
 import subprocess
 import time
 from pathlib import Path
+import os
 
 import dspy
 
@@ -18,11 +19,41 @@ is_finished_checker = dspy.Predict('history -> is_finished: bool, reasoning')
 CONSTRAINTS_FILE = Path('constraints.md')
 ARTIFACT_FILE = Path('artifact.md')
 
+# Load location from config or use default
+LOCATION = "Mering"
+if Path('nlco_config.toml').exists():
+    try:
+        import toml
+        config = toml.load('nlco_config.toml')
+        LOCATION = config.get('weather', {}).get('location', {}).get('city', LOCATION)
+    except:
+        pass
+
 
 def create_context_string() -> str:
     mem = subprocess.run(['free', '-h'], capture_output=True, text=True, check=True).stdout
+    
+    # Simple weather using curl
+    try:
+        # Get current + 2 day forecast in compact format
+        weather_raw = subprocess.run(['curl', '-s', f'wttr.in/{LOCATION}?format=j1'], 
+                                   capture_output=True, text=True, timeout=3).stdout
+        # Parse just the essentials from JSON
+        import json
+        w = json.loads(weather_raw)
+        current = w['current_condition'][0]
+        weather = (f"{LOCATION}: {current['weatherDesc'][0]['value']} {current['temp_C']}°C "
+                  f"feels:{current['FeelsLikeC']}°C humidity:{current['humidity']}% "
+                  f"wind:{current['windspeedKmph']}km/h")
+        # Add tomorrow's forecast
+        tomorrow = w['weather'][1]
+        weather += f"\n    Tomorrow: {tomorrow['hourly'][4]['weatherDesc'][0]['value']} {tomorrow['maxtempC']}°/{tomorrow['mintempC']}°C"
+    except:
+        weather = f"{LOCATION}: unavailable"
+    
     return (
         f"Datetime: {datetime.datetime.now():%Y-%m-%d %H:%M:%S}\n"
+        f"Weather: {weather}\n"
         f"'free -h':\n{mem}\n"
     )
 
