@@ -1,17 +1,33 @@
 #!/usr/bin/env python3
 
 import datetime
-import subprocess
 import time
 from pathlib import Path
-import os
-
+from pydantic import BaseModel, Field
 import dspy
+from context_provider import create_context_string
+
 
 lm = dspy.configure(lm=dspy.LM('deepseek/deepseek-reasoner', max_tokens=20_000))
 
-refiner = dspy.Predict('artifact, constraints, critique, context -> refined_artifact',
-                       instructions="Refine the artifact based on the critique.")
+
+class Edit(BaseModel):
+    search: str = Field(..., description="Search term to find in the artifact.")
+    replace: str = Field(..., description="Replacement text for the search term.")
+
+
+class RefineSig(dspy.Signature):
+    artifact: str = dspy.InputField()
+    constraints: str = dspy.InputField()
+    critique: str = dspy.InputField()
+    context: str = dspy.InputField()
+    edits: list[Edit] = dspy.OutputField()
+
+# class Refining(dspySign
+
+# refiner = dspy.Predict('artifact, constraints, critique, context -> refined_artifact', instructions="Refine the artifact based on the critique.")
+refiner = dspy.Predict(RefineSig,
+                      instructions="Refine the artifact based on the critique and constraints. Return a list of edits with search terms and replacements.")
 critic = dspy.Predict('artifact, constraints, context -> critique',
                       instructions="Critique the artifact based on the constraints and common sense.")
 is_finished_checker = dspy.Predict('history -> is_finished: bool, reasoning')
@@ -19,43 +35,20 @@ is_finished_checker = dspy.Predict('history -> is_finished: bool, reasoning')
 CONSTRAINTS_FILE = Path('constraints.md')
 ARTIFACT_FILE = Path('artifact.md')
 
-# Load location from config or use default
-LOCATION = "Mering"
-if Path('nlco_config.toml').exists():
-    try:
-        import toml
-        config = toml.load('nlco_config.toml')
-        LOCATION = config.get('weather', {}).get('location', {}).get('city', LOCATION)
-    except:
-        pass
 
-
-def create_context_string() -> str:
-    mem = subprocess.run(['free', '-h'], capture_output=True, text=True, check=True).stdout
-    
-    # Simple weather using curl
-    try:
-        # Get current + 2 day forecast in compact format
-        weather_raw = subprocess.run(['curl', '-s', f'wttr.in/{LOCATION}?format=j1'], 
-                                   capture_output=True, text=True, timeout=3).stdout
-        # Parse just the essentials from JSON
-        import json
-        w = json.loads(weather_raw)
-        current = w['current_condition'][0]
-        weather = (f"{LOCATION}: {current['weatherDesc'][0]['value']} {current['temp_C']}°C "
-                  f"feels:{current['FeelsLikeC']}°C humidity:{current['humidity']}% "
-                  f"wind:{current['windspeedKmph']}km/h")
-        # Add tomorrow's forecast
-        tomorrow = w['weather'][1]
-        weather += f"\n    Tomorrow: {tomorrow['hourly'][4]['weatherDesc'][0]['value']} {tomorrow['maxtempC']}°/{tomorrow['mintempC']}°C"
-    except:
-        weather = f"{LOCATION}: unavailable"
-    
-    return (
-        f"Datetime: {datetime.datetime.now():%Y-%m-%d %H:%M:%S}\n"
-        f"Weather: {weather}\n"
-        f"'free -h':\n{mem}\n"
-    )
+def apply_edits(artifact: str, edits: list[Edit]) -> str:
+    """
+    Apply a list of edits to the artifact text.
+    Each edit contains a search term and a replacement text.
+    """
+    error_message = ''
+    for edit in edits:
+        if edit.search not in artifact:
+            error_message += f"Search term '{edit.search}' not found in artifact.\n"
+            print('error:', error_message)
+            continue
+        artifact = artifact.replace(edit.search, edit.replace)
+    return artifact
 
 
 def iteration_loop():
@@ -66,12 +59,16 @@ def iteration_loop():
         artifact = ARTIFACT_FILE.read_text().strip()
         constraints = CONSTRAINTS_FILE.read_text().strip()
         context = create_context_string()
+        print(context)
 
         critique = critic(artifact=artifact, constraints=constraints, context=context).critique
         print(f"Critique:\n{critique}\n")
 
-        refined = refiner(artifact=artifact, constraints=constraints,
-                          critique=critique, context=context).refined_artifact
+        # refined = refiner(artifact=artifact, constraints=constraints, critique=critique, context=context).refined_artifact
+        prediction = refiner(artifact=artifact, constraints=constraints, critique=critique, context=context)
+        print('edits: ', prediction)
+        edits = prediction.edits  # Extract the edits list from the Prediction object
+        refined = apply_edits(artifact, edits)
         print('-' * 80)
         print(f"Artifact:\n{refined}")
 

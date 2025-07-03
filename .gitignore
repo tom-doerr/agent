@@ -188,6 +188,11 @@ mlruns/
 .env.*
 !.env.example
 
+# Local configuration
+nlco_config.py
+nlco_config.json
+nlco_config.toml
+
 # Data files
 *.csv
 *.json
@@ -195,3 +200,6 @@ mlruns/
 *.pkl
 *.db
 artifact.txt
+constraints.txt
+constraints.md
+artifact.md

@@ -46,11 +46,12 @@ safety_checker = dspy.Predict(
     ),
 )
 is_finished_checker = dspy.Predict(
-    "user_request, system_state_info, command_run_history, return_value -> reasoning, is_finished: bool",
+    "user_request, system_state_info, command_run_history, return_value -> reasoning, reply_to_user: str, is_finished: bool",
     instructions=(
         "The agent is finished if the user request has been fulfilled. "
         "The user request is fulfilled if the return value contains the answer to the user request "
-        "or if the user request is a command that has been executed successfully."
+        "or if the user request is a command that has been executed successfully. If the agent is not yet done, the reply_to_user can just contain a status update about the progress"
+
     ),
 )
 
@@ -66,6 +67,7 @@ def multiline_input(prompt: str = "Paste below (empty line = done):") -> str:
         if line == "":
             break
         buf.append(line)
+    print("-" * 40)
     return "\n".join(buf)
 
 
@@ -82,6 +84,7 @@ command_run_history = []
 
 # ── main loop ─────────────────────────────────────────────────────────────────
 while True:
+    print(f'user_request: "{user_request}"')
     command = command_generator(
         user_request=user_request,
         system_state_info=system_state_info,
@@ -120,8 +123,9 @@ while True:
         command_run_history=command_run_history,
         return_value=return_value,
     )
-    rp(f"[cyan]is_finished:[/] {is_finished_result.is_finished}")
     print("is_finished_result.reasoning:", is_finished_result.reasoning)
+    rp(f"[cyan]reply_to_user:[/] [purple]{is_finished_result.reply_to_user}[/]")
+    rp(f"[cyan]is_finished:[/] {is_finished_result.is_finished}")
 
     if is_finished_result.is_finished:
         rp("[green]Finished![/]")

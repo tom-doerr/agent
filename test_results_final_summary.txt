@@ -1,0 +1,14 @@
+ReasoningGym Parallel Inference Results
+======================================
+Timestamp: 2025-07-01T00:07:44.640421
+Max Tokens: 50
+Max Concurrent Requests: 3
+
+fraction_simplification:
+  Success Rate: 33.33%
+  Correct: 1/3
+
+base_conversion:
+  Success Rate: 0.00%
+  Correct: 0/3
+
