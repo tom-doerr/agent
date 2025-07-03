@@ -1,0 +1,11 @@
+# Reorder these lines to create your ranking (best items first)
+# Lines starting with # are ignored
+# Format: [index] title/description
+
+[0] TPU Deep Dive
+[1] Git Notes: Git's coolest, most unloved­ feature (2022)
+[2] U.S. bombs Iranian nuclear sites
+[3] Using an $8 smart outlet to avoid brainrot
+[4] Sound As Pure Form: Music Language Inspired by Supercollider, APL, and Forth
+[5] Tell HN: Beware confidentiality agreements that act as lifetime non competes
+[6] Harry Brearley, the creator of stainless steel (2016)

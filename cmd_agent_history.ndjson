@@ -1,0 +1,63 @@
+{"command": "help", "args": [], "input": "help", "agent": "cmd_agent", "timestamp": 1751298770}
+{"command": "status", "args": [], "input": "status", "agent": "cmd_agent", "timestamp": 1751298770}
+{"command": "test1", "args": [], "input": "test1", "agent": "cmd_agent", "timestamp": 1751298770}
+{"command": "test2", "args": [], "input": "test2", "agent": "cmd_agent", "timestamp": 1751298770}
+{"command": "history", "args": [], "input": "history", "agent": "cmd_agent", "timestamp": 1751298770}
+{"command": "help", "args": [], "input": "help", "agent": "cmd_agent", "timestamp": 1751298770}
+{"command": "echo", "args": ["hello", "world"], "input": "echo hello world", "agent": "cmd_agent", "timestamp": 1751298770}
+{"command": "unknown_command", "args": [], "input": "unknown_command", "agent": "cmd_agent", "timestamp": 1751298770}
+{"command": "fail", "args": [], "input": "fail", "agent": "cmd_agent", "timestamp": 1751298770}
+{"command": "help", "args": [], "input": "help", "agent": "cmd_agent", "timestamp": 1751299633}
+{"command": "status", "args": [], "input": "status", "agent": "cmd_agent", "timestamp": 1751299633}
+{"command": "test1", "args": [], "input": "test1", "agent": "cmd_agent", "timestamp": 1751299633}
+{"command": "test2", "args": [], "input": "test2", "agent": "cmd_agent", "timestamp": 1751299633}
+{"command": "history", "args": [], "input": "history", "agent": "cmd_agent", "timestamp": 1751299633}
+{"command": "help", "args": [], "input": "help", "agent": "cmd_agent", "timestamp": 1751299633}
+{"command": "echo", "args": ["hello", "world"], "input": "echo hello world", "agent": "cmd_agent", "timestamp": 1751299633}
+{"command": "unknown_command", "args": [], "input": "unknown_command", "agent": "cmd_agent", "timestamp": 1751299633}
+{"command": "fail", "args": [], "input": "fail", "agent": "cmd_agent", "timestamp": 1751299633}
+{"command": "help", "args": [], "input": "help", "agent": "cmd_agent", "timestamp": 1751301127}
+{"command": "status", "args": [], "input": "status", "agent": "cmd_agent", "timestamp": 1751301127}
+{"command": "test1", "args": [], "input": "test1", "agent": "cmd_agent", "timestamp": 1751301127}
+{"command": "test2", "args": [], "input": "test2", "agent": "cmd_agent", "timestamp": 1751301127}
+{"command": "history", "args": [], "input": "history", "agent": "cmd_agent", "timestamp": 1751301127}
+{"command": "help", "args": [], "input": "help", "agent": "cmd_agent", "timestamp": 1751301127}
+{"command": "echo", "args": ["hello", "world"], "input": "echo hello world", "agent": "cmd_agent", "timestamp": 1751301127}
+{"command": "unknown_command", "args": [], "input": "unknown_command", "agent": "cmd_agent", "timestamp": 1751301127}
+{"command": "fail", "args": [], "input": "fail", "agent": "cmd_agent", "timestamp": 1751301127}
+{"command": "help", "args": [], "input": "help", "agent": "cmd_agent", "timestamp": 1751301156}
+{"command": "status", "args": [], "input": "status", "agent": "cmd_agent", "timestamp": 1751301156}
+{"command": "test1", "args": [], "input": "test1", "agent": "cmd_agent", "timestamp": 1751301156}
+{"command": "test2", "args": [], "input": "test2", "agent": "cmd_agent", "timestamp": 1751301156}
+{"command": "history", "args": [], "input": "history", "agent": "cmd_agent", "timestamp": 1751301156}
+{"command": "help", "args": [], "input": "help", "agent": "cmd_agent", "timestamp": 1751301156}
+{"command": "echo", "args": ["hello", "world"], "input": "echo hello world", "agent": "cmd_agent", "timestamp": 1751301156}
+{"command": "unknown_command", "args": [], "input": "unknown_command", "agent": "cmd_agent", "timestamp": 1751301156}
+{"command": "fail", "args": [], "input": "fail", "agent": "cmd_agent", "timestamp": 1751301156}
+{"command": "help", "args": [], "input": "help", "agent": "cmd_agent", "timestamp": 1751301873}
+{"command": "status", "args": [], "input": "status", "agent": "cmd_agent", "timestamp": 1751301873}
+{"command": "test1", "args": [], "input": "test1", "agent": "cmd_agent", "timestamp": 1751301873}
+{"command": "test2", "args": [], "input": "test2", "agent": "cmd_agent", "timestamp": 1751301873}
+{"command": "history", "args": [], "input": "history", "agent": "cmd_agent", "timestamp": 1751301873}
+{"command": "help", "args": [], "input": "help", "agent": "cmd_agent", "timestamp": 1751301873}
+{"command": "echo", "args": ["hello", "world"], "input": "echo hello world", "agent": "cmd_agent", "timestamp": 1751301873}
+{"command": "unknown_command", "args": [], "input": "unknown_command", "agent": "cmd_agent", "timestamp": 1751301873}
+{"command": "fail", "args": [], "input": "fail", "agent": "cmd_agent", "timestamp": 1751301873}
+{"command": "help", "args": [], "input": "help", "agent": "cmd_agent", "timestamp": 1751322113}
+{"command": "status", "args": [], "input": "status", "agent": "cmd_agent", "timestamp": 1751322113}
+{"command": "test1", "args": [], "input": "test1", "agent": "cmd_agent", "timestamp": 1751322113}
+{"command": "test2", "args": [], "input": "test2", "agent": "cmd_agent", "timestamp": 1751322113}
+{"command": "history", "args": [], "input": "history", "agent": "cmd_agent", "timestamp": 1751322113}
+{"command": "help", "args": [], "input": "help", "agent": "cmd_agent", "timestamp": 1751322113}
+{"command": "echo", "args": ["hello", "world"], "input": "echo hello world", "agent": "cmd_agent", "timestamp": 1751322113}
+{"command": "unknown_command", "args": [], "input": "unknown_command", "agent": "cmd_agent", "timestamp": 1751322113}
+{"command": "fail", "args": [], "input": "fail", "agent": "cmd_agent", "timestamp": 1751322113}
+{"command": "help", "args": [], "input": "help", "agent": "cmd_agent", "timestamp": 1751347203}
+{"command": "status", "args": [], "input": "status", "agent": "cmd_agent", "timestamp": 1751347203}
+{"command": "test1", "args": [], "input": "test1", "agent": "cmd_agent", "timestamp": 1751347203}
+{"command": "test2", "args": [], "input": "test2", "agent": "cmd_agent", "timestamp": 1751347203}
+{"command": "history", "args": [], "input": "history", "agent": "cmd_agent", "timestamp": 1751347203}
+{"command": "help", "args": [], "input": "help", "agent": "cmd_agent", "timestamp": 1751347203}
+{"command": "echo", "args": ["hello", "world"], "input": "echo hello world", "agent": "cmd_agent", "timestamp": 1751347203}
+{"command": "unknown_command", "args": [], "input": "unknown_command", "agent": "cmd_agent", "timestamp": 1751347203}
+{"command": "fail", "args": [], "input": "fail", "agent": "cmd_agent", "timestamp": 1751347203}

@@ -1,0 +1,110 @@
+=============Do 12. Jun 01:15:11 CEST 2025===================
+
+============= DOCKER COMPOSE LOGS =============
+
+
+
+
+
+
+=====================================================================
+        overflow-y: auto;
+        height: 100%;
+    }
+    #input-container {
+        height: 15%;
+        width: 100%;
+        align: center top;
+    }
+    #request-input { (duplicate-code)
+textual_task_manager.py:1:0: R0801: Similar lines in 2 files
+==coding_agent_repl:[253:279]
+==dspy_programs.coding_agent_repl:[226:251]
+        self.process_request()
+
+    def disable_input(self):
+        self.query_one("#request-input").disabled = True
+        self.query_one("#execute-btn").disabled = True
+
+    def enable_input(self):
+        self.query_one("#request-input").disabled = False
+        self.query_one("#execute-btn").disabled = False
+
+    def process_request(self) -> None:
+        request_input = self.query_one("#request-input")
+        request = request_input.value.strip()
+        request_input.value = ""
+
+        # Set focus back to input immediately
+        self.set_focus(request_input)
+
+        if request.lower() == "/exit":
+            self.exit()
+            return
+
+        if request:
+            self.execute_agent(request)
+ (duplicate-code)
+textual_task_manager.py:1:0: R0801: Similar lines in 2 files
+==dspy_modules.memory_gan:[118:138]
+==dspy_programs.memory_gan:[134:154]
+    try:
+        # Extract components from prediction
+        source_text = pred.source_text
+        question = pred.question
+        reference_answer = pred.reference_answer
+        memory_answer = pred.memory_answer
+
+        # Skip if any component is missing
+        if not all([source_text, question, reference_answer, memory_answer]):
+            return 0.0
+
+        # Get assessment from judge
+        assessment = dspy.Predict(AssessAnswers)(
+            source_text=source_text,
+            question=question,
+            reference_answer=reference_answer,
+            memory_answer=memory_answer
+        )
+
+        # Parse score safely with better error handling (duplicate-code)
+textual_task_manager.py:1:0: R0801: Similar lines in 2 files
+==dspy_modules.value_network:[19:31]
+==dspy_programs.value_network:[25:34]
+        except (TypeError, ValueError):
+            # Use safe defaults on conversion failure
+            score = 0.5
+            uncertainty = 1.0
+
+        return dspy.Prediction(
+            score=score,
+            uncertainty=uncertainty
+        ) (duplicate-code)
+textual_task_manager.py:1:0: R0801: Similar lines in 2 files
+==agent_repl.agent:[2:10]
+==dspy_modules.coding_agent:[2:11]
+class CodingAgentSignature(dspy.Signature):
+    """Execute coding tasks autonomously. You can search Firebase by using 'firebase:' prefix in commands."""
+    request = dspy.InputField(desc="User request for code changes")
+    log_context = dspy.InputField(desc="Relevant log entries for context")
+    plan = dspy.OutputField(desc="Step-by-step plan to complete request")
+    commands = dspy.OutputField(desc="Shell commands to execute. Use 'firebase:query' for Firebase searches.")
+    edits = dspy.OutputField(desc="File edits in SEARCH/REPLACE block format")
+    done = dspy.OutputField(desc="'DONE' when task is complete, 'CONTINUE' to process next step autonomously")
+ (duplicate-code)
+textual_task_manager.py:1:0: R0801: Similar lines in 2 files
+==dspy_modules.value_network:[2:11]
+==dspy_programs.value_network:[2:11]
+class ValueNetworkSignature(dspy.Signature):
+    """Predict the score and uncertainty for a given data point."""
+    data_point = dspy.InputField(desc="A data point to be evaluated.")
+    score = dspy.OutputField(desc="Predicted score (float between 0.0 and 1.0)")
+    uncertainty = dspy.OutputField(desc="Predicted uncertainty (float between 0.0 and 1.0)")
+
+class ValueNetwork(dspy.Module):
+    def __init__(self):
+        super().__init__() (duplicate-code)
+
+------------------------------------------------------------------
+Your code has been rated at 5.57/10 (previous run: 5.57/10, +0.00)
+

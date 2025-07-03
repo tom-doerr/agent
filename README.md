@@ -61,3 +61,19 @@ The agent's performance depends on quality training data stored in `.simpledspy/
     ```bash
     python agent_simpledspy.py --lm r1
     ```
+
+## Additional Agents
+
+### Local Agent (`local_agent.py`)
+A command-line agent with Vi-style key bindings that uses DSPy to generate and execute commands with safety checking.
+
+### Ranking Agents
+*   `ranking_agent.py` - Pairwise ranking helper for learning usefulness preferences
+*   `ambient_pref_agent.py` - Preference-based agent that learns from ordered examples
+*   `dspy_ranking_optimizer.py` - Example of DSPy optimization for learning rankings
+
+### Value Learning
+The project includes several approaches for value learning with DSPy:
+*   Ordered JSONL files (`graded_set.ndjson`, `ranking_set.ndjson`) for training
+*   Pairwise comparison modules for learning preferences
+*   Optimization examples using BootstrapFewShotWithRandomSearch
