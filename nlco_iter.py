@@ -20,6 +20,7 @@ class RefineSig(dspy.Signature):
     artifact: str = dspy.InputField()
     constraints: str = dspy.InputField()
     critique: str = dspy.InputField()
+    search_replace_errors: list[Edit] = dspy.InputField(desc="Search and replace errors from previous iterations that couldn't be applied because the search block didn't match any part in the artifact")
     context: str = dspy.InputField()
     edits: list[Edit] = dspy.OutputField()
 
@@ -42,17 +43,20 @@ def apply_edits(artifact: str, edits: list[Edit]) -> str:
     Each edit contains a search term and a replacement text.
     """
     error_message = ''
+    search_replace_errors = []
     for edit in edits:
         if edit.search not in artifact:
+            search_replace_errors.append(edit)
             error_message += f"Search term '{edit.search}' not found in artifact.\n"
             print('error:', error_message)
             continue
         artifact = artifact.replace(edit.search, edit.replace)
-    return artifact
+    return artifact, search_replace_errors
 
 
 def iteration_loop():
     history = []
+    search_replace_errors = []
     for i in range(10):
         print(f"Iteration {i + 1} {'=' * 50}")
 
@@ -65,10 +69,11 @@ def iteration_loop():
         print(f"Critique:\n{critique}\n")
 
         # refined = refiner(artifact=artifact, constraints=constraints, critique=critique, context=context).refined_artifact
-        prediction = refiner(artifact=artifact, constraints=constraints, critique=critique, context=context)
+        prediction = refiner(artifact=artifact, constraints=constraints, critique=critique, search_replace_errors=search_replace_errors, context=context)
         print('edits: ', prediction)
         edits = prediction.edits  # Extract the edits list from the Prediction object
-        refined = apply_edits(artifact, edits)
+        # refined = apply_edits(artifact, edits)
+        refined, search_replace_errors = apply_edits(artifact, edits)
         print('-' * 80)
         print(f"Artifact:\n{refined}")
 
