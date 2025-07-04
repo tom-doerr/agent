@@ -1,0 +1,59 @@
+version: '3.8'
+
+services:
+  backend-test:
+    build: ./backend
+    environment:
+      - DATABASE_URL=sqlite:///./test_data/test_preferences.db
+      - TESTING=true
+    volumes:
+      - ./backend:/app
+      - ./test_data:/app/test_data
+    command: pytest -v --cov=. --cov-report=xml --cov-report=term
+    networks:
+      - test-network
+
+  frontend-test:
+    build: ./frontend
+    environment:
+      - CI=true
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    command: npm test -- --coverage --watchAll=false
+    networks:
+      - test-network
+
+  e2e-test:
+    build: ./e2e
+    environment:
+      - BACKEND_URL=http://backend:8000
+      - FRONTEND_URL=http://frontend:3000
+    volumes:
+      - ./e2e:/app
+      - /app/node_modules
+    depends_on:
+      - backend
+      - frontend
+    networks:
+      - test-network
+    command: npx playwright test
+
+  backend:
+    build: ./backend
+    environment:
+      - DATABASE_URL=sqlite:///./test_data/test_preferences.db
+      - TESTING=true
+    networks:
+      - test-network
+
+  frontend:
+    build: ./frontend
+    environment:
+      - REACT_APP_BACKEND_URL=http://backend:8000
+    networks:
+      - test-network
+
+networks:
+  test-network:
+    driver: bridge

@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Microphone Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+        }
+        button {
+            padding: 10px 20px;
+            font-size: 16px;
+            margin: 10px;
+        }
+        #status {
+            margin: 20px 0;
+            padding: 10px;
+            border: 1px solid #ccc;
+            background: #f5f5f5;
+        }
+        .error { color: red; }
+        .success { color: green; }
+        .info { color: blue; }
+    </style>
+</head>
+<body>
+    <h1>Microphone Test Page</h1>
+    <p>This page tests microphone access outside of Docker.</p>
+    
+    <button onclick="checkSupport()">Check Browser Support</button>
+    <button onclick="checkPermissions()">Check Permissions</button>
+    <button onclick="enumerateDevices()">List Devices</button>
+    <button onclick="requestMicrophone()">Request Microphone Access</button>
+    
+    <div id="status">
+        <h3>Status:</h3>
+        <div id="log"></div>
+    </div>
+
+    <script>
+        const log = (message, type = 'info') => {
+            const logDiv = document.getElementById('log');
+            const entry = document.createElement('div');
+            entry.className = type;
+            entry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+            logDiv.appendChild(entry);
+        };
+
+        const checkSupport = () => {
+            log('Checking browser support...', 'info');
+            
+            if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+                log('✅ getUserMedia is supported', 'success');
+            } else {
+                log('❌ getUserMedia is NOT supported', 'error');
+            }
+            
+            if (window.MediaRecorder) {
+                log('✅ MediaRecorder is supported', 'success');
+            } else {
+                log('❌ MediaRecorder is NOT supported', 'error');
+            }
+            
+            log(`Protocol: ${location.protocol}`, 'info');
+            log(`Hostname: ${location.hostname}`, 'info');
+        };
+
+        const checkPermissions = async () => {
+            log('Checking permissions...', 'info');
+            
+            if (!navigator.permissions || !navigator.permissions.query) {
+                log('⚠️ Permissions API not supported', 'error');
+                return;
+            }
+            
+            try {
+                const result = await navigator.permissions.query({ name: 'microphone' });
+                log(`Microphone permission: ${result.state}`, result.state === 'granted' ? 'success' : 'info');
+                
+                result.onchange = () => {
+                    log(`Permission changed to: ${result.state}`, 'info');
+                };
+            } catch (err) {
+                log(`Permission check error: ${err.message}`, 'error');
+            }
+        };
+
+        const enumerateDevices = async () => {
+            log('Enumerating devices...', 'info');
+            
+            try {
+                const devices = await navigator.mediaDevices.enumerateDevices();
+                const audioInputs = devices.filter(d => d.kind === 'audioinput');
+                
+                log(`Found ${audioInputs.length} audio input devices:`, 'info');
+                
+                audioInputs.forEach((device, i) => {
+                    const label = device.label || `Microphone ${i + 1}`;
+                    log(`  ${i + 1}. ${label} (${device.deviceId})`, 'info');
+                });
+                
+                if (audioInputs.length === 0) {
+                    log('⚠️ No microphone devices found', 'error');
+                }
+            } catch (err) {
+                log(`Enumerate devices error: ${err.message}`, 'error');
+            }
+        };
+
+        const requestMicrophone = async () => {
+            log('Requesting microphone access...', 'info');
+            
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ 
+                    audio: {
+                        echoCancellation: true,
+                        noiseSuppression: true,
+                        autoGainControl: true
+                    }
+                });
+                
+                log('✅ Microphone access granted!', 'success');
+                
+                const tracks = stream.getAudioTracks();
+                tracks.forEach(track => {
+                    log(`Audio track: ${track.label}`, 'success');
+                });
+                
+                // Stop the stream after 3 seconds
+                setTimeout(() => {
+                    tracks.forEach(track => track.stop());
+                    log('Microphone stopped', 'info');
+                }, 3000);
+                
+                // Re-enumerate devices after permission
+                setTimeout(enumerateDevices, 100);
+                
+            } catch (err) {
+                log(`❌ Microphone access error: ${err.name} - ${err.message}`, 'error');
+                
+                if (err.name === 'NotAllowedError') {
+                    log('Permission was denied by the user or system', 'error');
+                } else if (err.name === 'NotFoundError') {
+                    log('No microphone device found', 'error');
+                } else if (err.name === 'NotReadableError') {
+                    log('Microphone is already in use by another application', 'error');
+                }
+            }
+        };
+
+        // Auto-check on load
+        window.onload = () => {
+            checkSupport();
+        };
+    </script>
+</body>
+</html>

@@ -1,0 +1,36 @@
+version: '3.8'
+
+services:
+  e2e-test:
+    build: ./backend
+    depends_on:
+      - backend
+      - frontend
+    environment:
+      - BACKEND_URL=http://backend:8090
+    volumes:
+      - ./e2e:/app/e2e
+    command: >
+      sh -c "
+        echo 'Waiting for services to start...' &&
+        sleep 10 &&
+        echo 'Running E2E tests...' &&
+        python /app/e2e/test_api_e2e.py
+      "
+    networks:
+      - art-network
+
+  backend:
+    extends:
+      file: docker-compose.yml
+      service: backend
+
+  frontend:
+    extends:
+      file: docker-compose.yml
+      service: frontend
+
+networks:
+  art-network:
+    external: true
+    name: art-generator_art-network

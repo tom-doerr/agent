@@ -3,11 +3,11 @@
 import dspy
 
 
-dspy.settings.configure(lm=dspy.LM('deepseek/deepseek-chat', max_tokens=1000))
+dspy.settings.configure(lm=dspy.LM('deepseek/deepseek-chat', max_tokens=100, temperature=1.5))
 
 program = dspy.Predict('input -> output')
 
-dataset = [dspy.Example(input=str(i)).with_inputs('input') for i in range(1000)]
+dataset = [dspy.Example(input=str(i)).with_inputs('input') for i in range(100)]
 
 
 def score(example, pred, trace=None):
@@ -25,7 +25,7 @@ def score(example, pred, trace=None):
     # Ensure y is a string
     y = str(y)
     
-    return y.count("a") - 2 * (len(y) - 10)
+    return y.count("a") - 2 * max(0, len(y) - 10)
 
 optimizer = dspy.SIMBA(
         metric=score,

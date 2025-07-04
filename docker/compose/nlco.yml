@@ -1,0 +1,27 @@
+version: '3.8'
+
+services:
+  mlflow:
+    image: ghcr.io/mlflow/mlflow:latest
+    container_name: mlflow-server
+    ports:
+      - "5004:5000"
+    command: mlflow server --host 0.0.0.0 --port 5000 --backend-store-uri file:///mlruns --default-artifact-root file:///mlruns
+    volumes:
+      - ./mlruns:/mlruns
+    
+  nlco:
+    build:
+      context: ../..
+      dockerfile: docker/Dockerfile.nlco
+    container_name: nlco-iter
+    depends_on:
+      - mlflow
+    volumes:
+      - ./artifact.md:/app/artifact.md
+      - ./constraints.md:/app/constraints.md
+    environment:
+      - MLFLOW_TRACKING_URI=http://mlflow:5000
+      - OLLAMA_BASE_URL=http://host.docker.internal:11434
+    extra_hosts:
+      - "host.docker.internal:host-gateway"

@@ -1,0 +1,98 @@
+version: '3.8'
+
+services:
+  # Run all tests
+  test-all:
+    build:
+      context: ../..
+      dockerfile: docker/Dockerfile.tests
+    container_name: agent-tests-all
+    environment:
+      - PYTHONPATH=/app
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
+      - OLLAMA_BASE_URL=http://host.docker.internal:11434
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - .:/app
+      - ./test-results:/test-results
+    command: ["pytest", "-v", "--tb=short", "--junitxml=/test-results/junit.xml"]
+
+  # Run specific test file
+  test-file:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.tests
+    container_name: agent-test-file
+    environment:
+      - PYTHONPATH=/app
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
+      - OLLAMA_BASE_URL=http://host.docker.internal:11434
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - .:/app
+    # Override with: docker compose -f docker-compose.test.yml run test-file pytest tests/test_config.py -v
+
+  # Run tests with coverage
+  test-coverage:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.tests
+    container_name: agent-test-coverage
+    environment:
+      - PYTHONPATH=/app
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
+      - OLLAMA_BASE_URL=http://host.docker.internal:11434
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - .:/app
+      - ./test-results:/test-results
+    command: ["pytest", "--cov=.", "--cov-report=html:/test-results/coverage", "--cov-report=term"]
+
+  # Run tests in watch mode (requires pytest-watch)
+  test-watch:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.tests
+    container_name: agent-test-watch
+    environment:
+      - PYTHONPATH=/app
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
+      - OLLAMA_BASE_URL=http://host.docker.internal:11434
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - .:/app
+    command: ["pytest-watch", "--", "-v"]
+    stdin_open: true
+    tty: true
+
+  # Run only fast tests (marked with @pytest.mark.fast)
+  test-fast:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.tests
+    container_name: agent-test-fast
+    environment:
+      - PYTHONPATH=/app
+    volumes:
+      - .:/app
+    command: ["pytest", "-v", "-m", "fast"]
+
+  # Run integration tests (marked with @pytest.mark.integration)
+  test-integration:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.tests
+    container_name: agent-test-integration
+    environment:
+      - PYTHONPATH=/app
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
+      - OLLAMA_BASE_URL=http://host.docker.internal:11434
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - .:/app
+    command: ["pytest", "-v", "-m", "integration"]

@@ -1,0 +1,53 @@
+version: '3.8'
+
+services:
+  backend:
+    build: ./backend
+    ports:
+      - "8090:8090"
+    environment:
+      - DATABASE_URL=sqlite:///./data/preferences.db
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - REPLICATE_API_TOKEN=${REPLICATE_API_TOKEN}
+      - CORS_ORIGINS=http://localhost:3090
+    volumes:
+      - ./backend:/app
+      - ./data:/app/data
+    command: uvicorn main:app --host 0.0.0.0 --port 8090 --reload
+    networks:
+      - art-network
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "3090:3000"
+    environment:
+      - REACT_APP_BACKEND_URL=http://localhost:8090
+      - PORT=3000
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    command: npm start
+    depends_on:
+      - backend
+    networks:
+      - art-network
+
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "8085:80"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - frontend
+      - backend
+    networks:
+      - art-network
+
+networks:
+  art-network:
+    driver: bridge
+
+volumes:
+  data:

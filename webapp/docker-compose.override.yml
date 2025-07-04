@@ -1,0 +1,8 @@
+version: '3.8'
+
+services:
+  backend:
+    environment:
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - GOOGLE_API_KEY=${GOOGLE_API_KEY}
+      - LITELLM_LOG=${LITELLM_LOG:-INFO}

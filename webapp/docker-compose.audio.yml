@@ -1,0 +1,34 @@
+version: '3.8'
+
+# Override configuration for audio features
+services:
+  backend:
+    environment:
+      - OLLAMA_BASE_URL=http://host.docker.internal:11434
+      - GOOGLE_APPLICATION_CREDENTIALS=/app/credentials.json  # If using real Google Speech-to-Text
+      - LITELLM_LOG=DEBUG  # Enable debug logging for audio transcription
+    volumes:
+      - ./backend:/app
+      - ./credentials.json:/app/credentials.json:ro  # Mount credentials if available
+
+  frontend:
+    environment:
+      - REACT_APP_API_URL=http://localhost:8000
+      - REACT_APP_ENABLE_AUDIO=true  # Feature flag for audio
+
+  # Dedicated service for testing audio functionality  
+  audio-integration-test:
+    build:
+      context: ./e2e
+      dockerfile: Dockerfile
+    container_name: audio-integration-test
+    depends_on:
+      - backend
+      - frontend
+    volumes:
+      - ./e2e:/tests
+    command: npx playwright test test_audio.spec.js --headed
+    profiles:
+      - audio-test
+    environment:
+      - PLAYWRIGHT_BROWSERS_PATH=/ms-playwright

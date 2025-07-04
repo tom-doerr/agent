@@ -1,0 +1,77 @@
+version: '3.8'
+
+services:
+  # Backend with DSPy
+  backend:
+    build: 
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: dspy-backend-test
+    environment:
+      - OLLAMA_BASE_URL=http://host.docker.internal:11434
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    networks:
+      - test-network
+
+  # Frontend React app
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: dspy-frontend-test
+    depends_on:
+      - backend
+    environment:
+      - REACT_APP_API_URL=http://backend:8000
+    networks:
+      - test-network
+
+  # Backend unit tests
+  backend-test:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    command: pytest test_main.py -v --tb=short
+    depends_on:
+      - backend
+    environment:
+      - OLLAMA_BASE_URL=http://host.docker.internal:11434
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    networks:
+      - test-network
+    volumes:
+      - ./test-results/backend:/results
+
+  # Frontend unit tests
+  frontend-test:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    command: npm test -- --watchAll=false --coverage
+    environment:
+      - CI=true
+    networks:
+      - test-network
+    volumes:
+      - ./test-results/frontend:/app/coverage
+
+  # E2E tests with Playwright
+  e2e-test:
+    build:
+      context: ./e2e
+      dockerfile: Dockerfile
+    depends_on:
+      - backend
+      - frontend
+    environment:
+      - PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
+    networks:
+      - test-network
+    volumes:
+      - ./test-results/e2e:/app/test-results
+
+networks:
+  test-network:
+    driver: bridge
