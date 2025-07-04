@@ -1,0 +1,48 @@
+version: '3.8'
+
+services:
+  # Reverse proxy for nice URLs
+  nginx-proxy:
+    image: nginx:alpine
+    container_name: local-proxy
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx-local.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - mlflow
+    networks:
+      - local-services
+
+  # MLflow server
+  mlflow:
+    image: ghcr.io/mlflow/mlflow:latest
+    container_name: mlflow
+    ports:
+      - "5002:5000"
+    volumes:
+      - ./mlruns:/mlflow/mlruns
+      - ./mlflow.db:/mlflow/mlflow.db
+    environment:
+      - MLFLOW_BACKEND_STORE_URI=sqlite:///mlflow/mlflow.db
+      - MLFLOW_DEFAULT_ARTIFACT_ROOT=/mlflow/mlruns
+    command: >
+      mlflow server
+      --host 0.0.0.0
+      --port 5000
+      --backend-store-uri sqlite:///mlflow/mlflow.db
+      --default-artifact-root /mlflow/mlruns
+    networks:
+      local-services:
+        aliases:
+          - mlflow.local
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+networks:
+  local-services:
+    name: local-services
+    driver: bridge

@@ -1,0 +1,26 @@
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    git \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy requirements
+COPY requirements.txt .
+RUN pip install -r requirements.txt
+
+# Install test dependencies
+RUN pip install pytest pytest-cov pytest-watch pytest-mock pytest-asyncio
+
+# Copy test config files
+COPY pytest.ini* ./
+COPY conftest.py* ./
+COPY .env.example* ./
+
+# Copy source code and tests
+COPY . .
+
+# Default command runs all tests
+CMD ["pytest", "-v"]

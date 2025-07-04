@@ -1,0 +1,56 @@
+version: '3.8'
+
+services:
+  backend:
+    build: 
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: dspy-backend
+    ports:
+      - "8000:8000"
+    environment:
+      - OLLAMA_BASE_URL=http://host.docker.internal:11434
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - ./backend:/app
+    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: dspy-frontend
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+    environment:
+      - REACT_APP_API_URL=http://localhost:8000
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules  # Prevent overwriting node_modules
+
+  test-sse:
+    build: 
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: test-sse
+    ports:
+      - "8001:8001"
+    volumes:
+      - ./backend:/app
+    command: python test_sse.py
+
+  audio-tests:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: audio-tests
+    depends_on:
+      - backend
+    volumes:
+      - ./backend:/app
+    command: pytest test_audio_handler.py test_main.py::test_transcribe -v
+    profiles:
+      - tests

@@ -1,0 +1,60 @@
+version: '3.8'
+
+services:
+  backend:
+    build: 
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: dspy-backend-e2e
+    environment:
+      - OLLAMA_BASE_URL=http://host.docker.internal:11434
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    networks:
+      - e2e-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: dspy-frontend-e2e
+    depends_on:
+      backend:
+        condition: service_healthy
+    environment:
+      - REACT_APP_API_URL=http://backend:8000
+    networks:
+      - e2e-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  e2e-tests:
+    build:
+      context: ./e2e
+      dockerfile: Dockerfile
+    container_name: e2e-tests
+    depends_on:
+      frontend:
+        condition: service_healthy
+      backend:
+        condition: service_healthy
+    environment:
+      - PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
+    networks:
+      - e2e-network
+    volumes:
+      - ./test-results/e2e:/app/test-results
+      - ./e2e/videos:/app/videos
+      - ./e2e/screenshots:/app/screenshots
+
+networks:
+  e2e-network:
+    driver: bridge

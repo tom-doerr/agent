@@ -1,0 +1,54 @@
+version: '3.8'
+
+services:
+  backend:
+    build: ./backend
+    environment:
+      - DATABASE_URL=sqlite:///./data/preferences.db
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - REPLICATE_API_TOKEN=${REPLICATE_API_TOKEN}
+      - CORS_ORIGINS=http://frontend:3000
+    volumes:
+      - ./backend:/app
+      - ./data:/app/data
+    command: uvicorn main:app --host 0.0.0.0 --port 8090
+    networks:
+      - e2e-network
+
+  frontend:
+    build: ./frontend
+    environment:
+      - REACT_APP_BACKEND_URL=http://backend:8090
+      - PORT=3000
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    command: npm start
+    depends_on:
+      - backend
+    networks:
+      - e2e-network
+
+  e2e-runner:
+    build: ./backend
+    depends_on:
+      - backend
+      - frontend
+    environment:
+      - BACKEND_URL=http://backend:8090
+      - FRONTEND_URL=http://frontend:3000
+    volumes:
+      - ./e2e:/app/e2e
+      - ./backend:/app
+    command: >
+      sh -c "
+        echo 'Waiting for services to be ready...' &&
+        sleep 10 &&
+        python /app/e2e/test_api_e2e.py
+      "
+    networks:
+      - e2e-network
+
+networks:
+  e2e-network:
+    driver: bridge

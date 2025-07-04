@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>PulseAudio Browser Test</title>
+    <style>
+        body { font-family: Arial; max-width: 800px; margin: 50px auto; padding: 20px; }
+        button { padding: 10px 20px; font-size: 16px; margin: 10px; cursor: pointer; }
+        #log { background: #f5f5f5; padding: 15px; border: 1px solid #ddd; margin-top: 20px; font-family: monospace; }
+        .success { color: green; }
+        .error { color: red; }
+        .info { color: blue; }
+    </style>
+</head>
+<body>
+    <h1>PulseAudio Browser Audio Test</h1>
+    <p>This tests if your browser can see PulseAudio devices.</p>
+    
+    <button onclick="testBasicSupport()">1. Test Basic Support</button>
+    <button onclick="testEnumerateDevices()">2. List All Devices</button>
+    <button onclick="testRequestMic()">3. Request Microphone</button>
+    <button onclick="testWithConstraints()">4. Test Constraints</button>
+    
+    <div id="log">
+        <h3>Test Results:</h3>
+        <div id="results"></div>
+    </div>
+
+    <script>
+        const log = (msg, type = 'info') => {
+            const div = document.createElement('div');
+            div.className = type;
+            div.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
+            document.getElementById('results').appendChild(div);
+            console.log(msg);
+        };
+
+        const testBasicSupport = () => {
+            log('=== Testing Basic Support ===');
+            
+            // Check APIs
+            if (!navigator.mediaDevices) {
+                log('❌ navigator.mediaDevices NOT available', 'error');
+                return;
+            }
+            log('✅ navigator.mediaDevices available', 'success');
+            
+            if (!navigator.mediaDevices.getUserMedia) {
+                log('❌ getUserMedia NOT available', 'error');
+                return;
+            }
+            log('✅ getUserMedia available', 'success');
+            
+            if (!navigator.mediaDevices.enumerateDevices) {
+                log('❌ enumerateDevices NOT available', 'error');
+                return;
+            }
+            log('✅ enumerateDevices available', 'success');
+            
+            // Check secure context
+            if (window.isSecureContext) {
+                log('✅ Secure context (HTTPS/localhost)', 'success');
+            } else {
+                log('⚠️ Not a secure context', 'error');
+            }
+        };
+
+        const testEnumerateDevices = async () => {
+            log('=== Enumerating All Devices ===');
+            
+            try {
+                const devices = await navigator.mediaDevices.enumerateDevices();
+                log(`Found ${devices.length} total devices`, 'success');
+                
+                const audioInputs = devices.filter(d => d.kind === 'audioinput');
+                const audioOutputs = devices.filter(d => d.kind === 'audiooutput');
+                const videoInputs = devices.filter(d => d.kind === 'videoinput');
+                
+                log(`Audio Inputs: ${audioInputs.length}`);
+                audioInputs.forEach((device, i) => {
+                    const label = device.label || `Microphone ${i + 1}`;
+                    const id = device.deviceId;
+                    log(`  📎 ${label} (${id.substring(0, 8)}...)`);
+                });
+                
+                log(`Audio Outputs: ${audioOutputs.length}`);
+                log(`Video Inputs: ${videoInputs.length}`);
+                
+                if (audioInputs.length === 0) {
+                    log('⚠️ No audio input devices found!', 'error');
+                    log('This might mean:', 'error');
+                    log('  - Permission not granted yet', 'error');
+                    log('  - PulseAudio not properly connected', 'error');
+                    log('  - Browser policy blocking enumeration', 'error');
+                }
+                
+            } catch (err) {
+                log(`❌ Error enumerating: ${err.message}`, 'error');
+            }
+        };
+
+        const testRequestMic = async () => {
+            log('=== Requesting Microphone Access ===');
+            
+            try {
+                log('Requesting with basic constraint: {audio: true}');
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                
+                log('✅ Success! Got audio stream', 'success');
+                
+                const tracks = stream.getAudioTracks();
+                log(`Got ${tracks.length} audio tracks:`, 'success');
+                
+                tracks.forEach(track => {
+                    log(`  🎤 ${track.label}`, 'success');
+                    log(`     Kind: ${track.kind}`);
+                    log(`     ID: ${track.id}`);
+                    log(`     Enabled: ${track.enabled}`);
+                    log(`     Muted: ${track.muted}`);
+                    log(`     ReadyState: ${track.readyState}`);
+                    
+                    const settings = track.getSettings();
+                    log(`     Settings: ${JSON.stringify(settings, null, 2)}`);
+                });
+                
+                // Stop after 2 seconds
+                setTimeout(() => {
+                    tracks.forEach(t => t.stop());
+                    log('Stream stopped', 'info');
+                }, 2000);
+                
+                // Re-enumerate after permission
+                setTimeout(testEnumerateDevices, 100);
+                
+            } catch (err) {
+                log(`❌ Error: ${err.name} - ${err.message}`, 'error');
+                
+                if (err.name === 'NotFoundError') {
+                    log('No microphone device found by browser', 'error');
+                    log('PulseAudio might not be exposing devices to browser', 'error');
+                } else if (err.name === 'NotAllowedError') {
+                    log('Permission denied', 'error');
+                } else if (err.name === 'NotReadableError') {
+                    log('Device in use by another application', 'error');
+                }
+            }
+        };
+
+        const testWithConstraints = async () => {
+            log('=== Testing Various Constraints ===');
+            
+            const constraints = [
+                { audio: true },
+                { audio: { echoCancellation: false } },
+                { audio: { noiseSuppression: false } },
+                { audio: { autoGainControl: false } },
+                { audio: { sampleRate: 44100 } },
+                { audio: { channelCount: 2 } },
+                { audio: { deviceId: 'default' } },
+                { audio: { 
+                    echoCancellation: false,
+                    noiseSuppression: false,
+                    autoGainControl: false 
+                }}
+            ];
+            
+            for (const constraint of constraints) {
+                try {
+                    log(`Testing: ${JSON.stringify(constraint)}`);
+                    const stream = await navigator.mediaDevices.getUserMedia(constraint);
+                    const track = stream.getAudioTracks()[0];
+                    log(`  ✅ Success: ${track.label}`, 'success');
+                    track.stop();
+                } catch (err) {
+                    log(`  ❌ Failed: ${err.message}`, 'error');
+                }
+            }
+        };
+
+        // Auto-run basic test
+        window.onload = () => {
+            testBasicSupport();
+        };
+    </script>
+</body>
+</html>
