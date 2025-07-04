@@ -1,59 +1,62 @@
 #!/usr/bin/env python3
-"""Evaluate hypotheses by measuring outcome likelihood given context."""
+"""Evaluate hypotheses using actual prompt logprobs via litellm."""
 
 import os
-from litellm import completion
+import litellm
+import numpy as np
 from dotenv import load_dotenv
 
 load_dotenv()
 
-def score_outcome_likelihood(context, outcome, model="openrouter/google/gemini-2.5-flash-preview"):
-    """Ask model to score how likely an outcome is given context."""
-    prompt = f"""{context}
-
-Rate the likelihood of this specific outcome occurring (0-100):
-"{outcome}"
-
-Consider only how predictable/expected this outcome is given the context.
-Respond with just a number 0-100:"""
-    
-    response = completion(
+def get_prompt_logprobs(prompt, model="gpt-3.5-turbo-instruct"):
+    """Get actual log probabilities of prompt tokens using echo=True hack."""
+    resp = litellm.completion(
         model=model,
-        messages=[{"role": "user", "content": prompt}],
-        temperature=0,
-        api_key=os.getenv("OPENROUTER_API_KEY"),
-        api_base="https://openrouter.ai/api/v1"
+        prompt=prompt,
+        max_tokens=0,  # Don't generate anything
+        echo=True,     # Include prompt in response
+        logprobs=0,    # Request logprobs
+        api_key=os.getenv("OPENAI_API_KEY")
     )
     
-    try:
-        score = float(response.choices[0].message.content.strip())
-        return min(max(score, 0), 100)
-    except:
-        return 50
+    # Extract token logprobs from the prompt
+    logprobs_data = resp.choices[0].logprobs
+    token_logprobs = logprobs_data.token_logprobs
+    
+    # Calculate perplexity from logprobs
+    valid_logprobs = [lp for lp in token_logprobs if lp is not None]
+    if valid_logprobs:
+        avg_logprob = np.mean(valid_logprobs)
+        perplexity = np.exp(-avg_logprob)
+    else:
+        perplexity = float('inf')
+    
+    return perplexity, avg_logprob
 
-def test_hypothesis(hypothesis, situation, outcome, model="openrouter/google/gemini-2.5-flash-preview"):
-    """Compare outcome likelihood with/without hypothesis."""
-    # Context with hypothesis
-    context_with = f"Hypothesis: {hypothesis}\nSituation: {situation}"
-    score_with = score_outcome_likelihood(context_with, outcome, model)
+def test_hypothesis(hypothesis, situation, outcome, model="gpt-3.5-turbo-instruct"):
+    """Compare prompt perplexity with/without hypothesis using actual logprobs."""
+    # Full prompts including outcome
+    prompt_with = f"Hypothesis: {hypothesis}\nSituation: {situation}\nOutcome: {outcome}"
+    prompt_without = f"Situation: {situation}\nOutcome: {outcome}"
     
-    # Context without hypothesis
-    context_without = f"Situation: {situation}"
-    score_without = score_outcome_likelihood(context_without, outcome, model)
+    # Get actual prompt perplexity
+    perp_with, lp_with = get_prompt_logprobs(prompt_with, model)
+    perp_without, lp_without = get_prompt_logprobs(prompt_without, model)
     
-    improvement = score_with - score_without
+    # Lower perplexity = more predictable
+    improvement = (perp_without - perp_with) / perp_without * 100 if perp_without != float('inf') else 0
     
-    print(f"\n[{model.split('/')[-1]}]")
-    print(f"Outcome: '{outcome}'")
-    print(f"Likelihood: {score_with}% (with) vs {score_without}% (without)")
-    print(f"Improvement: {improvement:+.0f} points")
+    print(f"\n[{model}]")
+    print(f"Testing outcome: '{outcome}'")
+    print(f"Avg logprob: {lp_with:.3f} (with) vs {lp_without:.3f} (without)")
+    print(f"Perplexity: {perp_with:.2f} (with) vs {perp_without:.2f} (without)")
+    print(f"Improvement: {improvement:.1f}%")
+    print(f"Hypothesis helps: {'YES' if improvement > 5 else 'NO'}")
 
 # Test
 if __name__ == "__main__":
-    print("HYPOTHESIS EVALUATION")
-    print("="*40)
-    print("Note: Current APIs don't support getting logprobs of prompt tokens.")
-    print("Using likelihood scoring instead.\n")
+    print("HYPOTHESIS EVALUATION USING ACTUAL PROMPT LOGPROBS")
+    print("="*50)
     
     test_hypothesis(
         "Objects fall at 9.8 m/s² due to gravity",
