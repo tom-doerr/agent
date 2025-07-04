@@ -7,8 +7,12 @@ from pydantic import BaseModel, Field
 import dspy
 from context_provider import create_context_string
 
+# Print DSPy version at startup
+print(f"DSPy version: {dspy.__version__}")
 
-lm = dspy.configure(lm=dspy.LM('deepseek/deepseek-reasoner', max_tokens=20_000))
+lm=dspy.LM('deepseek/deepseek-reasoner', max_tokens=40_000)
+# lm = dspy.LM( 'ollama_chat/deepseek-r1:8b', api_base='http://localhost:11434', api_key='', temperature=0,  # Critical for structured output max_tokens=2000  # Prevent rambling)
+dspy.configure(lm=lm)
 
 
 class Edit(BaseModel):
@@ -60,7 +64,8 @@ def iteration_loop():
     for i in range(10):
         print(f"Iteration {i + 1} {'=' * 50}")
 
-        artifact = ARTIFACT_FILE.read_text().strip()
+        # artifact = ARTIFACT_FILE.read_text().strip()
+        artifact = ARTIFACT_FILE.read_text()
         constraints = CONSTRAINTS_FILE.read_text().strip()
         context = create_context_string()
         print(context)
