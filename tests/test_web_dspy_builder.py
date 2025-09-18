@@ -303,6 +303,62 @@ async def test_overrides_trigger_reexecution_and_propagation():
 
 
 @pytest.mark.asyncio
+async def test_live_override_applies_during_execution():
+    graph = GraphSpec(
+        nodes=[
+            NodeSpec(
+                id="input",
+                type="input",
+                config={"value": "hello"},
+                ports=NodePorts(outputs=["value"]),
+            ),
+            NodeSpec(
+                id="py",
+                type="python",
+                config={"code": "outputs['value'] = inputs['value']"},
+                ports=NodePorts(inputs=["value"], outputs=["value"]),
+            ),
+            NodeSpec(
+                id="out",
+                type="output",
+                config={},
+                ports=NodePorts(inputs=["value"]),
+            ),
+        ],
+        edges=[
+            EdgeSpec(
+                id="e1",
+                source=PortReference(node="input", port="value"),
+                target=PortReference(node="py", port="value"),
+            ),
+            EdgeSpec(
+                id="e2",
+                source=PortReference(node="py", port="value"),
+                target=PortReference(node="out", port="value"),
+            ),
+        ],
+    )
+
+    overrides: Dict[str, Dict[str, Any]] = {}
+    events: List[Dict[str, Any]] = []
+    settings = RunSettings()
+    manager = RunManager()
+
+    async def sender(event: Dict[str, Any]) -> None:
+        events.append(event)
+        if event["type"] == "node_start" and event.get("nodeId") == "py":
+            overrides["py"] = {
+                "code": "outputs['value'] = inputs['value'].upper()",
+            }
+
+    runner = GraphRunner(graph, settings, "live-override", sender, manager)
+    result = await runner.run(overrides=overrides)
+
+    assert result.final_outputs["out"]["value"] == "HELLO"
+    assert any(event["type"] == "edge_data" for event in events)
+
+
+@pytest.mark.asyncio
 async def test_cognition_node_executor_serialises_structured_outputs(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -424,4 +480,112 @@ async def test_cognition_node_executor_serialises_structured_outputs(
     assert metadata["inputs"]["constraints"] == "bounded"
 
     assert result.final_outputs["sink"]["decision"]["choice"] == "execute"
+
+
+@pytest.mark.asyncio
+async def test_cognition_executor_fallback_on_error(monkeypatch: pytest.MonkeyPatch) -> None:
+    events: List[Dict[str, Any]] = []
+
+    def failing_forward(self, **kwargs):  # noqa: ANN001 - signature fixed by monkeypatch
+        raise RuntimeError("lm unavailable")
+
+    monkeypatch.setattr(cognition.CognitionAgent, "forward", failing_forward)
+
+    cognition_config = {
+        "observation": "Offline observation",
+        "goals": "Offline goals",
+        "episodic_memory": "Offline memory",
+        "constraints": "",
+        "utility_def": "",
+        "prior_belief": "",
+        "attention_results": "",
+        "system_events": "",
+    }
+
+    graph = GraphSpec(
+        nodes=[
+            NodeSpec(
+                id="obs",
+                type="input",
+                config={"value": cognition_config["observation"]},
+                ports=NodePorts(outputs=["value"]),
+            ),
+            NodeSpec(
+                id="cog",
+                type="cognition",
+                config=cognition_config,
+                ports=NodePorts(
+                    inputs=[
+                        "observation",
+                        "goals",
+                        "episodic_memory",
+                        "constraints",
+                        "utility_def",
+                        "prior_belief",
+                        "attention_results",
+                        "system_events",
+                    ],
+                    outputs=[
+                        "percept",
+                        "belief",
+                        "affect",
+                        "plans",
+                        "scored",
+                        "decision",
+                        "verification",
+                        "outcome",
+                        "update",
+                    ],
+                ),
+            ),
+            NodeSpec(
+                id="summary",
+                type="output",
+                config={},
+                ports=NodePorts(inputs=["decision", "update"]),
+            ),
+        ],
+        edges=[
+            EdgeSpec(
+                id="edge_obs",
+                source=PortReference(node="obs", port="value"),
+                target=PortReference(node="cog", port="observation"),
+            ),
+            EdgeSpec(
+                id="edge_dec",
+                source=PortReference(node="cog", port="decision"),
+                target=PortReference(node="summary", port="decision"),
+            ),
+            EdgeSpec(
+                id="edge_upd",
+                source=PortReference(node="cog", port="update"),
+                target=PortReference(node="summary", port="update"),
+            ),
+        ],
+    )
+
+    settings = RunSettings()
+    manager = RunManager()
+
+    async def sender(event: Dict[str, Any]) -> None:
+        events.append(event)
+
+    runner = GraphRunner(graph, settings, "fallback", sender, manager)
+    result = await runner.run()
+
+    summary = result.final_outputs["summary"]
+    assert summary["decision"]["choice"] == "execute"
+    assert summary["update"]["note"]
+
+    node_end_events = [
+        event for event in events if event["type"] == "node_end" and event.get("nodeId") == "cog"
+    ]
+    assert node_end_events and node_end_events[0]["metadata"].get("fallback") is True
+
+    edge_values = [
+        event["value"]
+        for event in events
+        if event["type"] == "edge_data" and event.get("edgeId") == "edge_dec"
+    ]
+    assert edge_values and edge_values[0]["choice"] == "execute"
 

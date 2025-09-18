@@ -12,6 +12,47 @@ from pydantic import BaseModel, Field, ValidationError
 Parser = Union[Type[BaseModel], Type[list], Type[dict], Callable[[Any], Any]]
 
 
+class OfflineDSPyLM:
+    """Deterministic offline LM used when no provider is configured."""
+
+    def __init__(self) -> None:
+        self._counter = 0
+
+    def __call__(self, prompt: str, **kwargs: Any) -> Dict[str, str]:  # noqa: ANN401 - dspy passes dynamic kwargs
+        self._counter += 1
+        stop = kwargs.get("stop")
+        text = prompt.strip()
+        if stop and stop in text:
+            text = text.split(stop, 1)[0]
+        tokens = text.split()
+        if tokens:
+            summary = " ".join(tokens[-12:])
+        else:
+            summary = "offline cognition response"
+        return {"text": f"[offline:{self._counter}] {summary}"}
+
+
+_OFFLINE_LM_SINGLETON: Optional[OfflineDSPyLM] = None
+
+
+def ensure_offline_cognition_lm(force: bool = False) -> Any:
+    """Ensure DSPy has a lightweight offline LM configured."""
+
+    global _OFFLINE_LM_SINGLETON
+    current = getattr(dspy.settings, "lm", None)
+    if isinstance(current, OfflineDSPyLM):
+        _OFFLINE_LM_SINGLETON = current
+        if not force:
+            return current
+
+    if current is None or force:
+        _OFFLINE_LM_SINGLETON = OfflineDSPyLM()
+        dspy.configure(lm=_OFFLINE_LM_SINGLETON)
+        return _OFFLINE_LM_SINGLETON
+
+    return current
+
+
 # ---------- Typed data models ----------
 class Percept(BaseModel):
     facts: List[str] = Field(default_factory=list)
