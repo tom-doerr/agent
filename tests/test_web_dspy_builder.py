@@ -237,6 +237,11 @@ async def test_loop_node_executes_body_for_each_item():
     ]
     assert len(iterations) == 3
 
+    loop_cache = runner.run_state.node_results["loop"]
+    assert "iterations" in loop_cache.metadata
+    assert len(loop_cache.metadata["iterations"]) == 3
+    assert all(entry["nodes"] for entry in loop_cache.metadata["iterations"])
+
 
 
 @pytest.mark.asyncio
