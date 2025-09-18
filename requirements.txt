@@ -11,3 +11,5 @@ termcolor>=2.0.0
 tenacity>=8.2.0
 textual>=0.50
 simpledspy>=0.3.1
+fastapi>=0.110
+uvicorn>=0.22
