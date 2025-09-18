@@ -32,6 +32,20 @@ const statusIndicator = document.getElementById("status-indicator");
 const loopOverlay = document.getElementById("loop-editor");
 const loopSaveButton = document.getElementById("loop-save");
 const loopCancelButton = document.getElementById("loop-cancel");
+const programSelector = document.getElementById("program-selector");
+const loadProgramButton = document.getElementById("load-program");
+
+const DEFAULT_PROGRAM_KEY = "typed-cognition";
+const PROGRAM_SAMPLES = {
+  "typed-cognition": {
+    label: "Typed Cognition Agent",
+    build: buildCognitionProgram,
+  },
+  "llm-echo": {
+    label: "LLM Echo Starter",
+    build: buildLinearProgram,
+  },
+};
 
 state.loopCanvas = new LiteGraph.LGraphCanvas("#loop-canvas", state.loopEditorGraph);
 state.loopCanvas.ds.scale = 1;
@@ -40,6 +54,8 @@ state.loopCanvas.background_image = "";
 createPalette();
 attachCanvasEvents();
 connectSocket();
+populateProgramSelector();
+attachProgramHandlers();
 restoreGraphFromStorage();
 createSampleGraphIfEmpty();
 attachToolbarHandlers();
@@ -158,6 +174,43 @@ function registerNodes() {
     ensureUniquePortNames(this);
   };
   LiteGraph.registerNodeType("dspy/loopOutput", LoopOutputNode);
+
+  function CognitionNode() {
+    this.title = "Cognition Agent";
+    this.properties = {
+      observation: "",
+      episodic_memory: "",
+      goals: "",
+      constraints: "",
+      utility_def: "",
+      prior_belief: "",
+      attention_results: "",
+      system_events: "",
+    };
+    this.addInput("observation", "");
+    this.addInput("episodic_memory", "");
+    this.addInput("goals", "");
+    this.addInput("constraints", "");
+    this.addInput("utility_def", "");
+    this.addInput("prior_belief", "");
+    this.addInput("attention_results", "");
+    this.addInput("system_events", "");
+    this.addOutput("percept", "");
+    this.addOutput("belief", "");
+    this.addOutput("affect", "");
+    this.addOutput("plans", "");
+    this.addOutput("scored", "");
+    this.addOutput("decision", "");
+    this.addOutput("verification", "");
+    this.addOutput("outcome", "");
+    this.addOutput("update", "");
+  }
+  CognitionNode.title = "Cognition Agent";
+  CognitionNode.desc = "Run the typed cognition DSPy pipeline";
+  CognitionNode.prototype.onConfigure = function () {
+    ensureUniquePortNames(this);
+  };
+  LiteGraph.registerNodeType("dspy/cognition", CognitionNode);
 }
 
 function createPalette() {
@@ -167,6 +220,7 @@ function createPalette() {
     { type: "dspy/python", label: "Python" },
     { type: "dspy/output", label: "Output" },
     { type: "dspy/loop", label: "Loop" },
+    { type: "dspy/cognition", label: "Cognition Agent" },
   ];
   nodes.forEach((entry) => {
     const button = document.createElement("button");
@@ -687,8 +741,152 @@ function restoreGraphFromStorage() {
   }
 }
 
-function createSampleGraphIfEmpty() {
-  if (graph._nodes && graph._nodes.length) return;
+function populateProgramSelector() {
+  if (!programSelector) return;
+  programSelector.innerHTML = "";
+  Object.entries(PROGRAM_SAMPLES).forEach(([key, sample], index) => {
+    const option = document.createElement("option");
+    option.value = key;
+    option.textContent = sample.label;
+    if (index === 0 && !DEFAULT_PROGRAM_KEY) {
+      option.selected = true;
+    }
+    programSelector.appendChild(option);
+  });
+  if (PROGRAM_SAMPLES[DEFAULT_PROGRAM_KEY]) {
+    programSelector.value = DEFAULT_PROGRAM_KEY;
+  }
+}
+
+function attachProgramHandlers() {
+  if (!loadProgramButton) return;
+  loadProgramButton.addEventListener("click", () => {
+    const selected = programSelector ? programSelector.value : null;
+    if (!selected) return;
+    if (graph._nodes && graph._nodes.length) {
+      const confirmed = window.confirm(
+        "Replace the current graph with the selected template?"
+      );
+      if (!confirmed) {
+        return;
+      }
+    }
+    loadProgramSample(selected);
+  });
+}
+
+function loadProgramSample(key, options = {}) {
+  const sample = PROGRAM_SAMPLES[key];
+  if (!sample || typeof sample.build !== "function") return;
+  const { persist = true } = options;
+
+  graph.clear();
+  state.selectedNode = null;
+  updateInspector(null);
+  state.edgeData = {};
+  updateEdgePanel();
+  logEl.textContent = "";
+
+  sample.build(graph);
+
+  if (programSelector) {
+    programSelector.value = key;
+  }
+
+  graph.setDirtyCanvas(true, true);
+  canvas.draw(true, true);
+  if (persist) {
+    persistGraph();
+  }
+}
+
+function buildCognitionProgram(targetGraph) {
+  const baseX = 60;
+  const baseY = 80;
+  const spacingY = 90;
+  const inputDefinitions = [
+    {
+      key: "observation",
+      title: "Observation",
+      value: "Operator reports debris blocking the main walkway.",
+    },
+    {
+      key: "episodic_memory",
+      title: "Episodic Memory",
+      value: "Previous shift cleared similar debris using lift equipment.",
+    },
+    {
+      key: "goals",
+      title: "Goals",
+      value: "Restore safe passage while keeping staff injury risk low.",
+    },
+    {
+      key: "constraints",
+      title: "Constraints",
+      value: "Respect maintenance window and avoid exceeding overtime budget.",
+    },
+    {
+      key: "utility_def",
+      title: "Utility Definition",
+      value: "Prioritize safety over throughput while minimizing costs.",
+    },
+    {
+      key: "prior_belief",
+      title: "Prior Belief",
+      value: "Crew is trained for debris removal tasks.",
+    },
+    {
+      key: "attention_results",
+      title: "Attention",
+      value: "Sensors highlight moderate obstruction; forklift available.",
+    },
+    {
+      key: "system_events",
+      title: "System Events",
+      value: "No critical alarms; ventilation nominal.",
+    },
+  ];
+
+  const inputNodes = inputDefinitions.map((entry, index) => {
+    const node = LiteGraph.createNode("dspy/input");
+    node.title = entry.title;
+    node.pos = [baseX, baseY + index * spacingY];
+    node.properties.value = entry.value;
+    targetGraph.add(node);
+    return { entry, node };
+  });
+
+  const cognition = LiteGraph.createNode("dspy/cognition");
+  cognition.pos = [360, baseY + 3 * spacingY];
+  cognition.properties = cognition.properties || {};
+  inputNodes.forEach(({ entry }, index) => {
+    cognition.properties[entry.key] = entry.value;
+    inputNodes[index].node.connect(0, cognition, index);
+  });
+  targetGraph.add(cognition);
+
+  const outputs = [
+    { title: "Percept", port: 0, label: "percept", pos: [720, baseY] },
+    { title: "Plans", port: 3, label: "plans", pos: [720, baseY + spacingY] },
+    { title: "Decision", port: 5, label: "decision", pos: [720, baseY + spacingY * 2] },
+    { title: "Outcome", port: 7, label: "outcome", pos: [720, baseY + spacingY * 3] },
+    { title: "Update", port: 8, label: "update", pos: [720, baseY + spacingY * 4] },
+  ];
+
+  outputs.forEach(({ title, port, label, pos }) => {
+    const outputNode = LiteGraph.createNode("dspy/output");
+    outputNode.title = title;
+    outputNode.pos = pos;
+    outputNode.properties.label = label;
+    if (outputNode.inputs && outputNode.inputs[0]) {
+      outputNode.inputs[0].name = label;
+    }
+    targetGraph.add(outputNode);
+    cognition.connect(port, outputNode, 0);
+  });
+}
+
+function buildLinearProgram(targetGraph) {
   const input = LiteGraph.createNode("dspy/input");
   input.pos = [60, 160];
   input.properties.value = "Hello DSPy";
@@ -696,12 +894,16 @@ function createSampleGraphIfEmpty() {
   llm.pos = [320, 140];
   const output = LiteGraph.createNode("dspy/output");
   output.pos = [600, 150];
-  graph.add(input);
-  graph.add(llm);
-  graph.add(output);
+  targetGraph.add(input);
+  targetGraph.add(llm);
+  targetGraph.add(output);
   input.connect(0, llm, 0);
   llm.connect(0, output, 0);
-  graph.setDirtyCanvas(true, true);
+}
+
+function createSampleGraphIfEmpty() {
+  if (graph._nodes && graph._nodes.length) return;
+  loadProgramSample(DEFAULT_PROGRAM_KEY);
 }
 
 function normalizeGraph(data) {

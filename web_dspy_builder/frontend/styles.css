@@ -56,6 +56,12 @@ section h3 {
   font-size: 1rem;
 }
 
+#programs-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
 #node-palette {
   display: grid;
   gap: 0.5rem;
@@ -83,6 +89,12 @@ button {
 button:hover {
   background: #2f3042;
   border-color: #3b3c50;
+}
+
+.muted {
+  font-size: 0.75rem;
+  color: var(--text-soft);
+  margin: 0;
 }
 
 label {

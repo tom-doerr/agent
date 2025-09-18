@@ -96,6 +96,7 @@ def test_builder_serves_frontend_assets(builder_client: Tuple[TestClient, RunMan
     script_response = client.get("/static/app.js")
     assert script_response.status_code == 200
     assert 'LiteGraph.registerNodeType("dspy/python"' in script_response.text
+    assert 'LiteGraph.registerNodeType("dspy/cognition"' in script_response.text
 
     css_response = client.get("/static/styles.css")
     assert css_response.status_code == 200

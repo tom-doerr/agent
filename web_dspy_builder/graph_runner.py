@@ -10,6 +10,8 @@ from graphlib import CycleError, TopologicalSorter
 from io import StringIO
 from typing import Any, Awaitable, Callable, Dict, Iterable, List, Optional, Set
 
+from pydantic import BaseModel
+
 from .llm import LLMEngine
 from .models import (
     EdgeSpec,
@@ -237,6 +239,51 @@ class LoopNodeExecutor(BaseNodeExecutor):
         )
 
 
+class CognitionNodeExecutor(BaseNodeExecutor):
+    """Invoke the typed cognition agent and expose structured outputs."""
+
+    INPUT_FIELDS = (
+        "observation",
+        "episodic_memory",
+        "goals",
+        "constraints",
+        "utility_def",
+        "prior_belief",
+        "attention_results",
+        "system_events",
+    )
+
+    def __init__(self, runner: "GraphRunner", spec: NodeSpec) -> None:
+        super().__init__(runner, spec)
+        from cognition_typed_dspy import CognitionAgent
+
+        self.agent = CognitionAgent()
+
+    async def run(self, inputs: Dict[str, Any], overrides: Dict[str, Any]) -> NodeExecutionResult:
+        resolved: Dict[str, Any] = {}
+        for field in self.INPUT_FIELDS:
+            if field in overrides:
+                resolved[field] = overrides[field]
+            elif field in inputs:
+                resolved[field] = inputs[field]
+            else:
+                resolved[field] = self.spec.config.get(field, "")
+
+        outputs = await asyncio.to_thread(self.agent.forward, **resolved)
+        serialised = {key: self._serialise(value) for key, value in outputs.items()}
+        metadata = {"inputs": resolved}
+        return NodeExecutionResult(outputs=serialised, metadata=metadata)
+
+    def _serialise(self, value: Any) -> Any:
+        if isinstance(value, BaseModel):
+            return value.model_dump(mode="python")
+        if isinstance(value, list):
+            return [self._serialise(item) for item in value]
+        if isinstance(value, dict):
+            return {key: self._serialise(item) for key, item in value.items()}
+        return value
+
+
 EXECUTOR_REGISTRY: Dict[str, Callable[["GraphRunner", NodeSpec], BaseNodeExecutor]] = {
     "input": InputNodeExecutor,
     "llm": LLMNodeExecutor,
@@ -246,6 +293,7 @@ EXECUTOR_REGISTRY: Dict[str, Callable[["GraphRunner", NodeSpec], BaseNodeExecuto
     "loop": LoopNodeExecutor,
     "loopInput": InputNodeExecutor,
     "loopOutput": OutputNodeExecutor,
+    "cognition": CognitionNodeExecutor,
 }
 
 
