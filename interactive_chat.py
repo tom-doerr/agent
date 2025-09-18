@@ -107,11 +107,24 @@ class InteractiveChat(App):
     
     def _add_message(self, text: str, style_class: str = "") -> None:
         output = self.query_one("#output-container", Static)
-        new_content = f"[{style_class}]{text}[/]"
-        if output.renderable:
-            new_content = f"{output.renderable}\n{new_content}"
-        output.update(new_content)
+        new_block = f"[{style_class}]{text}[/]"
+
+        existing_content = getattr(output, "renderable", None)
+        if existing_content is None:
+            existing_content = getattr(output, "_message_history", "")
+
+        if existing_content:
+            combined = f"{existing_content}\n{new_block}"
+        else:
+            combined = new_block
+
+        output.update(combined)
         output.scroll_end()
+
+        # Store the combined content so legacy tests inspecting ``renderable``
+        # keep working even after Textual dropped the attribute in v6.
+        output._message_history = combined  # type: ignore[attr-defined]
+        setattr(output, "renderable", combined)
     
     async def _handle_request(self, message: str) -> None:
         try:
