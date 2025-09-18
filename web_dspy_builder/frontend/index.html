@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>DSPy Visual Builder</title>
+    <link rel="stylesheet" href="/static/styles.css" />
+  </head>
+  <body>
+    <div id="app">
+      <aside id="sidebar">
+        <header>
+          <h1>DSPy Visual Builder</h1>
+          <p class="subtitle">Build programs by wiring DSPy nodes.</p>
+        </header>
+        <section>
+          <h2>Node Palette</h2>
+          <div id="node-palette"></div>
+        </section>
+        <section id="settings-panel">
+          <h2>LLM Settings</h2>
+          <label>
+            Engine
+            <select id="llm-engine">
+              <option value="mock">Mock</option>
+              <option value="dspy">DSPy (configured)</option>
+              <option value="openrouter">OpenRouter</option>
+              <option value="openai">OpenAI</option>
+              <option value="ollama">Ollama</option>
+            </select>
+          </label>
+          <label>
+            Model
+            <input id="llm-model" type="text" placeholder="model name" />
+          </label>
+          <label>
+            Temperature
+            <input id="llm-temperature" type="number" step="0.1" min="0" max="2" value="0" />
+          </label>
+          <label>
+            Max tokens
+            <input id="llm-max-tokens" type="number" min="16" value="2048" />
+          </label>
+        </section>
+        <section id="runs-panel">
+          <h2>Runs</h2>
+          <ul id="run-history"></ul>
+        </section>
+      </aside>
+      <main>
+        <div id="toolbar">
+          <button id="run-button">Run Graph</button>
+          <button id="replay-button" disabled>Replay from Node</button>
+          <button id="clear-history">Clear History</button>
+          <span id="status-indicator"></span>
+        </div>
+        <div id="graph-container">
+          <canvas id="graph-canvas"></canvas>
+        </div>
+      </main>
+      <aside id="inspector">
+        <h2>Inspector</h2>
+        <div id="inspector-content" class="panel"></div>
+        <section>
+          <h3>Edge Data</h3>
+          <div id="edge-data" class="panel"></div>
+        </section>
+        <section>
+          <h3>Logs</h3>
+          <pre id="log-output" class="panel"></pre>
+        </section>
+      </aside>
+    </div>
+    <div id="loop-editor" class="overlay hidden">
+      <div class="overlay-content">
+        <div class="overlay-toolbar">
+          <h2>Edit Loop Body</h2>
+          <div class="spacer"></div>
+          <button id="loop-save">Save</button>
+          <button id="loop-cancel">Cancel</button>
+        </div>
+        <div class="overlay-canvas">
+          <canvas id="loop-canvas"></canvas>
+        </div>
+      </div>
+    </div>
+    <script src="/static/js/litegraph.min.js"></script>
+    <script src="/static/app.js" type="module"></script>
+  </body>
+</html>
