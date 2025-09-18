@@ -1,0 +1,313 @@
+:root {
+  color-scheme: dark;
+  font-family: "Inter", "Segoe UI", sans-serif;
+  --bg: #101014;
+  --panel: #1b1b22;
+  --accent: #4fa3ff;
+  --border: #2a2a36;
+  --text-soft: #b5b7c3;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: #f6f7fb;
+  height: 100vh;
+  overflow: hidden;
+}
+
+#app {
+  display: grid;
+  grid-template-columns: 280px 1fr 320px;
+  height: 100vh;
+}
+
+#sidebar,
+#inspector {
+  background: var(--panel);
+  padding: 1rem;
+  box-sizing: border-box;
+  overflow-y: auto;
+  border-right: 1px solid var(--border);
+}
+
+#inspector {
+  border-right: none;
+  border-left: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+header h1 {
+  margin: 0 0 0.25rem 0;
+  font-size: 1.4rem;
+}
+
+.subtitle {
+  margin: 0 0 1.5rem 0;
+  color: var(--text-soft);
+  font-size: 0.9rem;
+}
+
+section h2,
+section h3 {
+  margin: 1.2rem 0 0.4rem 0;
+  font-size: 1rem;
+}
+
+#programs-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+#node-palette {
+  display: grid;
+  gap: 0.5rem;
+}
+
+#node-palette button,
+button,
+select,
+input {
+  font: inherit;
+  border-radius: 0.4rem;
+  border: 1px solid var(--border);
+  background: #232332;
+  color: inherit;
+  padding: 0.5rem 0.75rem;
+}
+
+#node-palette button,
+button {
+  cursor: pointer;
+  transition: background 0.2s ease, border 0.2s ease;
+}
+
+#node-palette button:hover,
+button:hover {
+  background: #2f3042;
+  border-color: #3b3c50;
+}
+
+.muted {
+  font-size: 0.75rem;
+  color: var(--text-soft);
+  margin: 0;
+}
+
+label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  font-size: 0.85rem;
+  margin-bottom: 0.6rem;
+}
+
+main {
+  display: flex;
+  flex-direction: column;
+  background: #09090f;
+}
+
+#toolbar {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--border);
+  background: #13131b;
+}
+
+#toolbar button {
+  background: #2a2f4a;
+}
+
+#toolbar button:first-child {
+  background: #3c4fff;
+  border-color: #4f68ff;
+  color: #fff;
+}
+
+#toolbar button:first-child:hover {
+  background: #5466ff;
+}
+
+#status-indicator {
+  margin-left: auto;
+  font-size: 0.85rem;
+  color: var(--text-soft);
+}
+
+#graph-container {
+  position: relative;
+  flex: 1;
+}
+
+#graph-canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+  background: #111119;
+}
+
+.panel {
+  background: #15151f;
+  border: 1px solid var(--border);
+  border-radius: 0.6rem;
+  padding: 0.75rem;
+  box-sizing: border-box;
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+#log-output {
+  height: 160px;
+  white-space: pre-wrap;
+  font-family: "Fira Code", monospace;
+  font-size: 0.75rem;
+}
+
+#edge-data .edge-entry {
+  margin-bottom: 0.75rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid var(--border);
+}
+
+#edge-data .edge-entry:last-child {
+  border-bottom: none;
+}
+
+#run-history {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+#run-history li {
+  padding: 0.4rem 0.6rem;
+  background: #141421;
+  border: 1px solid var(--border);
+  border-radius: 0.4rem;
+  cursor: pointer;
+  font-size: 0.85rem;
+}
+
+#run-history li.active {
+  border-color: var(--accent);
+  background: rgba(79, 163, 255, 0.15);
+}
+
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(4, 5, 15, 0.8);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+}
+
+.overlay.hidden {
+  display: none;
+}
+
+.overlay-content {
+  width: 80vw;
+  height: 80vh;
+  background: #0f111b;
+  border: 1px solid var(--border);
+  border-radius: 0.8rem;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.overlay-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.75rem 1rem;
+  background: #151527;
+  border-bottom: 1px solid var(--border);
+}
+
+.overlay-toolbar h2 {
+  margin: 0;
+  font-size: 1.1rem;
+}
+
+.overlay-toolbar .spacer {
+  flex: 1;
+}
+
+.overlay-canvas {
+  flex: 1;
+  position: relative;
+}
+
+#loop-canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+  background: #101320;
+}
+
+.property-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  margin-bottom: 0.8rem;
+}
+
+.property-field textarea {
+  min-height: 80px;
+  resize: vertical;
+}
+
+.port-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  margin-bottom: 0.8rem;
+}
+
+.port-list .port-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.port-list input {
+  flex: 1;
+}
+
+.small-button {
+  padding: 0.25rem 0.5rem;
+  font-size: 0.75rem;
+}
+
+#inspector .panel {
+  flex: 1;
+}
+
+@media (max-width: 1200px) {
+  #app {
+    grid-template-columns: 240px 1fr 280px;
+  }
+}
+
+@media (max-width: 960px) {
+  #app {
+    grid-template-columns: 220px 1fr;
+    grid-template-areas: "sidebar main" "sidebar inspector";
+  }
+  #inspector {
+    grid-area: inspector;
+    flex-direction: column;
+  }
+}
