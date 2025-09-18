@@ -186,19 +186,75 @@ def convert_audio_format(audio_data: bytes, input_format: str = "webm") -> bytes
         PCM audio data at 16kHz
     """
     import io
-    import librosa
-    import soundfile as sf
+    import tempfile
+    import os
     
-    # Load audio using librosa
-    audio_io = io.BytesIO(audio_data)
-    y, sr = librosa.load(audio_io, sr=16000, mono=True)
-    
-    # Convert to PCM
-    buffer = io.BytesIO()
-    sf.write(buffer, y, 16000, format="RAW", subtype="PCM_16")
-    buffer.seek(0)
-    
-    return buffer.read()
+    try:
+        # Try using librosa first
+        import librosa
+        import soundfile as sf
+        
+        # Save to temporary file for better format handling
+        with tempfile.NamedTemporaryFile(suffix=f'.{input_format}', delete=False) as tmp_input:
+            tmp_input.write(audio_data)
+            tmp_input_path = tmp_input.name
+        
+        try:
+            # Load audio using librosa
+            y, sr = librosa.load(tmp_input_path, sr=16000, mono=True)
+            
+            # Convert to PCM
+            buffer = io.BytesIO()
+            sf.write(buffer, y, 16000, format="RAW", subtype="PCM_16")
+            buffer.seek(0)
+            
+            return buffer.read()
+        finally:
+            # Clean up temp file
+            if os.path.exists(tmp_input_path):
+                os.unlink(tmp_input_path)
+                
+    except Exception as e:
+        logger.error(f"Error converting audio with librosa: {e}")
+        
+        # Fallback: try using ffmpeg if available
+        try:
+            import subprocess
+            
+            with tempfile.NamedTemporaryFile(suffix=f'.{input_format}', delete=False) as tmp_input:
+                tmp_input.write(audio_data)
+                tmp_input_path = tmp_input.name
+            
+            with tempfile.NamedTemporaryFile(suffix='.pcm', delete=False) as tmp_output:
+                tmp_output_path = tmp_output.name
+            
+            try:
+                # Use ffmpeg to convert to PCM
+                cmd = [
+                    'ffmpeg', '-i', tmp_input_path,
+                    '-f', 's16le',  # 16-bit PCM
+                    '-acodec', 'pcm_s16le',
+                    '-ar', '16000',  # 16kHz sample rate
+                    '-ac', '1',  # Mono
+                    '-y',  # Overwrite output
+                    tmp_output_path
+                ]
+                
+                subprocess.run(cmd, check=True, capture_output=True)
+                
+                # Read the converted audio
+                with open(tmp_output_path, 'rb') as f:
+                    return f.read()
+                    
+            finally:
+                # Clean up temp files
+                for path in [tmp_input_path, tmp_output_path]:
+                    if os.path.exists(path):
+                        os.unlink(path)
+                        
+        except Exception as ffmpeg_error:
+            logger.error(f"Error converting audio with ffmpeg: {ffmpeg_error}")
+            raise Exception(f"Failed to convert audio: {e}")
 
 
 # Example usage for testing

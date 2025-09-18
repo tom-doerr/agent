@@ -371,17 +371,23 @@ function PreferenceUI({ images, onPreferenceUpdate, onGenerateOptimal }) {
           Rank Your Favorites
         </Typography>
         <Typography variant="body2" color="text.secondary" gutterBottom>
-          Drag and drop to order images from best (top) to worst (bottom).
+          Drag and drop to order images from best (top) to worst (bottom). Click and hold any card to drag it.
         </Typography>
 
         {rankings.length > 0 ? (
           <DragDropContext onDragEnd={handleDragEnd}>
             <Droppable droppableId="rankings">
-              {(provided) => (
+              {(provided, snapshot) => (
                 <Box
                   {...provided.droppableProps}
                   ref={provided.innerRef}
-                  sx={{ mt: 2 }}
+                  sx={{ 
+                    mt: 2,
+                    backgroundColor: snapshot.isDraggingOver ? 'action.hover' : 'transparent',
+                    borderRadius: 1,
+                    p: snapshot.isDraggingOver ? 1 : 0,
+                    transition: 'all 0.2s ease'
+                  }}
                 >
                   {rankings.map((image, index) => (
                     <Draggable key={image.id} draggableId={image.id} index={index}>
@@ -389,15 +395,24 @@ function PreferenceUI({ images, onPreferenceUpdate, onGenerateOptimal }) {
                         <Card
                           ref={provided.innerRef}
                           {...provided.draggableProps}
+                          {...provided.dragHandleProps}
                           sx={{
                             mb: 2,
                             backgroundColor: snapshot.isDragging ? 'action.hover' : 'background.paper',
+                            cursor: 'grab',
+                            transition: 'all 0.2s ease',
+                            '&:hover': {
+                              boxShadow: 3,
+                              transform: 'translateY(-2px)',
+                            },
+                            '&:active': {
+                              cursor: 'grabbing',
+                            }
                           }}
                         >
                           <Box sx={{ display: 'flex', alignItems: 'center', p: 2 }}>
                             <IconButton
-                              {...provided.dragHandleProps}
-                              sx={{ mr: 2 }}
+                              sx={{ mr: 2, cursor: 'grab' }}
                             >
                               <DragHandle />
                             </IconButton>
