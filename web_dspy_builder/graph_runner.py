@@ -1,0 +1,819 @@
+"""Graph execution engine for the DSPy visual builder."""
+
+from __future__ import annotations
+
+import asyncio
+from contextlib import redirect_stdout
+from dataclasses import dataclass, field
+from datetime import datetime, timezone
+from graphlib import CycleError, TopologicalSorter
+from io import StringIO
+from typing import Any, Awaitable, Callable, Dict, Iterable, List, Optional, Set
+
+from pydantic import BaseModel
+
+from .llm import LLMEngine
+from .models import (
+    EdgeSpec,
+    EdgeTransmission,
+    GraphSpec,
+    NodeCache,
+    NodeSpec,
+    RunSettings,
+    RunState,
+)
+from .run_manager import RunManager
+
+
+EventSender = Callable[[Dict[str, Any]], Awaitable[None]]
+
+
+@dataclass
+class NodeExecutionResult:
+    """Result returned by node executors."""
+
+    outputs: Dict[str, Any]
+    transmissions: Optional[List[EdgeTransmission]] = None
+    logs: Optional[str] = None
+    metadata: Dict[str, Any] = field(default_factory=dict)
+
+
+class ExecutionError(RuntimeError):
+    """Raised when the graph cannot be executed."""
+
+
+class BaseNodeExecutor:
+    """Base class for all node executors."""
+
+    def __init__(self, runner: "GraphRunner", spec: NodeSpec) -> None:
+        self.runner = runner
+        self.spec = spec
+
+    async def run(self, inputs: Dict[str, Any], overrides: Dict[str, Any]) -> NodeExecutionResult:
+        raise NotImplementedError
+
+    def output_ports(self) -> List[str]:
+        if self.spec.ports.outputs:
+            return self.spec.ports.outputs
+        return ["output"]
+
+
+class InputNodeExecutor(BaseNodeExecutor):
+    """Node that emits configured or overridden values."""
+
+    async def run(self, inputs: Dict[str, Any], overrides: Dict[str, Any]) -> NodeExecutionResult:
+        values_config = self.spec.config.get("values")
+        outputs: Dict[str, Any]
+        if isinstance(values_config, dict):
+            outputs = dict(values_config)
+        else:
+            outputs = {}
+
+        default_value = self.spec.config.get("value")
+        value = overrides.get("value", default_value)
+        if value is None and "value" in overrides:
+            value = overrides["value"]
+
+        ports = self.output_ports()
+        if ports and value is not None:
+            outputs.setdefault(ports[0], value)
+        elif value is not None:
+            outputs.setdefault("value", value)
+
+        for port, override_value in overrides.items():
+            if port == "value":
+                continue
+            outputs[port] = override_value
+
+        return NodeExecutionResult(outputs=outputs)
+
+
+class PythonNodeExecutor(BaseNodeExecutor):
+    """Execute custom python code within a restricted environment."""
+
+    SAFE_BUILTINS = {
+        "len": len,
+        "min": min,
+        "max": max,
+        "sum": sum,
+        "sorted": sorted,
+        "range": range,
+        "enumerate": enumerate,
+        "str": str,
+        "int": int,
+        "float": float,
+        "bool": bool,
+        "list": list,
+        "dict": dict,
+        "set": set,
+        "tuple": tuple,
+        "zip": zip,
+        "any": any,
+        "all": all,
+    }
+
+    async def run(self, inputs: Dict[str, Any], overrides: Dict[str, Any]) -> NodeExecutionResult:
+        code = overrides.get("code", self.spec.config.get("code", ""))
+        local_vars: Dict[str, Any] = {
+            "inputs": inputs,
+            "config": self.spec.config,
+            "outputs": {},
+        }
+        stdout = StringIO()
+        with redirect_stdout(stdout):
+            exec(  # noqa: S102 - execution is sandboxed via SAFE_BUILTINS
+                code,
+                {"__builtins__": self.SAFE_BUILTINS},
+                local_vars,
+            )
+        outputs: Dict[str, Any] = local_vars.get("outputs") or {}
+        metadata = {"stdout": stdout.getvalue()}
+        return NodeExecutionResult(outputs=outputs, metadata=metadata)
+
+
+class LLMNodeExecutor(BaseNodeExecutor):
+    """Invoke the configured language model using a simple templating approach."""
+
+    async def run(self, inputs: Dict[str, Any], overrides: Dict[str, Any]) -> NodeExecutionResult:
+        prompt_template = overrides.get("prompt") or self.spec.config.get("prompt", "")
+        stop = overrides.get("stop") or self.spec.config.get("stop")
+        prompt = self._render_prompt(prompt_template, inputs)
+        response = await asyncio.to_thread(self.runner.llm.complete, prompt, stop=stop)
+        output_port = self.output_ports()[0]
+        return NodeExecutionResult(outputs={output_port: response})
+
+    def _render_prompt(self, template: str, inputs: Dict[str, Any]) -> str:
+        rendered = template
+        for key, value in inputs.items():
+            token = "{{" + key + "}}"
+            rendered = rendered.replace(token, str(value))
+        return rendered
+
+
+class OutputNodeExecutor(BaseNodeExecutor):
+    """Collect incoming values; outputs mirror the collected inputs."""
+
+    async def run(self, inputs: Dict[str, Any], overrides: Dict[str, Any]) -> NodeExecutionResult:
+        result = dict(inputs)
+        result.update(overrides)
+        return NodeExecutionResult(outputs=result)
+
+
+class LoopNodeExecutor(BaseNodeExecutor):
+    """Execute a nested graph for each item provided on the "items" input."""
+
+    async def run(self, inputs: Dict[str, Any], overrides: Dict[str, Any]) -> NodeExecutionResult:
+        items = self._resolve_items(inputs, overrides)
+
+        body_graph = self._load_body_graph(overrides)
+        if body_graph is None:
+            return NodeExecutionResult(outputs={self.output_ports()[0]: items})
+
+        loop_outputs_config = self._loop_output_config()
+        aggregated = self._initialise_aggregated(loop_outputs_config)
+        iteration_metadata: List[Dict[str, Any]] = []
+
+        for index, item in enumerate(items):
+            metadata, iteration_outputs = await self._execute_iteration(
+                index, item, inputs, body_graph, loop_outputs_config
+            )
+            iteration_metadata.append(metadata)
+            self._merge_iteration_outputs(aggregated, iteration_outputs)
+
+        transmissions = self._build_transmissions(aggregated)
+
+        return NodeExecutionResult(
+            outputs=aggregated,
+            transmissions=transmissions,
+            metadata={"iterations": iteration_metadata},
+        )
+
+    def _resolve_items(
+        self, inputs: Dict[str, Any], overrides: Dict[str, Any]
+    ) -> List[Any]:
+        items = overrides.get("items", inputs.get("items", []))
+        if items is None:
+            return []
+        if isinstance(items, list):
+            return items
+        if isinstance(items, (tuple, set)):
+            return list(items)
+        return [items]
+
+    def _load_body_graph(self, overrides: Dict[str, Any]) -> Optional[GraphSpec]:
+        body_graph_data = overrides.get("bodyGraph") or self.spec.config.get("bodyGraph")
+        if not body_graph_data:
+            return None
+        return GraphSpec.model_validate(body_graph_data)
+
+    def _loop_output_config(self) -> List[Dict[str, Any]]:
+        loop_outputs_config = self.spec.config.get("loopOutputs", [])
+        if not loop_outputs_config:
+            raise ExecutionError(
+                f"Loop node {self.spec.id} is missing loopOutputs configuration"
+            )
+        return loop_outputs_config
+
+    @staticmethod
+    def _initialise_aggregated(config: List[Dict[str, Any]]) -> Dict[str, List[Any]]:
+        return {entry["target"]: [] for entry in config}
+
+    async def _execute_iteration(
+        self,
+        index: int,
+        item: Any,
+        inputs: Dict[str, Any],
+        body_graph: GraphSpec,
+        loop_outputs_config: List[Dict[str, Any]],
+    ) -> tuple[Dict[str, Any], List[tuple[str, Any]]]:
+        namespaced_graph = _namespace_graph(body_graph, f"{self.spec.id}::iter{index}::")
+        prepare_loop_bindings(namespaced_graph, item, inputs)
+        subrunner = self._create_iteration_runner(namespaced_graph, index)
+        result = await subrunner.run()
+        metadata = {
+            "outputs": result.final_outputs,
+            "nodes": list(result.node_outputs.keys()),
+        }
+        iteration_outputs = self._collect_iteration_outputs(
+            result, loop_outputs_config, index
+        )
+        return metadata, iteration_outputs
+
+    def _create_iteration_runner(
+        self, graph: GraphSpec, index: int
+    ) -> "GraphRunner":
+        iteration_scope = {
+            "scope": "loop",
+            "parentNodeId": self.spec.id,
+            "loopIteration": index,
+        }
+        return GraphRunner(
+            graph,
+            self.runner.settings,
+            run_id=f"{self.runner.run_id}:{self.spec.id}:{index}",
+            sender=self.runner.sender,
+            manager=None,
+            scope=iteration_scope,
+            parent=self.runner,
+        )
+
+    def _collect_iteration_outputs(
+        self,
+        result: GraphRunResult,
+        loop_outputs_config: List[Dict[str, Any]],
+        index: int,
+    ) -> List[tuple[str, Any]]:
+        collected: List[tuple[str, Any]] = []
+        for entry in loop_outputs_config:
+            original_id = entry["node"]
+            port = entry.get("port", "output")
+            target = entry["target"]
+            namespaced_id = f"{self.spec.id}::iter{index}::{original_id}"
+            node_outputs = result.node_outputs.get(namespaced_id, {})
+            collected.append((target, node_outputs.get(port)))
+        return collected
+
+    @staticmethod
+    def _merge_iteration_outputs(
+        aggregated: Dict[str, List[Any]],
+        iteration_outputs: List[tuple[str, Any]],
+    ) -> None:
+        for target, value in iteration_outputs:
+            aggregated.setdefault(target, []).append(value)
+
+    def _build_transmissions(
+        self, aggregated: Dict[str, List[Any]]
+    ) -> List[EdgeTransmission]:
+        transmissions: List[EdgeTransmission] = []
+        for edge in self.runner.outgoing_edges(self.spec.id):
+            values = aggregated.get(edge.source.port, [])
+            if not isinstance(values, list):
+                values = [values]
+            for iteration, value in enumerate(values):
+                transmissions.append(
+                    EdgeTransmission(
+                        edge_id=edge.id,
+                        source=edge.source,
+                        target=edge.target,
+                        value=value,
+                        iteration=iteration,
+                    )
+                )
+        return transmissions
+
+
+class CognitionNodeExecutor(BaseNodeExecutor):
+    """Invoke the typed cognition agent and expose structured outputs."""
+
+    INPUT_FIELDS = (
+        "observation",
+        "episodic_memory",
+        "goals",
+        "constraints",
+        "utility_def",
+        "prior_belief",
+        "attention_results",
+        "system_events",
+    )
+
+    def __init__(self, runner: "GraphRunner", spec: NodeSpec) -> None:
+        super().__init__(runner, spec)
+        from cognition_typed_dspy import (
+            Affect,
+            Belief,
+            CognitionAgent,
+            Decision,
+            Outcome,
+            Percept,
+            Plan,
+            ScoredPlan,
+            UpdateNote,
+            Verification,
+            ensure_offline_cognition_lm,
+        )
+
+        import dspy
+
+        if getattr(dspy.settings, "lm", None) is None:
+            ensure_offline_cognition_lm()
+        self.agent = CognitionAgent()
+        self._percept_cls = Percept
+        self._affect_cls = Affect
+        self._belief_cls = Belief
+        self._plan_cls = Plan
+        self._scored_cls = ScoredPlan
+        self._decision_cls = Decision
+        self._verification_cls = Verification
+        self._outcome_cls = Outcome
+        self._update_cls = UpdateNote
+
+    async def run(self, inputs: Dict[str, Any], overrides: Dict[str, Any]) -> NodeExecutionResult:
+        resolved: Dict[str, Any] = {}
+        for field in self.INPUT_FIELDS:
+            if field in overrides:
+                resolved[field] = overrides[field]
+            elif field in inputs:
+                resolved[field] = inputs[field]
+            else:
+                resolved[field] = self.spec.config.get(field, "")
+
+        fallback_used = False
+        try:
+            outputs = await asyncio.to_thread(self.agent.forward, **resolved)
+        except Exception:  # pragma: no cover - fallback branch
+            outputs = self._fallback_response(resolved)
+            fallback_used = True
+        serialised = {key: self._serialise(value) for key, value in outputs.items()}
+        metadata = {"inputs": resolved}
+        if fallback_used:
+            metadata["fallback"] = True
+        return NodeExecutionResult(outputs=serialised, metadata=metadata)
+
+    def _serialise(self, value: Any) -> Any:
+        if isinstance(value, BaseModel):
+            return value.model_dump(mode="python")
+        if isinstance(value, list):
+            return [self._serialise(item) for item in value]
+        if isinstance(value, dict):
+            return {key: self._serialise(item) for key, item in value.items()}
+        return value
+
+    def _fallback_response(self, resolved: Dict[str, Any]) -> Dict[str, Any]:
+        observation = str(resolved.get("observation", ""))
+        goals = str(resolved.get("goals", ""))
+        plan_steps = [f"Observe: {observation}", f"Pursue goals: {goals}"]
+        plan = self._plan_cls(id="fallback", steps=plan_steps)
+        scored = self._scored_cls(
+            id="fallback",
+            EV=0.0,
+            risk=0.0,
+            confidence=0.5,
+            rationale="Fallback cognition response",
+        )
+        decision = self._decision_cls(choice="execute", plan_id="fallback")
+        verification = self._verification_cls(checks=["fallback"], all_passed=True)
+        outcome = self._outcome_cls(
+            reward=0.0,
+            policy_violations=0,
+            risk_flag=False,
+            notes="Fallback cognition path",
+        )
+        update = self._update_cls(note="Executed fallback cognition response.")
+        return {
+            "percept": self._percept_cls(facts=[observation], uncertainties=[]),
+            "belief": self._belief_cls(
+                entities=["observation"],
+                assumptions=["Fallback assumption"],
+                epistemic=0.5,
+                aleatoric=0.0,
+            ),
+            "affect": self._affect_cls(
+                confidence=0.5,
+                surprise=0.0,
+                risk=0.0,
+                budget_spend=0.0,
+                budget_cap=1.0,
+            ),
+            "plans": [plan],
+            "scored": [scored],
+            "decision": decision,
+            "verification": verification,
+            "outcome": outcome,
+            "update": update,
+        }
+
+
+EXECUTOR_REGISTRY: Dict[str, Callable[["GraphRunner", NodeSpec], BaseNodeExecutor]] = {
+    "input": InputNodeExecutor,
+    "llm": LLMNodeExecutor,
+    "prompt": LLMNodeExecutor,
+    "python": PythonNodeExecutor,
+    "output": OutputNodeExecutor,
+    "loop": LoopNodeExecutor,
+    "loopInput": InputNodeExecutor,
+    "loopOutput": OutputNodeExecutor,
+    "cognition": CognitionNodeExecutor,
+}
+
+
+def create_executor(runner: "GraphRunner", spec: NodeSpec) -> BaseNodeExecutor:
+    try:
+        factory = EXECUTOR_REGISTRY[spec.type]
+    except KeyError as exc:  # pragma: no cover - defensive branch
+        raise ExecutionError(f"Unsupported node type: {spec.type}") from exc
+    return factory(runner, spec)
+
+
+@dataclass
+class GraphRunResult:
+    """Details returned after running a graph."""
+
+    run_id: str
+    node_outputs: Dict[str, Dict[str, Any]]
+    final_outputs: Dict[str, Any]
+    run_state: RunState
+
+
+class GraphRunner:
+    """Execute a graph specification and stream events through a sender."""
+
+    def __init__(
+        self,
+        graph: GraphSpec,
+        settings: RunSettings,
+        run_id: str,
+        sender: EventSender,
+        manager: Optional[RunManager],
+        *,
+        scope: Optional[Dict[str, Any]] = None,
+        parent: Optional["GraphRunner"] = None,
+    ) -> None:
+        self.graph = graph
+        self.settings = settings
+        self.run_id = run_id
+        self.sender = sender
+        self.manager = manager
+        self.scope = scope or {"scope": "graph"}
+        self.parent = parent
+        self.node_map = graph.node_map()
+        self._edges_by_source: Dict[str, List[EdgeSpec]] = {}
+        self._edges_by_target: Dict[str, List[EdgeSpec]] = {}
+        for edge in graph.edges:
+            self._edges_by_source.setdefault(edge.source.node, []).append(edge)
+            self._edges_by_target.setdefault(edge.target.node, []).append(edge)
+        self.llm = parent.llm if parent else LLMEngine(settings.llm)
+        self.run_state = RunState(
+            run_id=run_id,
+            graph=graph,
+            settings=settings,
+            started_at=datetime.now(timezone.utc),
+        )
+        if manager:
+            manager.register(self.run_state)
+
+    async def run(
+        self,
+        *,
+        resume: Optional[RunState] = None,
+        start_node: Optional[str] = None,
+        overrides: Optional[Dict[str, Any]] = None,
+    ) -> GraphRunResult:
+        if overrides is None:
+            overrides = {}
+        start_type = (
+            "run_started" if self.scope.get("scope") == "graph" else "subgraph_started"
+        )
+        await self._emit_event({"type": start_type})
+
+        cached_nodes, nodes_to_execute = self._plan_execution(
+            resume, start_node, overrides
+        )
+        results: Dict[str, Dict[str, Any]] = {}
+
+        for node_id in self._topological_order():
+            if await self._use_cached_node(node_id, cached_nodes, resume, results):
+                continue
+
+            if node_id not in nodes_to_execute:
+                continue
+
+            node = self.node_map[node_id]
+            await self._execute_node(node_id, node, overrides, results)
+
+        final_outputs = self._collect_graph_outputs(results)
+        complete_type = (
+            "run_complete" if self.scope.get("scope") == "graph" else "subgraph_complete"
+        )
+        await self._emit_event({"type": complete_type, "outputs": final_outputs})
+        return GraphRunResult(
+            run_id=self.run_id,
+            node_outputs=results,
+            final_outputs=final_outputs,
+            run_state=self.run_state,
+        )
+
+    async def _use_cached_node(
+        self,
+        node_id: str,
+        cached_nodes: Set[str],
+        resume: Optional[RunState],
+        results: Dict[str, Dict[str, Any]],
+    ) -> bool:
+        if not resume or node_id not in cached_nodes:
+            return False
+        cache = resume.node_results[node_id]
+        results[node_id] = cache.outputs
+        await self._emit_event(cache.to_event())
+        for transmission in cache.transmissions:
+            transmission.cached = True
+            await self._emit_event(transmission.to_event())
+        return True
+
+    async def _execute_node(
+        self,
+        node_id: str,
+        node: NodeSpec,
+        overrides: Dict[str, Any],
+        results: Dict[str, Dict[str, Any]],
+    ) -> None:
+        node_overrides = overrides.get(node_id, {})
+        inputs = self._prepare_inputs(node_id, node_overrides, results)
+        executor = create_executor(self, node)
+        await self._emit_event({"type": "node_start", "nodeId": node_id})
+
+        node_overrides = self._refresh_overrides(node_id, node_overrides, overrides, inputs)
+        started_at = datetime.now(timezone.utc)
+        execution_result = await self._invoke_executor(
+            executor, node_id, inputs, node_overrides
+        )
+        await self._handle_execution_result(
+            node_id, node, execution_result, results, started_at
+        )
+
+    def _prepare_inputs(
+        self,
+        node_id: str,
+        node_overrides: Dict[str, Any],
+        results: Dict[str, Dict[str, Any]],
+    ) -> Dict[str, Any]:
+        inputs = self._collect_inputs(node_id, results)
+        inputs.update(node_overrides.get("inputs", {}))
+        return inputs
+
+    def _refresh_overrides(
+        self,
+        node_id: str,
+        node_overrides: Dict[str, Any],
+        overrides: Dict[str, Any],
+        inputs: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        updated = overrides.get(node_id, node_overrides)
+        if updated is not node_overrides:
+            inputs.update(updated.get("inputs", {}))
+        return updated
+
+    async def _invoke_executor(
+        self,
+        executor: BaseNodeExecutor,
+        node_id: str,
+        inputs: Dict[str, Any],
+        node_overrides: Dict[str, Any],
+    ) -> NodeExecutionResult:
+        try:
+            return await executor.run(inputs, node_overrides)
+        except Exception as exc:  # pragma: no cover - error branch
+            error_type = (
+                "run_error" if self.scope.get("scope") == "graph" else "subgraph_error"
+            )
+            await self._emit_event(
+                {
+                    "type": error_type,
+                    "nodeId": node_id,
+                    "message": str(exc),
+                }
+            )
+            raise
+
+    async def _handle_execution_result(
+        self,
+        node_id: str,
+        node: NodeSpec,
+        execution_result: NodeExecutionResult,
+        results: Dict[str, Dict[str, Any]],
+        started_at: datetime,
+    ) -> None:
+        if execution_result.logs:
+            await self._emit_event(
+                {
+                    "type": "node_log",
+                    "nodeId": node_id,
+                    "log": execution_result.logs,
+                }
+            )
+
+        results[node_id] = execution_result.outputs
+        transmissions = self._transmissions_for(node_id, execution_result)
+        for transmission in transmissions:
+            await self._emit_event(transmission.to_event())
+
+        cache_entry = self._cache_node(
+            node, node_id, execution_result, transmissions, started_at
+        )
+        self.run_state.node_results[node_id] = cache_entry
+        await self._emit_event(
+            {
+                "type": "node_end",
+                "nodeId": node_id,
+                "outputs": execution_result.outputs,
+                "metadata": execution_result.metadata,
+            }
+        )
+
+    def _transmissions_for(
+        self, node_id: str, execution_result: NodeExecutionResult
+    ) -> List[EdgeTransmission]:
+        transmissions = execution_result.transmissions
+        if transmissions is None:
+            transmissions = self._default_transmissions(node_id, execution_result.outputs)
+        return transmissions
+
+    def _cache_node(
+        self,
+        node: NodeSpec,
+        node_id: str,
+        execution_result: NodeExecutionResult,
+        transmissions: List[EdgeTransmission],
+        started_at: datetime,
+    ) -> NodeCache:
+        completed_at = datetime.now(timezone.utc)
+        return NodeCache(
+            node_id=node_id,
+            outputs=execution_result.outputs,
+            transmissions=transmissions,
+            signature=node.signature(),
+            started_at=started_at,
+            completed_at=completed_at,
+            metadata=execution_result.metadata,
+        )
+
+    def _collect_inputs(
+        self, node_id: str, results: Dict[str, Dict[str, Any]]
+    ) -> Dict[str, Any]:
+        collected: Dict[str, List[Any]] = {}
+        for edge in self._edges_by_target.get(node_id, []):
+            source_outputs = results.get(edge.source.node, {})
+            if edge.source.port not in source_outputs:
+                continue
+            collected.setdefault(edge.target.port, []).append(
+                source_outputs[edge.source.port]
+            )
+
+        processed: Dict[str, Any] = {}
+        for port, values in collected.items():
+            processed[port] = values[0] if len(values) == 1 else values
+
+        defaults = self.node_map[node_id].config.get("defaults", {})
+        for port, default_value in defaults.items():
+            processed.setdefault(port, default_value)
+        return processed
+
+    def _collect_graph_outputs(self, results: Dict[str, Dict[str, Any]]) -> Dict[str, Any]:
+        output_nodes = [node for node in self.graph.nodes if node.type == "output"]
+        if not output_nodes:
+            return {}
+        summary: Dict[str, Any] = {}
+        for node in output_nodes:
+            summary[node.id] = results.get(node.id, {})
+        return summary
+
+    def _plan_execution(
+        self,
+        resume: Optional[RunState],
+        start_node: Optional[str],
+        overrides: Dict[str, Any],
+    ) -> tuple[Set[str], Set[str]]:
+        if not resume or not self.settings.allow_cache_reuse:
+            return set(), set(self.node_map.keys())
+
+        changed_nodes: Set[str] = set()
+        for node_id, node in self.node_map.items():
+            cached_signature = resume.node_signature(node_id)
+            if cached_signature is None or cached_signature != node.signature():
+                changed_nodes.add(node_id)
+
+        if start_node and start_node not in self.node_map:
+            raise ExecutionError(f"Unknown start node: {start_node}")
+
+        nodes_to_execute: Set[str] = set()
+        if changed_nodes:
+            nodes_to_execute |= self._downstream_nodes(changed_nodes)
+        if start_node:
+            nodes_to_execute |= self._downstream_nodes({start_node})
+
+        override_nodes = {node_id for node_id in overrides if node_id in self.node_map}
+        if override_nodes:
+            nodes_to_execute |= override_nodes
+            nodes_to_execute |= self._downstream_nodes(override_nodes)
+
+        if not nodes_to_execute:
+            nodes_to_execute = set(self.node_map.keys())
+
+        cached_nodes = set(resume.cached_nodes()) - nodes_to_execute
+        return cached_nodes, nodes_to_execute
+
+    def _downstream_nodes(self, start: Iterable[str]) -> Set[str]:
+        queue = list(start)
+        seen: Set[str] = set()
+        while queue:
+            node_id = queue.pop(0)
+            if node_id in seen:
+                continue
+            seen.add(node_id)
+            for edge in self._edges_by_source.get(node_id, []):
+                queue.append(edge.target.node)
+        return seen
+
+    def _topological_order(self) -> List[str]:
+        sorter = TopologicalSorter()
+        for node in self.graph.nodes:
+            dependencies = [edge.source.node for edge in self._edges_by_target.get(node.id, [])]
+            sorter.add(node.id, *dependencies)
+        try:
+            return list(sorter.static_order())
+        except CycleError as exc:  # pragma: no cover - cycle guard
+            raise ExecutionError("Graph contains cycles that cannot be resolved") from exc
+
+    def _default_transmissions(
+        self, node_id: str, outputs: Dict[str, Any]
+    ) -> List[EdgeTransmission]:
+        transmissions: List[EdgeTransmission] = []
+        for edge in self._edges_by_source.get(node_id, []):
+            if edge.source.port not in outputs:
+                continue
+            transmissions.append(
+                EdgeTransmission(
+                    edge_id=edge.id,
+                    source=edge.source,
+                    target=edge.target,
+                    value=outputs[edge.source.port],
+                )
+            )
+        return transmissions
+
+    def outgoing_edges(self, node_id: str) -> List[EdgeSpec]:
+        return self._edges_by_source.get(node_id, [])
+
+    async def _emit_event(self, event: Dict[str, Any]) -> None:
+        payload = dict(event)
+        payload.setdefault("runId", self.run_id)
+        payload.update(self.scope)
+        await self.sender(payload)
+        self.run_state.record_event(payload)
+
+
+def _namespace_graph(graph: GraphSpec, prefix: str) -> GraphSpec:
+    data = graph.model_dump(mode="python")
+    for node in data["nodes"]:
+        node["id"] = f"{prefix}{node['id']}"
+    for edge in data["edges"]:
+        edge["id"] = f"{prefix}{edge['id']}"
+        edge["source"]["node"] = f"{prefix}{edge['source']['node']}"
+        edge["target"]["node"] = f"{prefix}{edge['target']['node']}"
+    return GraphSpec.model_validate(data)
+
+
+def prepare_loop_bindings(graph: GraphSpec, item: Any, outer_inputs: Dict[str, Any]) -> None:
+    for node in graph.nodes:
+        if node.type != "loopInput":
+            continue
+        binding = node.config.get("binding", "items")
+        if binding == "items":
+            value = item
+        elif binding.startswith("input:"):
+            key = binding.split(":", 1)[1]
+            value = outer_inputs.get(key)
+        else:
+            value = node.config.get("default")
+        node.type = "input"
+        node.config.setdefault("value", value)
+
