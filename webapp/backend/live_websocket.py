@@ -18,6 +18,7 @@ class LiveAudioProcessor:
         self.gemini_session = None
         self.api_key = os.getenv("GEMINI_API_KEY")
         self.is_active = False
+        self.audio_buffer = []  # Buffer to accumulate audio chunks
         
     async def process(self):
         """Main processing loop"""
@@ -61,13 +62,51 @@ class LiveAudioProcessor:
                         # Convert base64 to bytes
                         import base64
                         audio_bytes = base64.b64decode(audio_data)
-                        logger.info(f"Received audio chunk of size: {len(audio_bytes)} bytes")
+                        logger.info(f"Received WebM audio chunk of size: {len(audio_bytes)} bytes")
                         
-                        # Send to Gemini
-                        await self.gemini_session.send_audio_chunk(audio_bytes)
+                        # Add to buffer
+                        self.audio_buffer.append(audio_bytes)
+                        
+                        # Process buffer if it's large enough (e.g., 10KB)
+                        if sum(len(chunk) for chunk in self.audio_buffer) >= 10000:
+                            try:
+                                # Combine all chunks
+                                combined_audio = b''.join(self.audio_buffer)
+                                logger.info(f"Processing accumulated audio of size: {len(combined_audio)} bytes")
+                                
+                                # Convert WebM to PCM format
+                                pcm_audio = convert_audio_format(combined_audio, input_format="webm")
+                                logger.info(f"Converted to PCM audio of size: {len(pcm_audio)} bytes")
+                                
+                                # Send to Gemini
+                                await self.gemini_session.send_audio_chunk(pcm_audio)
+                                
+                                # Clear buffer
+                                self.audio_buffer = []
+                            except Exception as e:
+                                logger.error(f"Error converting audio: {e}")
+                                # Keep accumulating if conversion fails
+                                pass
                         
                 elif message_type == "audio_complete":
-                    # Audio recording completed
+                    # Audio recording completed - process any remaining audio
+                    if self.audio_buffer and self.gemini_session:
+                        try:
+                            combined_audio = b''.join(self.audio_buffer)
+                            logger.info(f"Processing final audio of size: {len(combined_audio)} bytes")
+                            
+                            # Convert WebM to PCM format
+                            pcm_audio = convert_audio_format(combined_audio, input_format="webm")
+                            logger.info(f"Converted final audio to PCM of size: {len(pcm_audio)} bytes")
+                            
+                            # Send to Gemini
+                            await self.gemini_session.send_audio_chunk(pcm_audio)
+                            
+                            # Clear buffer
+                            self.audio_buffer = []
+                        except Exception as e:
+                            logger.error(f"Error converting final audio: {e}")
+                    
                     await self.websocket.send_json({
                         "type": "processing_complete"
                     })

@@ -1,110 +1,269 @@
 .audio-recorder {
-  margin: 20px 0;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 15px;
+  background: linear-gradient(135deg, rgba(97, 218, 251, 0.1), rgba(79, 195, 247, 0.05));
+  backdrop-filter: blur(10px);
+  padding: 30px;
+  border-radius: 16px;
+  border: 1px solid rgba(97, 218, 251, 0.3);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+  margin: 20px auto;
+  max-width: 600px;
+  animation: slideIn 0.5s ease;
+}
+
+.audio-recorder h3 {
+  color: #61dafb;
+  margin-top: 0;
+  margin-bottom: 20px;
+  font-size: 1.8em;
+  text-align: center;
 }
 
 .record-button {
-  padding: 15px 30px;
-  font-size: 18px;
+  background: linear-gradient(45deg, #f44336, #e91e63);
+  color: white;
   border: none;
+  padding: 16px 32px;
+  font-size: 18px;
+  font-weight: bold;
   border-radius: 50px;
   cursor: pointer;
   transition: all 0.3s ease;
-  background-color: #4CAF50;
-  color: white;
-  font-weight: bold;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 20px auto;
+  box-shadow: 0 4px 15px rgba(244, 67, 54, 0.3);
+  text-transform: uppercase;
+  letter-spacing: 1px;
 }
 
 .record-button:hover {
-  background-color: #45a049;
-  transform: scale(1.05);
+  transform: translateY(-2px) scale(1.05);
+  box-shadow: 0 6px 25px rgba(244, 67, 54, 0.5);
 }
 
 .record-button.recording {
-  background-color: #f44336;
-  animation: pulse 1.5s infinite;
+  background: linear-gradient(45deg, #4CAF50, #66BB6A);
+  animation: recordPulse 1.5s ease-in-out infinite;
 }
 
-@keyframes pulse {
-  0% {
-    box-shadow: 0 0 0 0 rgba(244, 67, 54, 0.7);
+@keyframes recordPulse {
+  0%, 100% { 
+    transform: scale(1);
+    box-shadow: 0 4px 15px rgba(76, 175, 80, 0.3);
   }
-  70% {
-    box-shadow: 0 0 0 20px rgba(244, 67, 54, 0);
+  50% { 
+    transform: scale(1.05);
+    box-shadow: 0 8px 30px rgba(76, 175, 80, 0.6);
   }
-  100% {
-    box-shadow: 0 0 0 0 rgba(244, 67, 54, 0);
-  }
+}
+
+.device-selector {
+  margin: 20px 0;
+}
+
+.device-selector label {
+  display: block;
+  margin-bottom: 10px;
+  color: #b3d9ff;
+  font-weight: 600;
+  font-size: 14px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.device-selector select {
+  width: 100%;
+  padding: 12px 16px;
+  border-radius: 8px;
+  border: 2px solid rgba(97, 218, 251, 0.3);
+  background: rgba(255, 255, 255, 0.05);
+  color: white;
+  font-size: 16px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.device-selector select:hover {
+  border-color: rgba(97, 218, 251, 0.5);
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.device-selector select:focus {
+  outline: none;
+  border-color: #61dafb;
+  box-shadow: 0 0 20px rgba(97, 218, 251, 0.3);
+}
+
+.device-selector select option {
+  background: #1a1a2e;
+  color: white;
 }
 
 .audio-preview {
-  margin-top: 10px;
-  padding: 10px;
-  background-color: rgba(255, 255, 255, 0.1);
+  margin-top: 20px;
+  padding: 15px;
+  background: rgba(0, 0, 0, 0.3);
   border-radius: 8px;
+  backdrop-filter: blur(10px);
 }
 
 .audio-preview audio {
-  width: 300px;
+  width: 100%;
+  filter: invert(1);
 }
 
 .mic-debug {
   margin-top: 20px;
-  padding: 15px;
-  background-color: rgba(0, 0, 0, 0.3);
-  border-radius: 8px;
-  border: 1px solid rgba(97, 218, 251, 0.3);
+  padding: 20px;
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 12px;
   font-size: 12px;
-  text-align: left;
-  min-width: 300px;
+  color: #b3d9ff;
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(97, 218, 251, 0.2);
 }
 
 .mic-debug h5 {
-  margin: 0 0 10px 0;
+  margin-top: 0;
+  margin-bottom: 15px;
   color: #61dafb;
-  font-size: 14px;
+  font-size: 16px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
 }
 
 .mic-debug p {
-  margin: 5px 0;
-  color: #ccc;
+  margin: 8px 0;
+  font-family: 'Courier New', monospace;
 }
 
 .mic-debug ul {
-  margin: 5px 0;
+  list-style: none;
   padding-left: 20px;
+  margin: 10px 0;
 }
 
 .mic-debug li {
-  color: #aaa;
-  font-size: 11px;
-}
-
-.mic-debug .error {
-  color: #ff6b6b;
-}
-
-.mic-debug .warning {
-  color: #ffa500;
-  font-size: 11px;
-  line-height: 1.4;
-  margin: 10px 0;
+  padding: 4px 0;
+  color: #8BC34A;
 }
 
 .audio-level-bar {
   width: 100%;
   height: 20px;
-  background-color: rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.1);
   border-radius: 10px;
   overflow: hidden;
   margin-top: 5px;
+  border: 1px solid rgba(97, 218, 251, 0.3);
 }
 
 .audio-level-fill {
   height: 100%;
-  background-color: #4CAF50;
+  background: linear-gradient(90deg, #4CAF50, #8BC34A, #CDDC39, #FFC107, #FF5722);
   transition: width 0.1s ease;
+  box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.3);
+}
+
+.warning {
+  background: rgba(255, 193, 7, 0.1);
+  border: 1px solid rgba(255, 193, 7, 0.3);
+  border-radius: 8px;
+  padding: 15px;
+  margin-top: 10px;
+}
+
+.warning p {
+  color: #FFC107;
+  margin: 0 0 10px 0;
+  font-weight: 500;
+}
+
+.warning ul {
+  margin: 10px 0;
+}
+
+.warning button {
+  background: #FFC107;
+  color: #1a1a2e;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 600;
+  transition: all 0.3s ease;
+}
+
+.warning button:hover {
+  background: #FFB300;
+  transform: translateY(-1px);
+}
+
+.error {
+  color: #ff6b6b;
+  font-weight: 500;
+}
+
+.transcript {
+  margin: 20px 0;
+  padding: 20px;
+  background: rgba(0, 0, 0, 0.4);
+  border-radius: 12px;
+  border: 1px solid rgba(97, 218, 251, 0.3);
+  backdrop-filter: blur(10px);
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.transcript h4 {
+  margin-top: 0;
+  color: #61dafb;
+  font-size: 1.4em;
+}
+
+.transcript pre {
+  white-space: pre-wrap;
+  margin: 0;
+  color: #e0e0e0;
+  line-height: 1.6;
+  font-size: 14px;
+}
+
+.connection-status {
+  text-align: center;
+  margin: 15px 0;
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.connection-status p {
+  margin: 0;
+  padding: 8px 16px;
+  border-radius: 20px;
+  display: inline-block;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+/* Scrollbar styling */
+.transcript::-webkit-scrollbar,
+.mic-debug::-webkit-scrollbar {
+  width: 8px;
+}
+
+.transcript::-webkit-scrollbar-track,
+.mic-debug::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+}
+
+.transcript::-webkit-scrollbar-thumb,
+.mic-debug::-webkit-scrollbar-thumb {
+  background: rgba(97, 218, 251, 0.5);
+  border-radius: 4px;
+}
+
+.transcript::-webkit-scrollbar-thumb:hover,
+.mic-debug::-webkit-scrollbar-thumb:hover {
+  background: rgba(97, 218, 251, 0.8);
 }

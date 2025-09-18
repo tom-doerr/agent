@@ -120,10 +120,22 @@ function LiveAudioRecorder({ onStatusChange, model = 'gemini-flash' }) {
 
   const updateAudioLevel = () => {
     if (analyserRef.current && isRecording) {
-      const dataArray = new Uint8Array(analyserRef.current.frequencyBinCount);
-      analyserRef.current.getByteFrequencyData(dataArray);
-      const average = dataArray.reduce((a, b) => a + b) / dataArray.length;
-      setMicDebug(prev => ({ ...prev, audioLevel: Math.round(average) }));
+      // Use time domain data for better audio level detection
+      const bufferLength = analyserRef.current.fftSize;
+      const dataArray = new Uint8Array(bufferLength);
+      analyserRef.current.getByteTimeDomainData(dataArray);
+      
+      // Calculate RMS (Root Mean Square) for actual audio level
+      let sum = 0;
+      for (let i = 0; i < bufferLength; i++) {
+        const normalized = (dataArray[i] - 128) / 128;
+        sum += normalized * normalized;
+      }
+      const rms = Math.sqrt(sum / bufferLength);
+      const db = 20 * Math.log10(rms);
+      const level = Math.max(0, Math.min(255, (db + 60) * 4)); // Scale to 0-255
+      
+      setMicDebug(prev => ({ ...prev, audioLevel: Math.round(level) }));
       animationRef.current = requestAnimationFrame(updateAudioLevel);
     }
   };
@@ -226,10 +238,35 @@ function LiveAudioRecorder({ onStatusChange, model = 'gemini-flash' }) {
 
       // Set up audio analysis
       audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)();
+      
+      // Resume audio context if suspended (browser security requirement)
+      if (audioContextRef.current.state === 'suspended') {
+        await audioContextRef.current.resume();
+        console.log('Audio context resumed');
+      }
+      
       const source = audioContextRef.current.createMediaStreamSource(stream);
       analyserRef.current = audioContextRef.current.createAnalyser();
       analyserRef.current.fftSize = 256;
+      analyserRef.current.minDecibels = -90;
+      analyserRef.current.maxDecibels = -10;
+      analyserRef.current.smoothingTimeConstant = 0.85;
       source.connect(analyserRef.current);
+      
+      // Test if we're getting audio data
+      const testArray = new Uint8Array(analyserRef.current.frequencyBinCount);
+      analyserRef.current.getByteFrequencyData(testArray);
+      console.log('Initial audio test:', testArray.slice(0, 10));
+      
+      // Check audio track settings
+      const settings = audioTrack.getSettings();
+      console.log('Audio track settings:', settings);
+      
+      // Verify the track is not muted
+      if (audioTrack.muted) {
+        console.warn('Audio track is muted!');
+      }
+      
       updateAudioLevel();
 
       // Create MediaRecorder with smaller time slices for real-time streaming

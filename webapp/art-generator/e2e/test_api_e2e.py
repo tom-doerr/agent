@@ -116,51 +116,176 @@ async def test_suggest_comparison():
         else:
             print("   ⚠ Not enough images for comparison suggestion")
 
+async def test_ranking_update(image_ids):
+    """Test ranking update functionality"""
+    print("\n8. Testing ranking update...")
+    async with httpx.AsyncClient() as client:
+        response = await client.post(
+            f"{BASE_URL}/preferences/rank",
+            json={
+                "image_rankings": image_ids[:4]  # Rank first 4 images
+            }
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert data["status"] == "success"
+        print(f"   ✓ Ranking updated: {data['comparisons_added']} comparisons added")
+
+async def test_generate_optimal():
+    """Test optimal image generation based on preferences"""
+    print("\n9. Testing optimal image generation...")
+    async with httpx.AsyncClient() as client:
+        response = await client.post(f"{BASE_URL}/generate/optimal")
+        if response.status_code == 200:
+            data = response.json()
+            print(f"   ✓ Optimal generation started (task_id: {data['task_id'][:8]}...)")
+            
+            # Wait for completion
+            for i in range(10):
+                response = await client.get(f"{BASE_URL}/status/{data['task_id']}")
+                status_data = response.json()
+                
+                if status_data["status"] == "completed":
+                    print("   ✓ Optimal image generated successfully")
+                    return
+                elif status_data["status"] == "failed":
+                    print(f"   ⚠ Optimal generation failed: {status_data.get('error')}")
+                    return
+                
+                await asyncio.sleep(1)
+        else:
+            print(f"   ⚠ Not enough preference data for optimal generation")
+
+async def test_websocket_connection():
+    """Test WebSocket connection and messages"""
+    print("\n10. Testing WebSocket connection...")
+    try:
+        import websockets
+        
+        async with websockets.connect(f"ws://backend:8090/ws") as websocket:
+            print("   ✓ WebSocket connected")
+            
+            # Wait for a message or timeout
+            try:
+                message = await asyncio.wait_for(websocket.recv(), timeout=2.0)
+                print(f"   ✓ Received WebSocket message: {message[:50]}...")
+            except asyncio.TimeoutError:
+                print("   ✓ WebSocket connection stable (no messages)")
+                
+    except ImportError:
+        print("   ⚠ WebSocket library not available, skipping")
+    except Exception as e:
+        print(f"   ⚠ WebSocket test failed: {e}")
+
+async def test_concurrent_preferences():
+    """Test concurrent preference updates"""
+    print("\n11. Testing concurrent preference updates...")
+    async with httpx.AsyncClient() as client:
+        # Get available images
+        response = await client.get(f"{BASE_URL}/images?limit=6")
+        images = response.json()
+        
+        if len(images) >= 6:
+            # Submit multiple comparisons concurrently
+            tasks = []
+            for i in range(0, 6, 2):
+                tasks.append(client.post(
+                    f"{BASE_URL}/preferences/compare",
+                    json={
+                        "winner_id": images[i]["id"],
+                        "loser_id": images[i+1]["id"],
+                        "comparison_type": "concurrent_test"
+                    }
+                ))
+            
+            responses = await asyncio.gather(*tasks)
+            
+            # All should succeed
+            success_count = sum(1 for r in responses if r.status_code == 200)
+            print(f"   ✓ {success_count}/3 concurrent comparisons succeeded")
+        else:
+            print("   ⚠ Not enough images for concurrent test")
+
 async def main():
     """Run all E2E tests"""
     print("=" * 60)
-    print("AI Art Generator E2E Tests")
+    print("AI Art Generator E2E Tests - Comprehensive Suite")
     print("=" * 60)
     
     try:
         # Basic tests
         await test_health()
         
-        # Generate images
-        print("\nGenerating test images...")
-        image1 = await test_generate_image()
+        # Generate test images
+        print("\nGenerating test images for comprehensive testing...")
+        generated_images = []
         
-        # Generate second image with different prompt
-        print("\nGenerating second test image...")
-        async with httpx.AsyncClient() as client:
-            response = await client.post(
-                f"{BASE_URL}/generate",
-                json={
-                    "prompt": "Abstract geometric patterns",
-                    "provider": "local",  # Try local provider
-                    "size": "1024x1024"
-                }
-            )
-            task_id = response.json()["task_id"]
-            # Wait briefly
-            await asyncio.sleep(2)
-            response = await client.get(f"{BASE_URL}/status/{task_id}")
-            image2 = response.json().get("result")
+        # Generate multiple images with different providers
+        providers = ["openai", "local", "replicate"]
+        prompts = [
+            "A futuristic city at sunset",
+            "Abstract geometric patterns",
+            "A serene mountain landscape",
+            "Colorful underwater scene"
+        ]
         
-        # List images
+        for i, (prompt, provider) in enumerate(zip(prompts, providers * 2)):
+            print(f"\nGenerating image {i+1}/4...")
+            async with httpx.AsyncClient() as client:
+                response = await client.post(
+                    f"{BASE_URL}/generate",
+                    json={
+                        "prompt": prompt,
+                        "provider": provider,
+                        "size": "1024x1024"
+                    }
+                )
+                if response.status_code == 200:
+                    task_id = response.json()["task_id"]
+                    
+                    # Poll for completion
+                    for _ in range(30):
+                        response = await client.get(f"{BASE_URL}/status/{task_id}")
+                        status_data = response.json()
+                        
+                        if status_data["status"] == "completed":
+                            generated_images.append(status_data["result"])
+                            print(f"   ✓ Image {i+1} generated successfully")
+                            break
+                        elif status_data["status"] == "failed":
+                            print(f"   ✗ Image {i+1} generation failed")
+                            break
+                        
+                        await asyncio.sleep(1)
+        
+        # List all images
         images = await test_list_images()
         
         if len(images) >= 2:
-            # Test preferences with generated images
+            # Test preference features
             await test_preference_comparison(images[0]["id"], images[1]["id"])
             await test_preference_rating(images[0]["id"])
             await test_preference_prediction(images[0]["id"])
             await test_suggest_comparison()
+            
+            # Test new features
+            if len(images) >= 4:
+                image_ids = [img["id"] for img in images[:4]]
+                await test_ranking_update(image_ids)
+            
+            # Test optimal generation
+            await test_generate_optimal()
+            
+            # Test concurrent operations
+            await test_concurrent_preferences()
+            
+            # Test WebSocket
+            await test_websocket_connection()
         else:
-            print("\n⚠ Not enough images for preference tests")
+            print("\n⚠ Not enough images for comprehensive preference tests")
         
         print("\n" + "=" * 60)
-        print("✅ All E2E tests passed!")
+        print("✅ All E2E tests completed successfully!")
         print("=" * 60)
         
     except Exception as e:

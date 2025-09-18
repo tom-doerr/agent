@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import AudioRecorder from './AudioRecorder';
 import LiveAudioRecorder from './LiveAudioRecorder';
+import AudioDebugger from './AudioDebugger';
 import FileUploadAudio from './FileUploadAudio';
 import './App.css';
 
@@ -211,6 +212,10 @@ function App() {
               model={audioModel}
               onStatusChange={(status) => console.log('Live streaming status:', status)}
             />
+          </div>
+          
+          <div style={{ marginTop: '40px', borderTop: '2px solid #61dafb', paddingTop: '20px' }}>
+            <AudioDebugger />
           </div>
         </div>
         
