@@ -3,6 +3,8 @@
 import datetime
 import time
 from pathlib import Path
+import re
+from typing import Optional
 
 from pydantic import BaseModel, Field
 
@@ -10,10 +12,18 @@ import dspy
 from rich.console import Console
 from rich.panel import Panel
 
+try:
+    import mlflow
+except Exception:  # pragma: no cover - optional dependency
+    mlflow = None
+
 from context_provider import create_context_string
 from metrics_utils import run_with_metrics
 from timewarrior_module import TimewarriorModule
 from memory_module import MemoryModule
+from executive_module import ExecutiveModule
+from planning_module import PlanningModule
+from affect_module import AffectModule
 
 # Print DSPy version at startup
 print(f"DSPy version: {dspy.__version__}")
@@ -22,10 +32,32 @@ lm=dspy.LM('deepseek/deepseek-reasoner', max_tokens=40_000)
 # lm = dspy.LM( 'ollama_chat/deepseek-r1:8b', api_base='http://localhost:11434', api_key='', temperature=0,  # Critical for structured output max_tokens=2000  # Prevent rambling)
 dspy.configure(lm=lm)
 
-timew_lm = dspy.LM('deepseek/deepseek-chat', max_tokens=4_000, temperature=0)
+support_lm = dspy.LM('deepseek/deepseek-chat', max_tokens=4_000, temperature=0)
 console = Console()
-timewarrior_tracker = TimewarriorModule(timew_lm, console=console)
-memory_manager = MemoryModule(timew_lm, console=console)
+short_term_path = Path("short_term_memory.md")
+timewarrior_tracker = TimewarriorModule(support_lm, console=console, short_term_path=short_term_path)
+memory_manager = MemoryModule(support_lm, console=console)
+planning_manager = PlanningModule(support_lm, console=console)
+affect_module = AffectModule(support_lm, console=console)
+executive_manager = ExecutiveModule(
+    support_lm,
+    console=console,
+    timewarrior_module=timewarrior_tracker,
+    memory_module=memory_manager,
+    planning_module=planning_manager,
+    short_term_path=short_term_path,
+)
+
+MLFLOW_ENABLED = False
+if mlflow is not None:
+    try:
+        mlflow.set_tracking_uri("http://localhost:5010")
+        mlflow.set_experiment("nlco_iter")
+        MLFLOW_ENABLED = True
+    except Exception as exc:  # pragma: no cover - logging only
+        console.print(Panel(f"MLflow disabled: {exc}", border_style="red"))
+else:  # pragma: no cover - logging only
+    console.print(Panel("MLflow not available; logging disabled.", border_style="yellow"))
 
 
 class Edit(BaseModel):
@@ -56,7 +88,7 @@ ARTIFACT_FILE = Path('artifact.md')
 def iteration_loop():
     history = []
     search_replace_errors = []
-    for i in range(10):
+    for i in range(3):
         console.rule(f"Iteration {i + 1}")
 
         # artifact = ARTIFACT_FILE.read_text().strip()
@@ -65,21 +97,22 @@ def iteration_loop():
         context = create_context_string()
         console.print(Panel(context, title="Context", border_style="cyan"))
 
-        timew_feedback = timewarrior_tracker.run(
+        affect_report = affect_module.run(
             artifact=artifact,
             constraints=constraints,
             context=context,
         )
-        if timew_feedback:
-            console.print(Panel(timew_feedback, title="Timewarrior", border_style="green"))
 
-        memory_feedback = memory_manager.run(
+        executive_summary = executive_manager.run(
             artifact=artifact,
             constraints=constraints,
             context=context,
+            affect_report=affect_report,
         )
-        if memory_feedback:
-            console.print(Panel(memory_feedback, title="Memory", border_style="magenta"))
+        if executive_summary:
+            console.print(Panel(executive_summary, title="Executive Summary", border_style="green"))
+
+        log_iteration_to_mlflow(i + 1, affect_report, executive_summary)
 
         critique_prediction = run_with_metrics(
             'Critic',
@@ -137,3 +170,28 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+
+def log_iteration_to_mlflow(iteration: int, affect_report, executive_summary: Optional[str]) -> None:
+    if not MLFLOW_ENABLED or mlflow is None:
+        return
+    try:
+        with mlflow.start_run(run_name=f"iteration-{iteration}"):
+            mlflow.log_metric("iteration", iteration)
+            if affect_report:
+                if affect_report.urgency:
+                    mlflow.log_param("affect_urgency", affect_report.urgency)
+                if affect_report.emotions:
+                    mlflow.log_param("affect_emotions", ", ".join(affect_report.emotions))
+                if affect_report.goal_scores:
+                    for goal, score in affect_report.goal_scores.items():
+                        metric_name = _sanitize_metric_name(f"goal_{goal}")
+                        mlflow.log_metric(metric_name, int(score), step=iteration)
+            if executive_summary:
+                mlflow.log_param("executive_summary", executive_summary[:250])
+    except Exception as exc:  # pragma: no cover - diagnostic only
+        console.print(Panel(f"Failed to log to MLflow: {exc}", border_style="red"))
+
+
+def _sanitize_metric_name(name: str) -> str:
+    return re.sub(r"[^a-z0-9_]+", "_", name.lower())

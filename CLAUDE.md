@@ -32,6 +32,7 @@ Environment variables (.env):
 pytest  # All tests
 python -m pytest tests/test_cognition_typed_dspy.py -v  # Specific file
 python -m pytest tests/test_config.py::TestConfigIO -v  # Specific class
+python -m pytest tests/test_executive_module.py -v  # Executive controller unit tests
 ```
 
 ## Running Components
@@ -138,3 +139,7 @@ These files are tracked but should not be committed in normal workflows.
 - `memory_module.py` - ReAct loop that edits persistent `memory.md` via search/replace tools
 - `timewarrior_tools.py` - Structured DSPy tool for `timew summary/start/stop`
 - `timewarrior_module.py` - Fast loop that keeps Timewarrior tracking aligned with plans
+- `executive_module.py` - ReAct coordinator that triggers Timewarrior, memory, or planning updates as needed
+- `planning_module.py` - ReAct loop that maintains `plan.toml` via typed edits
+- `affect_module.py` - Generates qualitative urgency/emotional assessments from current context
+- `reviewer_module.py` - Validates proposed Timewarrior actions before they execute

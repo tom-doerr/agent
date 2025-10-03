@@ -15,7 +15,7 @@
 - **Schedule format**: Use emojis for visual recognition; avoid seconds in timestamps
 - **Priority levels**: Critical (revenue/health/workflow), High, Deferred
 - **Backlog triage**: Review when energy allows; pre-triage important items
-- **AI task tracking**: Use ★ prefix for AI answers; remove done tasks from artifact
+- **AI task tracking**: Use ★ prefix for AI answers; immediately move answered tasks from pending to done section in artifact
 
 ## Communication & Social
 - **Messenger routine**: Reply to all services in evening
@@ -45,5 +45,13 @@
 - **Completion likelihood**: Simple applications with immediate value are more likely to get finished; complex projects without clear short-term benefits tend to remain incomplete
 
 ## Context Enhancement
-- **Timewarrior integration**: Including timewarrior history in NLCO context provides valuable temporal patterns and work rhythm insights
+- **Timewarrior integration**: Including timewarrior history in NLCO context provides valuable temporal patterns and work rhythm insights; enables better planning and productivity tracking
 - **Evening routine optimization**: Adding l-theanine to evening nootropics water consistently promotes better sleep quality and earlier bedtime
+
+
+
+
+
+## Leveling Laser Elevation
+- **Ceiling height options**: Use tripod with extension pole, mount on tall stable object (ladder/shelf), attach to ceiling fixture with magnetic base/adhesive, use suction cup mount on high smooth surfaces, or construct custom elevation setup with poles leaned against wall
+- **Additional methods**: Tripod with extension pole or telescopic stand; mounting on tall stable objects like ladder or shelf; attachment to ceiling fixtures using magnetic base, adhesive pads, or clamps; suction cup mount on smooth high surfaces like windows near ceiling; custom elevation setup using poles or rods leaned against wall

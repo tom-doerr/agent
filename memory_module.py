@@ -186,28 +186,6 @@ class MemoryModule(dspy.Module):
     def _log_trajectory(self, trajectory: Dict[str, Any]) -> None:
         if not trajectory:
             return
-        table = Table(title="Memory ReAct Steps", show_lines=True)
-        table.add_column("#", justify="center")
-        table.add_column("Thought", overflow="fold")
-        table.add_column("Tool", justify="center")
-        table.add_column("Args", overflow="fold")
-        table.add_column("Observation", overflow="fold")
-
-        idx = 0
-        while f"thought_{idx}" in trajectory:
-            thought = trajectory.get(f"thought_{idx}", "")
-            tool_name = trajectory.get(f"tool_name_{idx}", "")
-            tool_args = trajectory.get(f"tool_args_{idx}", {})
-            observation = trajectory.get(f"observation_{idx}", "")
-            table.add_row(
-                str(idx),
-                thought,
-                tool_name,
-                repr(tool_args),
-                observation if isinstance(observation, str) else repr(observation),
-            )
-            idx += 1
-
         self.console.rule("Memory ReAct Steps", style="magenta")
         idx = 0
         while f"thought_{idx}" in trajectory:

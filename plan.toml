@@ -1,0 +1,6 @@
+[daily_routines]
+wake_up_time = "10:00"
+exercise = "HIF (treadmill)"
+
+[technical_objectives]
+twitter_service_maintenance = "Maintain automated posting and engagement prediction services"
