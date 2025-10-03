@@ -1,0 +1,11 @@
+fastapi>=0.110
+uvicorn[standard]>=0.27
+python-dotenv>=1.0
+litellm>=1.40
+websockets>=11.0
+librosa>=0.10
+soundfile>=0.12
+python-multipart>=0.0.9
+dspy-ai>=1.0
+numpy>=1.24
+scipy>=1.11

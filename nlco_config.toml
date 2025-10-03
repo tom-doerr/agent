@@ -1,0 +1,15 @@
+# Configuration for nlco_iter.py
+
+[weather]
+enabled = true
+
+[weather.location]
+lat = 48.2667
+lon = 10.9833
+city = "Mering"
+region = "Bavaria"
+country = "Germany"
+
+[smartthings]
+# Get your token from https://account.smartthings.com/tokens
+# token = "your-token-here"
