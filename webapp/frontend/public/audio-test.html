@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Audio Level Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 600px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #1a1a2e;
+            color: white;
+        }
+        button {
+            padding: 10px 20px;
+            margin: 10px;
+            font-size: 16px;
+            cursor: pointer;
+        }
+        #levelMeter {
+            width: 100%;
+            height: 30px;
+            background: #333;
+            margin: 20px 0;
+            border-radius: 15px;
+            overflow: hidden;
+        }
+        #levelBar {
+            height: 100%;
+            background: linear-gradient(90deg, #4CAF50, #8BC34A, #CDDC39, #FFC107, #FF5722);
+            width: 0%;
+            transition: width 0.1s;
+        }
+        #info {
+            background: #2a2a3e;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 20px 0;
+            font-family: monospace;
+            font-size: 14px;
+        }
+        .log {
+            margin: 5px 0;
+            padding: 5px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Audio Level Test</h1>
+    
+    <button id="startBtn">Start Audio Test</button>
+    <button id="stopBtn" disabled>Stop</button>
+    
+    <div id="levelMeter">
+        <div id="levelBar"></div>
+    </div>
+    
+    <div id="info">
+        <div>Status: <span id="status">Not started</span></div>
+        <div>Audio Level: <span id="level">0</span>%</div>
+        <div>RMS: <span id="rms">0.00</span></div>
+        <div>dB: <span id="db">-∞</span></div>
+        <div>Peak: <span id="peak">0</span></div>
+    </div>
+    
+    <div id="logs"></div>
+
+    <script>
+        let audioContext;
+        let analyser;
+        let microphone;
+        let javascriptNode;
+        let animationId;
+        let stream;
+        
+        const levelBar = document.getElementById('levelBar');
+        const statusEl = document.getElementById('status');
+        const levelEl = document.getElementById('level');
+        const rmsEl = document.getElementById('rms');
+        const dbEl = document.getElementById('db');
+        const peakEl = document.getElementById('peak');
+        const logsEl = document.getElementById('logs');
+        
+        function log(message) {
+            const logDiv = document.createElement('div');
+            logDiv.className = 'log';
+            logDiv.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+            logsEl.insertBefore(logDiv, logsEl.firstChild);
+            if (logsEl.children.length > 10) {
+                logsEl.removeChild(logsEl.lastChild);
+            }
+        }
+        
+        async function startAudioTest() {
+            try {
+                log('Requesting microphone access...');
+                
+                // Get microphone access
+                stream = await navigator.mediaDevices.getUserMedia({
+                    audio: {
+                        echoCancellation: false,
+                        noiseSuppression: false,
+                        autoGainControl: false
+                    }
+                });
+                
+                log('Microphone access granted');
+                
+                // Create audio context
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                log(`Audio context created, state: ${audioContext.state}`);
+                
+                // Resume if suspended
+                if (audioContext.state === 'suspended') {
+                    await audioContext.resume();
+                    log('Audio context resumed');
+                }
+                
+                // Create analyser
+                analyser = audioContext.createAnalyser();
+                analyser.fftSize = 2048;
+                analyser.smoothingTimeConstant = 0.3;
+                
+                // Create microphone source
+                microphone = audioContext.createMediaStreamSource(stream);
+                
+                // Connect microphone to analyser
+                microphone.connect(analyser);
+                
+                // Create script processor for real-time analysis
+                const bufferSize = 2048;
+                javascriptNode = audioContext.createScriptProcessor(bufferSize, 1, 1);
+                
+                javascriptNode.onaudioprocess = function(event) {
+                    const inputData = event.inputBuffer.getChannelData(0);
+                    
+                    // Calculate RMS
+                    let sum = 0;
+                    let peak = 0;
+                    for (let i = 0; i < inputData.length; i++) {
+                        const sample = inputData[i];
+                        sum += sample * sample;
+                        peak = Math.max(peak, Math.abs(sample));
+                    }
+                    const rms = Math.sqrt(sum / inputData.length);
+                    const db = 20 * Math.log10(rms);
+                    const level = Math.max(0, Math.min(100, (db + 60) * 1.66));
+                    
+                    // Update display
+                    levelBar.style.width = level + '%';
+                    levelEl.textContent = Math.round(level);
+                    rmsEl.textContent = rms.toFixed(4);
+                    dbEl.textContent = isFinite(db) ? db.toFixed(1) : '-∞';
+                    peakEl.textContent = peak.toFixed(3);
+                };
+                
+                // Connect analyser to script processor
+                analyser.connect(javascriptNode);
+                javascriptNode.connect(audioContext.destination);
+                
+                // Also use animation frame for frequency data
+                function updateFrequencyData() {
+                    const freqData = new Uint8Array(analyser.frequencyBinCount);
+                    analyser.getByteFrequencyData(freqData);
+                    
+                    // Calculate average frequency level
+                    const average = freqData.reduce((a, b) => a + b, 0) / freqData.length;
+                    
+                    // Log first few frequency bins for debugging
+                    if (Math.random() < 0.1) { // Log occasionally
+                        log(`Freq data: [${freqData.slice(0, 5).join(', ')}...] Avg: ${average.toFixed(1)}`);
+                    }
+                    
+                    animationId = requestAnimationFrame(updateFrequencyData);
+                }
+                updateFrequencyData();
+                
+                statusEl.textContent = 'Running';
+                document.getElementById('startBtn').disabled = true;
+                document.getElementById('stopBtn').disabled = false;
+                
+                log('Audio test started successfully');
+                
+            } catch (error) {
+                log(`Error: ${error.name} - ${error.message}`);
+                statusEl.textContent = 'Error';
+            }
+        }
+        
+        function stopAudioTest() {
+            log('Stopping audio test...');
+            
+            if (animationId) {
+                cancelAnimationFrame(animationId);
+            }
+            
+            if (javascriptNode) {
+                javascriptNode.disconnect();
+            }
+            
+            if (microphone) {
+                microphone.disconnect();
+            }
+            
+            if (analyser) {
+                analyser.disconnect();
+            }
+            
+            if (audioContext) {
+                audioContext.close();
+            }
+            
+            if (stream) {
+                stream.getTracks().forEach(track => track.stop());
+            }
+            
+            levelBar.style.width = '0%';
+            statusEl.textContent = 'Stopped';
+            levelEl.textContent = '0';
+            rmsEl.textContent = '0.00';
+            dbEl.textContent = '-∞';
+            peakEl.textContent = '0';
+            
+            document.getElementById('startBtn').disabled = false;
+            document.getElementById('stopBtn').disabled = true;
+            
+            log('Audio test stopped');
+        }
+        
+        document.getElementById('startBtn').addEventListener('click', startAudioTest);
+        document.getElementById('stopBtn').addEventListener('click', stopAudioTest);
+        
+        log('Page loaded, click Start to begin audio test');
+    </script>
+</body>
+</html>

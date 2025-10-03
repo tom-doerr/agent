@@ -1,0 +1,31 @@
+version: '3.8'
+
+services:
+  dspy-builder:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8801:8800"  # Expose on non-standard port 8801 to avoid conflicts
+    environment:
+      - DSPY_BUILDER_HOST=0.0.0.0
+      - DSPY_BUILDER_PORT=8800
+      - PYTHONUNBUFFERED=1
+    volumes:
+      # Mount the source code for development
+      - ./:/app/web_dspy_builder:ro
+      # Mount parent directory for access to other modules if needed
+      - ../:/workspace:ro
+    restart: unless-stopped
+    networks:
+      - dspy-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8800/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+networks:
+  dspy-network:
+    driver: bridge
