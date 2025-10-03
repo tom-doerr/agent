@@ -14,8 +14,10 @@ from rich.panel import Panel
 
 try:
     import mlflow
+    from packaging.version import Version
 except Exception:  # pragma: no cover - optional dependency
     mlflow = None
+    Version = None
 
 from context_provider import create_context_string
 from metrics_utils import run_with_metrics
@@ -39,20 +41,19 @@ timewarrior_tracker = TimewarriorModule(support_lm, console=console, short_term_
 memory_manager = MemoryModule(support_lm, console=console)
 planning_manager = PlanningModule(support_lm, console=console)
 affect_module = AffectModule(support_lm, console=console)
-executive_manager = ExecutiveModule(
-    support_lm,
-    console=console,
-    timewarrior_module=timewarrior_tracker,
-    memory_module=memory_manager,
-    planning_module=planning_manager,
-    short_term_path=short_term_path,
-)
 
 MLFLOW_ENABLED = False
 if mlflow is not None:
     try:
         mlflow.set_tracking_uri("http://localhost:5010")
         mlflow.set_experiment("nlco_iter")
+        if Version is not None and Version(mlflow.__version__) >= Version("2.18.0"):
+            try:
+                mlflow.dspy.autolog()
+            except Exception as autolog_exc:  # pragma: no cover - diagnostic only
+                console.print(Panel(f"MLflow autolog not enabled: {autolog_exc}", border_style="yellow"))
+        else:  # pragma: no cover - diagnostic only
+            console.print(Panel("MLflow < 2.18.0 detected; tracing autolog is unavailable.", border_style="yellow"))
         MLFLOW_ENABLED = True
     except Exception as exc:  # pragma: no cover - logging only
         console.print(Panel(f"MLflow disabled: {exc}", border_style="red"))
@@ -103,16 +104,7 @@ def iteration_loop():
             context=context,
         )
 
-        executive_summary = executive_manager.run(
-            artifact=artifact,
-            constraints=constraints,
-            context=context,
-            affect_report=affect_report,
-        )
-        if executive_summary:
-            console.print(Panel(executive_summary, title="Executive Summary", border_style="green"))
-
-        log_iteration_to_mlflow(i + 1, affect_report, executive_summary)
+        log_iteration_to_mlflow(i + 1, affect_report, executive_summary=None)
 
         critique_prediction = run_with_metrics(
             'Critic',
@@ -168,10 +160,6 @@ def main():
         time.sleep(1)            # don’t spin-lock the CPU
 
 
-if __name__ == "__main__":
-    main()
-
-
 def log_iteration_to_mlflow(iteration: int, affect_report, executive_summary: Optional[str]) -> None:
     if not MLFLOW_ENABLED or mlflow is None:
         return
@@ -195,3 +183,7 @@ def log_iteration_to_mlflow(iteration: int, affect_report, executive_summary: Op
 
 def _sanitize_metric_name(name: str) -> str:
     return re.sub(r"[^a-z0-9_]+", "_", name.lower())
+
+
+if __name__ == "__main__":
+    main()
