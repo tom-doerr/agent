@@ -5,6 +5,7 @@ from __future__ import annotations
 import datetime
 from dataclasses import dataclass
 from enum import Enum
+from pathlib import Path
 from typing import Any, List, Optional
 
 import dspy
@@ -12,6 +13,7 @@ from pydantic import BaseModel, Field, ValidationError, model_validator
 from rich.console import Console
 from rich.panel import Panel
 
+from reviewer_module import TimewarriorReviewer
 from timewarrior_tools import TimewarriorResult, TimewarriorToolInput, timew_tool
 
 
@@ -77,7 +79,10 @@ class TimewarriorDecisionSignature(dspy.Signature):
     active_summary: str = dspy.InputField(desc="Concise summary of the active session (e.g. start time, total duration).")
     clock: str = dspy.InputField(desc="ISO timestamp for this iteration.")
     decision: TimewarriorDecisionModel = dspy.OutputField(
-        desc="Structured decision including action, optional tags, and reason."
+        desc=(
+            "Structured decision including action, optional tags, and reason. Only select start when the user explicitly "
+            "states they are currently performing the activity—never start just because something is scheduled later."
+        )
     )
 
 
@@ -97,6 +102,7 @@ class TimewarriorModule(dspy.Module):
         *,
         max_tags: int = 3,
         console: Optional[Console] = None,
+        short_term_path: Path | str = "short_term_memory.md",
     ) -> None:
         super().__init__()
         self.fast_lm = fast_lm
@@ -110,6 +116,8 @@ class TimewarriorModule(dspy.Module):
             ),
         )
         self.console = console or Console()
+        self.short_term_path = Path(short_term_path)
+        self.reviewer = TimewarriorReviewer(fast_lm, console=self.console)
 
     def run(self, *, artifact: str, constraints: str, context: str) -> Optional[str]:
         """Run the time tracking step once and return a status line for logging."""
@@ -153,7 +161,14 @@ class TimewarriorModule(dspy.Module):
             self.console.print(Panel(message, title="Timewarrior", border_style="red"))
             return message
 
-        message = self._apply_decision(decision, active_tags)
+        message = self._apply_decision(
+            decision,
+            active_tags,
+            artifact=artifact,
+            constraints=constraints,
+            context=context,
+            summary=summary_text,
+        )
         if message and decision.reason:
             return f"{message} | {decision.reason}"
         return message
@@ -162,6 +177,11 @@ class TimewarriorModule(dspy.Module):
         self,
         decision: TimewarriorDecision,
         active_tags: List[str],
+        *,
+        artifact: str,
+        constraints: str,
+        context: str,
+        summary: str,
     ) -> Optional[str]:
         action = decision.action
 
@@ -176,18 +196,40 @@ class TimewarriorModule(dspy.Module):
             sanitized_active = [tag for tag in sanitized_active if tag]
             if sanitized_active and set(cleaned) == set(sanitized_active):
                 return "timew: already tracking desired tags"
+            allowed, reviewer_reason = self.reviewer.run(
+                artifact=artifact,
+                constraints=constraints,
+                context=context,
+                summary=summary,
+                proposed_action="start",
+                proposed_tags=cleaned,
+            )
+            if not allowed:
+                return f"timew start denied: {reviewer_reason}"
             result = timew_tool(command=TimewarriorToolInput(command="start", tags=cleaned))
-            return self._format_result_message(result)
+            tags_text = ", ".join(cleaned) if cleaned else ""
+            event = f"Started Timewarrior tracking: {tags_text}" if tags_text else "Started Timewarrior tracking."
+            return self._format_result_message(result, event)
 
         if action is TimewarriorAction.STOP:
             if not active_tags:
                 return "timew: nothing is currently tracked"
+            allowed, reviewer_reason = self.reviewer.run(
+                artifact=artifact,
+                constraints=constraints,
+                context=context,
+                summary=summary,
+                proposed_action="stop",
+                proposed_tags=active_tags,
+            )
+            if not allowed:
+                return f"timew stop denied: {reviewer_reason}"
             result = timew_tool(command=TimewarriorToolInput(command="stop"))
-            return self._format_result_message(result)
+            return self._format_result_message(result, "Stopped Timewarrior tracking.")
 
         return f"timew: unsupported action '{action.value}'"
 
-    def _format_result_message(self, result: TimewarriorResult) -> str:
+    def _format_result_message(self, result: TimewarriorResult, event: Optional[str] = None) -> str:
         if result.error:
             self.available = False
             message = f"timew unavailable ({result.error})"
@@ -199,6 +241,8 @@ class TimewarriorModule(dspy.Module):
             return message
         message = result.stdout or "timew command executed"
         self.console.print(Panel(message, title="Timewarrior", border_style="green", expand=False))
+        if event:
+            self._append_short_term_event(event)
         return message
 
     def _parse_active_tags(self, summary_text: str) -> List[str]:
@@ -295,3 +339,12 @@ class TimewarriorModule(dspy.Module):
         head = context[: limit // 2]
         tail = context[-(limit // 2) :]
         return f"{head}\n...\n{tail}"
+
+    def _append_short_term_event(self, event: str) -> None:
+        timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
+        line = f"- [{timestamp}] {event}\n"
+        try:
+            with self.short_term_path.open("a", encoding="utf-8") as fh:
+                fh.write(line)
+        except Exception as exc:
+            self.console.print(Panel(f"Failed to write short-term memory: {exc}", border_style="red"))
