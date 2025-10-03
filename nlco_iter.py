@@ -3,9 +3,17 @@
 import datetime
 import time
 from pathlib import Path
+
 from pydantic import BaseModel, Field
+
 import dspy
+from rich.console import Console
+from rich.panel import Panel
+
 from context_provider import create_context_string
+from metrics_utils import run_with_metrics
+from timewarrior_module import TimewarriorModule
+from memory_module import MemoryModule
 
 # Print DSPy version at startup
 print(f"DSPy version: {dspy.__version__}")
@@ -13,6 +21,11 @@ print(f"DSPy version: {dspy.__version__}")
 lm=dspy.LM('deepseek/deepseek-reasoner', max_tokens=40_000)
 # lm = dspy.LM( 'ollama_chat/deepseek-r1:8b', api_base='http://localhost:11434', api_key='', temperature=0,  # Critical for structured output max_tokens=2000  # Prevent rambling)
 dspy.configure(lm=lm)
+
+timew_lm = dspy.LM('deepseek/deepseek-chat', max_tokens=4_000, temperature=0)
+console = Console()
+timewarrior_tracker = TimewarriorModule(timew_lm, console=console)
+memory_manager = MemoryModule(timew_lm, console=console)
 
 
 class Edit(BaseModel):
@@ -40,45 +53,59 @@ CONSTRAINTS_FILE = Path('constraints.md')
 ARTIFACT_FILE = Path('artifact.md')
 
 
-def apply_edits(artifact: str, edits: list[Edit]) -> str:
-    """
-    Apply a list of edits to the artifact text.
-    Each edit contains a search term and a replacement text.
-    """
-    error_message = ''
-    search_replace_errors = []
-    for edit in edits:
-        if edit.search not in artifact:
-            search_replace_errors.append(edit)
-            error_message += f"Search term '{edit.search}' not found in artifact.\n"
-            print('error:', error_message)
-            continue
-        artifact = artifact.replace(edit.search, edit.replace)
-    return artifact, search_replace_errors
-
-
 def iteration_loop():
     history = []
     search_replace_errors = []
     for i in range(10):
-        print(f"Iteration {i + 1} {'=' * 50}")
+        console.rule(f"Iteration {i + 1}")
 
         # artifact = ARTIFACT_FILE.read_text().strip()
         artifact = ARTIFACT_FILE.read_text()
         constraints = CONSTRAINTS_FILE.read_text().strip()
         context = create_context_string()
-        print(context)
+        console.print(Panel(context, title="Context", border_style="cyan"))
 
-        critique = critic(artifact=artifact, constraints=constraints, context=context).critique
-        print(f"Critique:\n{critique}\n")
+        timew_feedback = timewarrior_tracker.run(
+            artifact=artifact,
+            constraints=constraints,
+            context=context,
+        )
+        if timew_feedback:
+            console.print(Panel(timew_feedback, title="Timewarrior", border_style="green"))
 
-        refined = refiner(artifact=artifact, constraints=constraints, critique=critique, context=context).refined_artifact
+        memory_feedback = memory_manager.run(
+            artifact=artifact,
+            constraints=constraints,
+            context=context,
+        )
+        if memory_feedback:
+            console.print(Panel(memory_feedback, title="Memory", border_style="magenta"))
+
+        critique_prediction = run_with_metrics(
+            'Critic',
+            critic,
+            artifact=artifact,
+            constraints=constraints,
+            context=context,
+        )
+        critique = critique_prediction.critique
+        console.print(Panel(critique, title="Critique", border_style="yellow"))
+
+        refined_prediction = run_with_metrics(
+            'Refiner',
+            refiner,
+            artifact=artifact,
+            constraints=constraints,
+            critique=critique,
+            context=context,
+        )
+        refined = refined_prediction.refined_artifact
         # prediction = refiner(artifact=artifact, constraints=constraints, critique=critique, search_replace_errors=search_replace_errors, context=context)
         # print('edits: ', prediction)
         # edits = prediction.edits  # Extract the edits list from the Prediction object
-        # refined, search_replace_errors = apply_edits(artifact, edits)
-        print('-' * 80)
-        print(f"Artifact:\n{refined}")
+        # refined, search_replace_errors = editing_utils.apply_edits(artifact, edits)
+        console.rule("Updated Artifact", style="white")
+        console.print(refined)
 
         ARTIFACT_FILE.write_text(refined)
         history += [f'Iteration {i + 1}', artifact, constraints, critique, refined]
@@ -110,4 +137,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
