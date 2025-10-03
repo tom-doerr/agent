@@ -179,6 +179,10 @@ mlruns/
 # Aider
 .aider*
 
+# Local planning artifacts
+constraints.md
+artifact.md
+
 # Log files
 *.log
 
