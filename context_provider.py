@@ -13,6 +13,63 @@ config = get_config()
 LOCATION = config.weather.location.city if config.weather.location else "Mering"
 
 
+def get_post_queue_status():
+    """Return a status string describing remaining posts in the queue."""
+    queue_path = config.social.post_queue_path if hasattr(config, "social") else None
+    if not queue_path:
+        return ""
+
+    try:
+        raw = Path(queue_path).read_text()
+    except FileNotFoundError:
+        return f"Post queue: file not found at {queue_path}"
+    except Exception as exc:  # pragma: no cover - unexpected I/O failure
+        return f"Post queue: error reading {queue_path}: {exc}"
+
+    try:
+        data = json.loads(raw)
+    except json.JSONDecodeError:
+        return f"Post queue: invalid JSON at {queue_path}"
+
+    if isinstance(data, list):
+        count = len(data)
+    elif isinstance(data, dict):
+        posts = data.get("posts")
+        count = len(posts) if isinstance(posts, list) else 0
+    else:
+        count = 0
+
+    return f"Post queue: {count} posts remaining"
+
+
+def get_autoposter_alert():
+    """Warn if the posted posts file is stale or missing."""
+    posted_path = config.social.posted_posts_path if hasattr(config, "social") else None
+    if not posted_path:
+        return ""
+
+    path = Path(posted_path)
+    if not path.exists():
+        return f"Autoposter alert: posted posts file missing at {posted_path}"
+
+    try:
+        mtime = datetime.datetime.fromtimestamp(path.stat().st_mtime, tz=datetime.timezone.utc)
+    except OSError as exc:  # pragma: no cover - unexpected filesystem failure
+        return f"Autoposter alert: unable to read posted posts file: {exc}"
+
+    now = datetime.datetime.now(datetime.timezone.utc)
+    minutes_since_edit = (now - mtime).total_seconds() / 60
+
+    if minutes_since_edit > 35:
+        formatted_time = mtime.astimezone().strftime("%Y-%m-%d %H:%M:%S %Z")
+        return (
+            "Autoposter alert: posted_posts.json last updated at "
+            f"{formatted_time} ({minutes_since_edit:.0f} minutes ago)"
+        )
+
+    return ""
+
+
 def get_weather_info():
     """Get weather information for configured location."""
     try:
@@ -80,7 +137,15 @@ def create_context_string():
     home_status = get_home_status()
     if home_status:
         context_parts.append(home_status)
-    
+
+    post_queue_status = get_post_queue_status()
+    if post_queue_status:
+        context_parts.append(post_queue_status)
+
+    autoposter_alert = get_autoposter_alert()
+    if autoposter_alert:
+        context_parts.append(autoposter_alert)
+
     context_parts.append(get_system_info())
-    
+
     return "\n".join(context_parts)

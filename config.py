@@ -1,7 +1,7 @@
 """Configuration management with Pydantic validation."""
 
 from pathlib import Path
-from typing import Optional, Dict, Any, Union
+from typing import Optional, Union
 import os
 import toml
 
@@ -63,12 +63,35 @@ class ModelConfig(BaseModel):
         return v
 
 
+class SocialMediaConfig(BaseModel):
+    """Social media/post queue configuration."""
+    post_queue_path: Optional[Path] = Field(
+        None, description="Path to the saved posts queue JSON file"
+    )
+    posted_posts_path: Optional[Path] = Field(
+        None, description="Path to the posted posts JSON file for autoposter health checks"
+    )
+
+    @validator('post_queue_path', pre=True)
+    def convert_to_path(cls, v):
+        if v in (None, ""):
+            return None
+        return Path(v)
+
+    @validator('posted_posts_path', pre=True)
+    def convert_posted_path(cls, v):
+        if v in (None, ""):
+            return None
+        return Path(v)
+
+
 class AgentConfig(BaseModel):
     """Main configuration for the agent system."""
     weather: WeatherConfig = Field(default_factory=WeatherConfig)
     smartthings: SmartThingsConfig = Field(default_factory=SmartThingsConfig)
     mlflow: MLflowConfig = Field(default_factory=MLflowConfig)
     model: ModelConfig = Field(default_factory=ModelConfig)
+    social: SocialMediaConfig = Field(default_factory=SocialMediaConfig)
     
     # Paths
     data_dir: Path = Field(Path("."), description="Data directory")
@@ -146,11 +169,17 @@ def save_config(config: AgentConfig, config_path: Union[str, Path] = "nlco_confi
     
     # Convert to dict, handling Path objects
     config_dict = config.dict()
-    
-    # Convert Path objects to strings
-    for key in ['data_dir', 'models_dir', 'logs_dir']:
-        if key in config_dict:
-            config_dict[key] = str(config_dict[key])
+
+    def _convert_paths(obj):
+        if isinstance(obj, Path):
+            return str(obj)
+        if isinstance(obj, dict):
+            return {k: _convert_paths(v) for k, v in obj.items()}
+        if isinstance(obj, list):
+            return [_convert_paths(v) for v in obj]
+        return obj
+
+    config_dict = _convert_paths(config_dict)
     
     # Remove None values for cleaner TOML
     def remove_none(d):
