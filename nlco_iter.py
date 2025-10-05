@@ -86,54 +86,73 @@ CONSTRAINTS_FILE = Path('constraints.md')
 ARTIFACT_FILE = Path('artifact.md')
 
 
+def _now_str() -> str:
+    return datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+
 def iteration_loop():
     history = []
     search_replace_errors = []
-    for i in range(3):
-        console.rule(f"Iteration {i + 1}")
+    for i in range(10):
+        console.rule(f"{_now_str()} · Iteration {i + 1}")
 
-        # artifact = ARTIFACT_FILE.read_text().strip()
-        artifact = ARTIFACT_FILE.read_text()
-        constraints = CONSTRAINTS_FILE.read_text().strip()
-        context = create_context_string()
-        console.print(Panel(context, title="Context", border_style="cyan"))
+        mlflow_run = None
+        if MLFLOW_ENABLED and mlflow is not None:
+            mlflow_run = mlflow.start_run(run_name=f"iteration-{i + 1}")
 
-        affect_report = affect_module.run(
-            artifact=artifact,
-            constraints=constraints,
-            context=context,
-        )
+        try:
+            artifact = ARTIFACT_FILE.read_text()
+            constraints = CONSTRAINTS_FILE.read_text().strip()
+            context = create_context_string()
+            console.print(Panel(context, title=f"Context @ {_now_str()}", border_style="cyan"))
 
-        log_iteration_to_mlflow(i + 1, affect_report, executive_summary=None)
+            affect_report = affect_module.run(
+                artifact=artifact,
+                constraints=constraints,
+                context=context,
+            )
 
-        critique_prediction = run_with_metrics(
-            'Critic',
-            critic,
-            artifact=artifact,
-            constraints=constraints,
-            context=context,
-        )
-        critique = critique_prediction.critique
-        console.print(Panel(critique, title="Critique", border_style="yellow"))
+            log_iteration_to_mlflow(i + 1, affect_report, executive_summary=None)
 
-        refined_prediction = run_with_metrics(
-            'Refiner',
-            refiner,
-            artifact=artifact,
-            constraints=constraints,
-            critique=critique,
-            context=context,
-        )
-        refined = refined_prediction.refined_artifact
-        # prediction = refiner(artifact=artifact, constraints=constraints, critique=critique, search_replace_errors=search_replace_errors, context=context)
-        # print('edits: ', prediction)
-        # edits = prediction.edits  # Extract the edits list from the Prediction object
-        # refined, search_replace_errors = editing_utils.apply_edits(artifact, edits)
-        console.rule("Updated Artifact", style="white")
-        console.print(refined)
+            memory_feedback = memory_manager.run(
+                artifact=artifact,
+                constraints=constraints,
+                context=context,
+            )
+            if memory_feedback:
+                console.print(Panel(memory_feedback, title=f"Memory @ {_now_str()}", border_style="magenta"))
 
-        ARTIFACT_FILE.write_text(refined)
-        history += [f'Iteration {i + 1}', artifact, constraints, critique, refined]
+            critique_prediction = run_with_metrics(
+                'Critic',
+                critic,
+                artifact=artifact,
+                constraints=constraints,
+                context=context,
+            )
+            critique = critique_prediction.critique
+            console.print(Panel(critique, title=f"Critique @ {_now_str()}", border_style="yellow"))
+
+            refined_prediction = run_with_metrics(
+                'Refiner',
+                refiner,
+                artifact=artifact,
+                constraints=constraints,
+                critique=critique,
+                context=context,
+            )
+            refined = refined_prediction.refined_artifact
+            # prediction = refiner(artifact=artifact, constraints=constraints, critique=critique, search_replace_errors=search_replace_errors, context=context)
+            # print('edits: ', prediction)
+            # edits = prediction.edits  # Extract the edits list from the Prediction object
+            # refined, search_replace_errors = editing_utils.apply_edits(artifact, edits)
+            console.rule(f"{_now_str()} · Updated Artifact", style="white")
+            console.print(refined)
+
+            ARTIFACT_FILE.write_text(refined)
+            history += [f'Iteration {i + 1}', artifact, constraints, critique, refined]
+        finally:
+            if mlflow_run is not None:
+                mlflow.end_run()
 
         # if is_finished_checker(history=history).is_finished:
         if False:
@@ -164,25 +183,33 @@ def log_iteration_to_mlflow(iteration: int, affect_report, executive_summary: Op
     if not MLFLOW_ENABLED or mlflow is None:
         return
     try:
-        with mlflow.start_run(run_name=f"iteration-{iteration}"):
-            mlflow.log_metric("iteration", iteration)
-            if affect_report:
-                if affect_report.urgency:
-                    mlflow.log_param("affect_urgency", affect_report.urgency)
-                if affect_report.emotions:
-                    mlflow.log_param("affect_emotions", ", ".join(affect_report.emotions))
-                if affect_report.goal_scores:
-                    for goal, score in affect_report.goal_scores.items():
-                        metric_name = _sanitize_metric_name(f"goal_{goal}")
-                        mlflow.log_metric(metric_name, int(score), step=iteration)
-            if executive_summary:
-                mlflow.log_param("executive_summary", executive_summary[:250])
+        active_run = mlflow.active_run()
+        if active_run is None:
+            with mlflow.start_run(run_name=f"iteration-{iteration}"):
+                _log_iteration_payload(iteration, affect_report, executive_summary)
+        else:
+            _log_iteration_payload(iteration, affect_report, executive_summary)
     except Exception as exc:  # pragma: no cover - diagnostic only
         console.print(Panel(f"Failed to log to MLflow: {exc}", border_style="red"))
 
 
 def _sanitize_metric_name(name: str) -> str:
     return re.sub(r"[^a-z0-9_]+", "_", name.lower())
+
+
+def _log_iteration_payload(iteration: int, affect_report, executive_summary: Optional[str]) -> None:
+    mlflow.log_metric("iteration", iteration)
+    if affect_report:
+        if affect_report.urgency:
+            mlflow.log_param("affect_urgency", affect_report.urgency)
+        if affect_report.emotions:
+            mlflow.log_param("affect_emotions", ", ".join(affect_report.emotions))
+        if affect_report.goal_scores:
+            for goal, score in affect_report.goal_scores.items():
+                metric_name = _sanitize_metric_name(f"goal_{goal}")
+                mlflow.log_metric(metric_name, int(score), step=iteration)
+    if executive_summary:
+        mlflow.log_param("executive_summary", executive_summary[:250])
 
 
 if __name__ == "__main__":

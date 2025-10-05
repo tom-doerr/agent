@@ -64,6 +64,20 @@ python abbrev_optimization_simple.py  # Run optimization
 
 Uses `abbrev_dataset.jsonl` for training, saves to `abbrev_expander_optimized.json`
 
+### Timestamp Note Logger (Textual)
+```bash
+python timestamp_textual_app.py
+```
+
+Features:
+- Prefixes each submitted note with `HHMM` military time and inserts `# YYYY-MM-DD` headings on date rollover.
+- Shows `artifact.md` in a read-only pane updated automatically (default refresh every 2s; override via `artifact_refresh_seconds`).
+- Displays a live "artifact updated X ago" status above the viewer (refreshes every second).
+- Appends each entry to `constraints.md`, creating date headers on demand so NLCO loop picks up new instructions immediately.
+- Help overlay (`Ctrl+H`) lists primary shortcuts (`Ctrl+C` exit, Enter submit, Esc/i toggle Vim-style modes for the input).
+- Vim shortcuts supported: basic motions (`h`, `l`, `w`, `b`, `0`, `$`), delete/change (`d`, `c`, `C`), simple text objects (`iw`, `aw`), and delete/change word commands (e.g., `dw`, `diw`, `ciw`).
+- Layout: header → run history log → Vim input → artifact pane (status bottom-right) → help footer.
+
 ### Webapp
 ```bash
 cd webapp/
@@ -81,6 +95,9 @@ config = load_config()
 ```
 
 Override with env vars: WEATHER_CITY, SMARTTHINGS_TOKEN, MLFLOW_TRACKING_URI
+
+Key `[nlco_config.toml]` sections:
+- `[social]` defines `post_queue_path` (saved posts queue) and `posted_posts_path` (autoposter history). `context_provider.py` uses them to surface queue counts and warn if the autoposter log is stale.
 
 ## Key Architecture
 
@@ -125,7 +142,7 @@ Docker Compose files with non-standard ports to avoid host conflicts:
 - `agent_simpledspy.py` - Main SimpleDSPy agent
 - `cognition_typed_dspy.py` - Typed cognition pipeline
 - `config.py` - Pydantic configuration management
-- `context_provider.py` - Context utilities
+- `context_provider.py` - Builds runtime context (weather, system stats, home status, post queue counts, autoposter health alerts)
 - `nlco_iter.py` - Natural Language Command Optimization
 - `setup_env.sh` - Environment setup script
 

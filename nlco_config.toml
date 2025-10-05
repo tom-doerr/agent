@@ -13,3 +13,7 @@ country = "Germany"
 [smartthings]
 # Get your token from https://account.smartthings.com/tokens
 # token = "your-token-here"
+
+[social]
+post_queue_path = "/home/tom/git/x_twitter_production/saved_posts.json"
+posted_posts_path = "/home/tom/git/x_twitter_production/posted_posts.json"
