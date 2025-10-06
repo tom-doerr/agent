@@ -1,0 +1,11 @@
+<section class="panel" id="artifact-panel"
+         hx-get="/partials/artifact"
+         hx-trigger="load, every 5s"
+         hx-target="#artifact-panel"
+         hx-swap="outerHTML">
+  <div class="footer-meta">
+    <h2>Artifact</h2>
+    <span>Updated {{ artifact_age }}</span>
+  </div>
+  <pre class="viewer">{{ artifact_text | e }}</pre>
+</section>

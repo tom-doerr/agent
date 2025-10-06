@@ -86,6 +86,34 @@ docker compose up --build
 
 Backend: http://localhost:8000, Frontend: http://localhost:3000
 
+### HTMX FastAPI Frontend
+```bash
+./start_htmx_server.sh  # defaults to 127.0.0.1:48123 with --reload
+```
+
+Environment overrides (auto-loaded from `.env` via `start_htmx_server.sh`, see `.env.example`):
+- `NLCO_WEB_APP_MODULE` (default `webapp.nlco_htmx.app:app`)
+- `NLCO_WEB_HOST`, `NLCO_WEB_PORT` (default `127.0.0.1`, `48123`)
+- `NLCO_WEB_RELOAD` (set `false` for production) and `NLCO_WEB_WORKERS` (used when reload disabled)
+- `NLCO_WEB_LOG_LEVEL` / `NLCO_WEB_EXTRA_OPTS` for additional `uvicorn` tuning
+- `NLCO_PYTHON_BIN` to force a specific interpreter (defaults to `python`); useful when packages are installed under pyenv/virtualenv.
+
+Features:
+- HTMX dashboard for submitting timestamped constraints (appends to `constraints.md` with auto date headings).
+- Live artifact (`artifact.md`), memory (`memory.md`), and short-term memory views with age indicators and auto-refresh.
+- Single FastAPI service—no Node build step; HTML templates live in `webapp/nlco_htmx/templates/`.
+- Tests: `pytest tests/test_web_htmx_app.py -q` exercises routing, timestamp formatting, and history limits.
+- Authentication enforced with FastAPI Users (cookie-based JWT). Default login flow expects GitHub OAuth; password routes remain under `/auth/*` for testing/automation.
+- Additional tests ensure unauthenticated requests receive 401s and the GitHub login CTA appears when OAuth is configured.
+
+Auth configuration:
+- `NLCO_AUTH_DB_URI` (default `sqlite+aiosqlite:///./nlco_auth.db`)
+- `NLCO_AUTH_SECRET` (JWT + reset tokens)
+- `NLCO_AUTH_COOKIE_SECURE` (`true` for HTTPS deployments)
+- `NLCO_AUTH_COOKIE_MAX_AGE` (seconds, default 604800)
+- `NLCO_GITHUB_CLIENT_ID`, `NLCO_GITHUB_CLIENT_SECRET`, `NLCO_GITHUB_REDIRECT_URL`, `NLCO_GITHUB_STATE_SECRET`
+- Without GitHub credentials the UI shows a placeholder and you can still use `/auth/register` + `/auth/jwt/login` for local access.
+
 ## Configuration Management
 
 Uses Pydantic-validated config from `nlco_config.toml`:
@@ -143,7 +171,9 @@ Docker Compose files with non-standard ports to avoid host conflicts:
 - `cognition_typed_dspy.py` - Typed cognition pipeline
 - `config.py` - Pydantic configuration management
 - `context_provider.py` - Builds runtime context (weather, system stats, home status, post queue counts, autoposter health alerts)
-- `nlco_iter.py` - Natural Language Command Optimization
+- `constraints_diff_module.py` - Computes diffs for constraints.md, feeds the current `task +nlco export` to the LLM, auto-tags commands with `+nlco`, and exposes both a verification module and a 3-try reconciliation loop so Taskwarrior updates are validated before acceptance.
+- `nlco_iter.py` - Natural Language Command Optimization; async loop (`iteration_loop`) awaits an asyncified memory manager, so memory updates run concurrently and summaries print once each pass completes.
+- `nlco_scheduler.py` - Centralized scheduling rules for the iteration loop: runs immediately on constraint edits, at least once per hour otherwise, and skips the hourly run when constraints have been untouched for ≥3 days. Tested via `pytest tests/test_nlco_scheduler.py -q`.
 - `setup_env.sh` - Environment setup script
 
 ## Git Best Practices

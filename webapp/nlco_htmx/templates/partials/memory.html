@@ -1,0 +1,16 @@
+<section class="panel" id="memory-panel"
+         hx-get="/partials/memory"
+         hx-trigger="load, every 7s"
+         hx-target="#memory-panel"
+         hx-swap="outerHTML">
+  <div class="footer-meta">
+    <h2>Memory</h2>
+    <span>Updated {{ memory_age }}</span>
+  </div>
+  <pre class="viewer">{{ memory_text | e }}</pre>
+  <div class="footer-meta">
+    <strong>Short-Term Memory</strong>
+    <span>Updated {{ short_term_age }}</span>
+  </div>
+  <pre class="viewer">{{ short_term_text | e }}</pre>
+</section>

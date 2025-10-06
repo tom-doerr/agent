@@ -1,0 +1,19 @@
+<div id="history-container"
+     hx-get="/partials/history"
+     hx-trigger="load, every 10s"
+     hx-target="#history-container"
+     hx-swap="outerHTML"
+     hx-on::after-settle="const list=this.querySelector('.log-list'); if(list){list.scrollTop=list.scrollHeight;}">
+  {% if history %}
+  <ul class="log-list compact">
+    {% for date_str, entries in history %}
+    <li class="log-date"># {{ date_str }}</li>
+    {% for entry in entries %}
+    <li class="timestamp-entry">{{ entry }}</li>
+    {% endfor %}
+    {% endfor %}
+  </ul>
+  {% else %}
+  <p class="help">No constraint history available.</p>
+  {% endif %}
+</div>

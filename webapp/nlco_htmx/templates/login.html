@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="panel full-width login-panel">
+  <h2>Sign in to NLCO</h2>
+  {% if login_url %}
+  <p class="help">Authenticate to submit constraints and view the artifact dashboard.</p>
+  <a class="button" href="{{ login_url }}">Continue with GitHub</a>
+  {% else %}
+  <p class="help">Authentication is not yet configured. Set the GitHub OAuth environment variables to enable sign-in.</p>
+  {% endif %}
+  <p class="help">Need API access? The FastAPI Users endpoints are available under <code>/auth</code> and <code>/auth/jwt</code>.</p>
+</section>
+{% endblock %}

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
+import asyncio
 import datetime
-import time
 from pathlib import Path
 import re
 from typing import Optional
@@ -26,6 +26,7 @@ from memory_module import MemoryModule
 from executive_module import ExecutiveModule
 from planning_module import PlanningModule
 from affect_module import AffectModule
+from nlco_scheduler import evaluate_run_decision
 
 # Print DSPy version at startup
 print(f"DSPy version: {dspy.__version__}")
@@ -39,6 +40,7 @@ console = Console()
 short_term_path = Path("short_term_memory.md")
 timewarrior_tracker = TimewarriorModule(support_lm, console=console, short_term_path=short_term_path)
 memory_manager = MemoryModule(support_lm, console=console)
+memory_manager_async = dspy.asyncify(memory_manager.run)
 planning_manager = PlanningModule(support_lm, console=console)
 affect_module = AffectModule(support_lm, console=console)
 
@@ -85,15 +87,18 @@ is_finished_checker = dspy.Predict('history -> is_finished: bool, reasoning')
 CONSTRAINTS_FILE = Path('constraints.md')
 ARTIFACT_FILE = Path('artifact.md')
 
+MAX_ITERATIONS = 3
+
 
 def _now_str() -> str:
     return datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
 
-def iteration_loop():
+async def iteration_loop():
+    start_mtime = CONSTRAINTS_FILE.stat().st_mtime
     history = []
     search_replace_errors = []
-    for i in range(10):
+    for i in range(MAX_ITERATIONS):
         console.rule(f"{_now_str()} · Iteration {i + 1}")
 
         mlflow_run = None
@@ -107,27 +112,27 @@ def iteration_loop():
             console.print(Panel(context, title=f"Context @ {_now_str()}", border_style="cyan"))
 
             affect_report = affect_module.run(
-                artifact=artifact,
                 constraints=constraints,
                 context=context,
+                artifact=artifact,
             )
 
             log_iteration_to_mlflow(i + 1, affect_report, executive_summary=None)
 
-            memory_feedback = memory_manager.run(
-                artifact=artifact,
-                constraints=constraints,
-                context=context,
+            memory_task = asyncio.create_task(
+                memory_manager_async(
+                    constraints=constraints,
+                    context=context,
+                    artifact=artifact,
+                )
             )
-            if memory_feedback:
-                console.print(Panel(memory_feedback, title=f"Memory @ {_now_str()}", border_style="magenta"))
 
             critique_prediction = run_with_metrics(
                 'Critic',
                 critic,
-                artifact=artifact,
                 constraints=constraints,
                 context=context,
+                artifact=artifact,
             )
             critique = critique_prediction.critique
             console.print(Panel(critique, title=f"Critique @ {_now_str()}", border_style="yellow"))
@@ -135,10 +140,10 @@ def iteration_loop():
             refined_prediction = run_with_metrics(
                 'Refiner',
                 refiner,
-                artifact=artifact,
                 constraints=constraints,
                 critique=critique,
                 context=context,
+                artifact=artifact,
             )
             refined = refined_prediction.refined_artifact
             # prediction = refiner(artifact=artifact, constraints=constraints, critique=critique, search_replace_errors=search_replace_errors, context=context)
@@ -154,6 +159,15 @@ def iteration_loop():
             if mlflow_run is not None:
                 mlflow.end_run()
 
+        memory_feedback = await memory_task
+        if memory_feedback:
+            console.print(Panel(memory_feedback, title=f"Memory @ {_now_str()}", border_style="magenta"))
+
+        current_mtime = CONSTRAINTS_FILE.stat().st_mtime
+        if current_mtime != start_mtime:
+            console.print(Panel("Constraints changed mid-iteration; restarting loop.", border_style="red"))
+            break
+
         # if is_finished_checker(history=history).is_finished:
         if False:
             finished_check_result = is_finished_checker(history=history)
@@ -168,15 +182,42 @@ def iteration_loop():
             break
 
 
-def main():
-    last_mtime = None
+HOURLY_INTERVAL = datetime.timedelta(hours=1)
+STALE_CONSTRAINTS_AGE = datetime.timedelta(days=3)
+
+
+async def main_loop():
+    last_mtime: Optional[float] = None
+    last_run_time: Optional[datetime.datetime] = None
     while True:
-        mtime = CONSTRAINTS_FILE.stat().st_mtime
-        if mtime != last_mtime:
-            print(f"Constraints changed at {datetime.datetime.fromtimestamp(mtime)}. Running iterations…")
-            last_mtime = mtime
-            iteration_loop()
-        time.sleep(1)            # don’t spin-lock the CPU
+        try:
+            mtime = CONSTRAINTS_FILE.stat().st_mtime
+        except FileNotFoundError:
+            console.print(Panel("constraints.md not found; waiting for file to appear.", border_style="red"))
+            await asyncio.sleep(5)
+            continue
+
+        now = datetime.datetime.now()
+        decision = evaluate_run_decision(
+            last_mtime=last_mtime,
+            last_run_time=last_run_time,
+            current_mtime=mtime,
+            now=now,
+            run_interval=HOURLY_INTERVAL,
+            stale_interval=STALE_CONSTRAINTS_AGE,
+        )
+
+        if decision.message:
+            print(decision.message)
+
+        if decision.should_run:
+            last_mtime = decision.next_last_mtime
+            last_run_time = decision.next_last_run_time
+            await iteration_loop()
+        elif decision.is_stale_skip:
+            last_mtime = decision.next_last_mtime
+            last_run_time = decision.next_last_run_time
+        await asyncio.sleep(1)
 
 
 def log_iteration_to_mlflow(iteration: int, affect_report, executive_summary: Optional[str]) -> None:
@@ -213,4 +254,7 @@ def _log_iteration_payload(iteration: int, affect_report, executive_summary: Opt
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        asyncio.run(main_loop())
+    except KeyboardInterrupt:
+        pass
