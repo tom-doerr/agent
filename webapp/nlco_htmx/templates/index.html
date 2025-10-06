@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="panel full-width compact-panel">
+  <div class="footer-meta">
+    <strong>Constraint History</strong>
+    <span class="help">All submissions are timestamped in constraints.md</span>
+  </div>
+  {% include "partials/history.html" %}
+  <form class="submit-form"
+        hx-post="/messages"
+        hx-target="#history-container"
+        hx-swap="outerHTML"
+        hx-on::after-request="this.reset()">
+    <label for="message-input">New constraint</label>
+    <textarea id="message-input" name="message" rows="2" required placeholder="Describe the current task or update..."
+              onkeydown="if(event.key==='Enter' && !event.shiftKey){event.preventDefault(); const form=this.form||this.closest('form'); if(form){if(form.requestSubmit){form.requestSubmit();}else{form.submit();}}}"></textarea>
+    <button type="submit">Append with Timestamp</button>
+  </form>
+  <p class="help">Escalate only real-time work; timestamps use 24-hour HHMM format, and new date headings are added automatically.</p>
+</section>
+
+{% include "partials/artifact.html" %}
+{% include "partials/memory.html" %}
+
+{% endblock %}

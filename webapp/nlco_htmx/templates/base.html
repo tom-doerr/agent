@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{{ title if title else "NLCO Frontend" }}</title>
+    <link rel="stylesheet" href="/static/style.css" />
+    <script src="https://unpkg.com/htmx.org@2.0.3" integrity="sha384-T9GfILrvEoNtr104T31awNBv5soEefGU6O0VPLA1Wrja9waIJ8aG9ET3StYUzj8Q" crossorigin="anonymous"></script>
+  </head>
+  <body>
+    <header class="app-header">
+      <div>
+        <h1>NLCO Control Panel</h1>
+        <p class="subtitle">Submit constraints and monitor artifact &amp; memory.</p>
+      </div>
+      <nav class="nav-bar">
+        <a href="/" class="home-link">Home</a>
+        {% if user %}
+        <span class="user-chip" title="{{ user.email }}">{{ user.email }}</span>
+        <form method="post" action="/auth/jwt/logout" class="logout-form">
+          <button type="submit">Sign out</button>
+        </form>
+        {% elif login_url %}
+        <a href="{{ login_url }}" class="home-link">Sign in</a>
+        {% else %}
+        <span class="user-chip">Auth not configured</span>
+        {% endif %}
+      </nav>
+    </header>
+    <main>
+      {% block content %}{% endblock %}
+    </main>
+  </body>
+</html>
