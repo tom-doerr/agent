@@ -29,7 +29,7 @@ class InstrumentalGoals(BaseModel):
     @classmethod
     def ensure_list(cls, value: Any) -> List[str]:
         if isinstance(value, str):
-            return [item.strip()[:100] for item in value.splitlines() if item.strip()]
+            return _ensure_list(value)
         if isinstance(value, list):
             items: List[str] = []
             for entry in value:
@@ -37,6 +37,18 @@ class InstrumentalGoals(BaseModel):
                     items.append(entry.strip()[:100])
             return items
         return []
+
+
+def _ensure_list(value: Any) -> List[str]:
+    if isinstance(value, str):
+        return [item.strip()[:100] for item in value.splitlines() if item.strip()]
+    if isinstance(value, list):
+        items: List[str] = []
+        for entry in value:
+            if isinstance(entry, str) and entry.strip():
+                items.append(entry.strip()[:100])
+        return items
+    return []
 
 
 class SatisfactionResult(BaseModel):
@@ -58,7 +70,7 @@ class _GoalsSignature(dspy.Signature):
     user_message: str = dspy.InputField(desc="Latest user message.")
     chat_history: str = dspy.InputField(desc="Chronological chat history.")
     memory_slots: str = dspy.InputField(desc="Current memory slots.")
-    instrumental_goals: List[str] = dspy.OutputField(desc="List of instrumental goals.")
+    instrumental_goals: str = dspy.OutputField(desc="Newline separated instrumental goals.")
     instructions: ClassVar[str] = (
         "List concrete instrumental goals the assistant should pursue next. "
         "Return 1-5 short goal statements (<=100 chars each)."
@@ -96,7 +108,7 @@ class GoalPlanner(dspy.Module):
             chat_history=_format_chat_history(chat_history),
             memory_slots=_format_memory(memory_slots),
         )
-        return InstrumentalGoals(goals=result.instrumental_goals)
+        return InstrumentalGoals(goals=_ensure_list(result.instrumental_goals))
 
 
 class SatisfactionScorer(dspy.Module):
@@ -117,7 +129,7 @@ class SatisfactionScorer(dspy.Module):
             chat_history=_format_chat_history(chat_history),
             memory_slots=_format_memory(memory_slots),
         )
-        score = int(prediction.score)
+        score = int(str(prediction.score).strip())
         return SatisfactionResult(score=score, rationale=prediction.rationale)
 
 
