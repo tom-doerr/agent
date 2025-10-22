@@ -16,6 +16,7 @@ class RunDecision:
     is_stale_skip: bool
     next_last_mtime: Optional[float]
     next_last_run_time: Optional[datetime]
+    trigger: str = "none"  # "constraints", "scheduled", "stale_skip", or "none"
 
 
 def evaluate_run_decision(
@@ -49,6 +50,7 @@ def evaluate_run_decision(
             is_stale_skip=False,
             next_last_mtime=current_mtime,
             next_last_run_time=now,
+            trigger="constraints",
         )
 
     if not due_to_timer:
@@ -58,6 +60,7 @@ def evaluate_run_decision(
             is_stale_skip=False,
             next_last_mtime=last_mtime,
             next_last_run_time=last_run_time,
+            trigger="none",
         )
 
     if is_stale:
@@ -71,6 +74,7 @@ def evaluate_run_decision(
             is_stale_skip=True,
             next_last_mtime=current_mtime,
             next_last_run_time=now,
+            trigger="stale_skip",
         )
 
     scheduled_msg = (
@@ -84,6 +88,7 @@ def evaluate_run_decision(
         is_stale_skip=False,
         next_last_mtime=current_mtime,
         next_last_run_time=now,
+        trigger="scheduled",
     )
 
 

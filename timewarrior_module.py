@@ -70,8 +70,8 @@ class TimewarriorDecisionSignature(dspy.Signature):
     or stop tracking if the session should end. Always justify the decision.
     """
 
-    artifact: str = dspy.InputField(desc="Current artifact content with schedule and tasks.")
     constraints: str = dspy.InputField(desc="Constraint notes provided by the user.")
+    artifact: str = dspy.InputField(desc="Current artifact content with schedule and tasks.")
     context: str = dspy.InputField(desc="Live context string (datetime, weather, system info) for situational awareness.")
     summary: str = dspy.InputField(desc="Raw output of `timew summary` for reference.")
     is_tracking: bool = dspy.InputField(desc="True if Timewarrior currently tracks any tags.")

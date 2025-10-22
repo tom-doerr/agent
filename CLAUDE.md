@@ -7,9 +7,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 Multi-project repository focused on DSPy-based AI agents and tools:
 - **SimpleDSPy Agent** - Main agent with command execution
 - **NLCO Iteration Loop** - Local planner with Timewarrior + memory automation
+- **Structured Schedule Pipeline** – Refiner now emits Pydantic-typed `ScheduleBlock` data in parallel with the artifact; the CLI/Textual loops persist it to `structured_schedule.json` for downstream tooling.
 - **Web DSPy Builder** - Node-based visual editor for DSPy programs
 - **Abbreviation Decoder** - CLI for expanding abbreviated text
 - **Textual DSPy** - Terminal UI for DSPy
+- **agent-manual Poetry Package** - Minimal Textual DSPy TUI packaged for installation (modular runtime, memory, CLI, TUI components)
 - **Webapp** - Multimodal web app with Gemini
 
 ## Environment Setup
@@ -78,6 +80,31 @@ Features:
 - Vim shortcuts supported: basic motions (`h`, `l`, `w`, `b`, `0`, `$`), delete/change (`d`, `c`, `C`), simple text objects (`iw`, `aw`), and delete/change word commands (e.g., `dw`, `diw`, `ciw`).
 - Layout: header → run history log → Vim input → artifact pane (status bottom-right) → help footer.
 
+### agent-manual (Poetry package)
+```bash
+cd agent_manual_pkg
+poetry install
+poetry run agent-manual
+```
+
+Highlights:
+- `/model` prompt toggles between the two DeepSeek v3.2 experimental presets (`chat` vs `reasoner`), both using the `openrouter/deepseek/deepseek-v3.2-exp` slug with different reasoning budgets.
+- `run_shell` tool shows the shell command, DSPy safety verdict, and captured output directly in the Textual log.
+- Uses the lightweight `ReadableReAct` wrapper so each step (thought/tool/observation) streams into the UI with emoji markers.
+- Config persisted to `~/.config/agent-manual/config.json` (override with `AGENT_MANUAL_CONFIG` or `--config` CLI flag); updates made via CLI or `/model` are saved and reloaded on next launch.
+- `max_tokens` is configurable via CLI (`--max-tokens`), the config file, or `/max_tokens` inside the TUI, and persists across runs.
+- Dedicated memory pane mirrors the persisted `memory.json` alongside the main log; the async `MemoryModule` produces Pydantic-validated slot updates (<=100 chars) after each tool step and keeps file + UI in sync.
+- Satisfaction pane (top-left) shows the latest instrumental goals plus a 1–9 score with rationale computed by two DSPy modules (`GoalPlanner` and `SatisfactionScorer`); memory occupies the lower-left pane, while the chat log lives on the right.
+- `/modules` now includes per-module presets for `satisfaction_goals` and `satisfaction_score` so you can swap LMs independently of the agent and memory summarizer.
+- `/modules` opens a menu to assign models per DSPy module (agent vs memory); selections persist in `module_models` within the config.
+- Status pane shows active models/modules, live elapsed timer, and request state while the TUI is working; all errors bubble into the log and status banner.
+- Animated spinner (`⠋⠙⠹…`) appears under the status while DSPy work is in progress, flipping to the result once the step finishes so users see live feedback during long calls.
+- `?` toggles a help modal, `g` then `i` focuses the prompt input, and `ESC` exits it; user, agent, and system messages are color-coded in the log for clarity.
+- New `send_message` tool lets the agent reply directly to the user (message is emitted in the log/status without additional tooling).
+- Memory summarization now uses a DSPy `Predict` call (`MemoryModule.SummarySignature`) to produce structured updates; validators in `MemorySlotUpdate` enforce max length with inline documentation.
+- Tests: `DSPY_CACHEDIR=/tmp/.dspy_cache pytest tests/test_agent_manual.py -q`
+- E2E (requires OpenRouter/OpenAI creds): `zsh -ic 'cd /home/tom/git/agent && DSPY_CACHEDIR=/tmp/.dspy_cache pytest tests/test_agent_manual_e2e.py -q'`
+
 ### Webapp
 ```bash
 cd webapp/
@@ -101,10 +128,24 @@ Environment overrides (auto-loaded from `.env` via `start_htmx_server.sh`, see `
 Features:
 - HTMX dashboard for submitting timestamped constraints (appends to `constraints.md` with auto date headings).
 - Live artifact (`artifact.md`), memory (`memory.md`), and short-term memory views with age indicators and auto-refresh.
+- Structured schedule table sourced from `structured_schedule.json`, refreshed via HTMX and mirrored in the `/api/v1/status` payload for other clients.
 - Single FastAPI service—no Node build step; HTML templates live in `webapp/nlco_htmx/templates/`.
 - Tests: `pytest tests/test_web_htmx_app.py -q` exercises routing, timestamp formatting, and history limits.
+- Additional cases cover the structured schedule table, schedule JSON parsing errors, and loader helpers to guarantee validation stays consistent with the refiner contract.
 - Authentication enforced with FastAPI Users (cookie-based JWT). Default login flow expects GitHub OAuth; password routes remain under `/auth/*` for testing/automation.
 - Additional tests ensure unauthenticated requests receive 401s and the GitHub login CTA appears when OAuth is configured.
+- JSON API endpoints (authenticated): `GET /api/v1/status` returns artifact/memory/history snapshots, `POST /api/v1/messages` appends a constraint line and returns the refreshed snapshot. Both reuse FastAPI Users sessions (cookie `nlco_auth`).
+- Login UI: the `/` route now renders a username/password form (plus optional GitHub button). The form POSTs to `/auth/jwt/login`, shows client-side errors, and redirects on success. Usernames without `@` are expanded using the default-user domain or the closest matching email (e.g. `tom` → `tom@nlco.dev`).
+- Optional bootstrap user: set `NLCO_DEFAULT_USER_EMAIL` and `NLCO_DEFAULT_USER_PASSWORD`; the app creates that account at startup so you can sign in immediately.
+- `pytest tests/test_web_htmx_app.py -q` exercises both HTMX pages and JSON routes.
+
+### Android Mobile App
+- Location: `android/nlco-android`
+- Features: native Compose UI mirroring the HTMX dashboard (artifact + memory snapshots, constraint history, message composer), Retrofit client with persisted session cookies, and reactive state via `MainViewModel`.
+- Build requirements: JDK 17 and Android SDK (`platforms;android-34`, `build-tools;34.0.0`). Configure `local.properties` (`sdk.dir`) or `ANDROID_SDK_ROOT`.
+- Backend URL defaults to `http://10.0.2.2:48123/`; override with `-Pnlco.baseUrl=https://your-host/` or adjust `gradle.properties`.
+- Tests: run from `android/nlco-android/` with `JAVA_HOME=/path/to/jdk17 ./gradlew test` (ensure the Gradle wrapper can download `gradle-8.7-bin.zip`).
+- Manual builds: `JAVA_HOME=/path/to/jdk17 ./gradlew assembleDebug`. To avoid wrapper downloads on restricted networks, you can use a pre-installed Gradle 8.7 binary (`/path/to/gradle-8.7/bin/gradle assembleDebug`).
 
 Auth configuration:
 - `NLCO_AUTH_DB_URI` (default `sqlite+aiosqlite:///./nlco_auth.db`)
@@ -147,6 +188,7 @@ Key `[nlco_config.toml]` sections:
 - Configure with `dspy.configure(lm=...)`
 - Training data in `.jsonl` format
 - Use `OfflineDSPyLM` for testing without API calls
+- Signature convention: declare `constraints` as the first input wherever a DSPy signature includes it to minimize cache churn.
 
 ## MLflow Integration
 

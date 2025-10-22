@@ -30,6 +30,7 @@ from memory_module import MemoryModule
 from metrics_utils import run_with_metrics
 from planning_module import PlanningModule
 from timewarrior_module import TimewarriorModule
+from refiner_signature import RefineSignature, normalize_schedule, schedule_to_json, render_schedule_timeline
 
 try:  # Optional MLflow support
     import mlflow
@@ -43,6 +44,7 @@ CONSTRAINTS_FILE = Path("constraints.md")
 ARTIFACT_FILE = Path("artifact.md")
 MEMORY_FILE = Path("memory.md")
 SHORT_TERM_PATH = Path("short_term_memory.md")
+STRUCTURED_SCHEDULE_FILE = Path("structured_schedule.json")
 
 
 def _sanitize_metric_name(name: str) -> str:
@@ -202,12 +204,15 @@ class NLCOTextualApp(App):
         dspy.configure(lm=self._primary_lm)
         self._support_lm = dspy.LM("deepseek/deepseek-chat", max_tokens=4_000, temperature=0)
         self._critic = dspy.Predict(
-            "artifact, constraints, context -> critique",
+            "constraints, artifact, context -> critique",
             instructions="Critique the artifact based on the constraints and common sense.",
         )
         self._refiner = dspy.Predict(
-            "artifact, constraints, critique, context -> refined_artifact",
-            instructions="Refine the artifact based on the critique.",
+            RefineSignature,
+            instructions=(
+                "Refine the artifact based on the critique while keeping the full schedule written in the artifact text. "
+                "Populate structured_schedule with a well-formed list of ScheduleBlock entries that exactly mirrors the schedule in the refined artifact."
+            ),
         )
 
     def _configure_mlflow(self) -> None:
@@ -266,6 +271,8 @@ class NLCOTextualApp(App):
                 yield Log(id="critique-log")
                 yield Label("Refinement", classes="stage-title")
                 yield Log(id="refine-log")
+                yield Label("Structured Schedule", classes="stage-title")
+                yield Log(id="schedule-log")
             with Vertical(classes="stage-container"):
                 yield Label("Artifact", classes="stage-title")
                 yield Log(id="artifact-log")
@@ -492,8 +499,29 @@ class NLCOTextualApp(App):
                     context=context,
                 )
                 refined = getattr(refine_pred, "refined_artifact", "")
+                try:
+                    schedule_blocks = normalize_schedule(getattr(refine_pred, "structured_schedule", []))
+                except ValueError as schedule_error:
+                    structured_schedule_display = f"Structured schedule output was invalid: {schedule_error}"
+                    STRUCTURED_SCHEDULE_FILE.write_text("[]\n")
+                    timeline_display = "Timeline unavailable (invalid schedule output)."
+                else:
+                    schedule_json = schedule_to_json(schedule_blocks)
+                    STRUCTURED_SCHEDULE_FILE.write_text(schedule_json + "\n")
+                    if schedule_blocks:
+                        structured_schedule_display = schedule_json
+                        timeline_display = render_schedule_timeline(schedule_blocks)
+                    else:
+                        structured_schedule_display = "Structured schedule is empty."
+                        timeline_display = "Timeline unavailable (no blocks)."
                 flush_log()
                 self.call_from_thread(self._update_stage_log, "refine", refined)
+                combined_schedule_display = f"{timeline_display}\n\n{structured_schedule_display}".strip()
+                self.call_from_thread(
+                    self._update_stage_log,
+                    "schedule",
+                    combined_schedule_display,
+                )
 
                 ARTIFACT_FILE.write_text(refined)
                 self.call_from_thread(self._update_artifact_editor, refined)
@@ -518,6 +546,7 @@ class NLCOTextualApp(App):
         self.query_one("#affect-log", Log).clear()
         self.query_one("#critique-log", Log).clear()
         self.query_one("#refine-log", Log).clear()
+        self.query_one("#schedule-log", Log).clear()
         self.query_one("#artifact-log", Log).clear()
         self.query_one("#context-view", Static).update("")
 
@@ -542,6 +571,7 @@ class NLCOTextualApp(App):
             "planning": "#planning-log",
             "critique": "#critique-log",
             "refine": "#refine-log",
+            "schedule": "#schedule-log",
         }
         if stage not in widget_map:
             return

@@ -27,6 +27,7 @@ def test_run_when_mtime_changes():
     assert decision.next_last_run_time == now
     assert not decision.is_stale_skip
     assert "Constraints changed" in (decision.message or "")
+    assert decision.trigger == "constraints"
 
 
 def test_run_on_hourly_schedule_when_not_stale():
@@ -45,6 +46,7 @@ def test_run_on_hourly_schedule_when_not_stale():
     assert decision.next_last_mtime == mtime
     assert decision.next_last_run_time == now
     assert "Running scheduled iteration" in (decision.message or "")
+    assert decision.trigger == "scheduled"
 
 
 def test_skip_when_stale():
@@ -63,6 +65,7 @@ def test_skip_when_stale():
     assert decision.is_stale_skip
     assert decision.next_last_run_time == now
     assert "Skipping scheduled iteration" in (decision.message or "")
+    assert decision.trigger == "stale_skip"
 
 
 def test_no_run_when_interval_not_elapsed():
@@ -81,3 +84,4 @@ def test_no_run_when_interval_not_elapsed():
     assert not decision.is_stale_skip
     assert decision.next_last_run_time == last_run
     assert decision.message is None
+    assert decision.trigger == "none"

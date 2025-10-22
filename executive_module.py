@@ -15,8 +15,8 @@ from affect_module import AffectReport
 
 
 class ExecutiveStepSignature(dspy.Signature):
-    artifact: str = dspy.InputField(desc="Latest artifact produced by NLCO.")
     constraints: str = dspy.InputField(desc="Active constraints from the user.")
+    artifact: str = dspy.InputField(desc="Latest artifact produced by NLCO.")
     context: str = dspy.InputField(desc="Runtime context string (datetime, system status, etc.).")
     affect: str = dspy.InputField(desc="Summary of affect assessment and goal scores.")
     history: str = dspy.InputField(desc="Transcript of prior thoughts/actions/observations.")

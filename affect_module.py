@@ -21,8 +21,8 @@ class AffectReport(BaseModel):
 
 
 class AffectSignature(dspy.Signature):
-    artifact: str = dspy.InputField(desc="Latest artifact content, including priorities and schedule.")
     constraints: str = dspy.InputField(desc="User-defined constraints and context notes.")
+    artifact: str = dspy.InputField(desc="Latest artifact content, including priorities and schedule.")
     context: str = dspy.InputField(desc="Runtime context string (datetime, system info, etc.).")
     memory: str = dspy.InputField(desc="Long-term memory markdown contents.")
     plan: str = dspy.InputField(desc="Persistent planning TOML text.")

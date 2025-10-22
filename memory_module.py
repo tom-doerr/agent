@@ -58,9 +58,9 @@ class MemoryModule(dspy.Module):
         signature = (
             dspy.Signature(
                 {
+                    "constraints": dspy.InputField(desc="User-provided soft constraints."),
                     "memory": dspy.InputField(desc="Current memory markdown text."),
                     "artifact": dspy.InputField(desc="Latest artifact produced by NLCO."),
-                    "constraints": dspy.InputField(desc="User-provided soft constraints."),
                     "context": dspy.InputField(desc="Runtime context string (datetime, system info, etc.)."),
                 },
                 instructions=textwrap.dedent(

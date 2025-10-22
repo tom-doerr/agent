@@ -1,0 +1,10 @@
+
+# Core
+textual>=0.62
+dspy-ai>=2.6.0
+# Providers
+openai>=1.43.0
+google-generativeai>=0.7.2
+# Optional bridge + http robustness
+litellm>=1.43.0
+httpx>=0.27.2

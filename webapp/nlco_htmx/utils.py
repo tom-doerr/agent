@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 from datetime import date, datetime
 import re
 from pathlib import Path
 from typing import Iterable, Optional
+
+from refiner_signature import ScheduleBlock, normalize_schedule
 
 DATE_HEADING_RE = re.compile(r"^#\s*(\d{4}-\d{2}-\d{2})$")
 
@@ -132,3 +133,27 @@ def format_timedelta(reference: datetime, past: Optional[datetime]) -> str:
     hours, remainder = divmod(total, 3600)
     minutes = remainder // 60
     return f"{hours}h {minutes}m ago"
+
+
+def load_schedule_snapshot(path: Path) -> tuple[list[ScheduleBlock], Optional[datetime], Optional[str]]:
+    """Load structured schedule blocks along with mtime and optional error."""
+
+    try:
+        stat = path.stat()
+    except FileNotFoundError:
+        return [], None, None
+
+    try:
+        raw = path.read_text(encoding="utf-8").strip()
+    except Exception as exc:  # pragma: no cover - defensive guard
+        return [], datetime.fromtimestamp(stat.st_mtime), f"Error reading schedule: {exc}"
+
+    if not raw:
+        return [], datetime.fromtimestamp(stat.st_mtime), None
+
+    try:
+        blocks = normalize_schedule(raw)
+    except ValueError as exc:
+        return [], datetime.fromtimestamp(stat.st_mtime), f"Unable to parse schedule: {exc}"
+
+    return blocks, datetime.fromtimestamp(stat.st_mtime), None

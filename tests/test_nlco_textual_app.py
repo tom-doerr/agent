@@ -22,11 +22,13 @@ def app_factory(monkeypatch, tmp_path):
     artifact_path = tmp_path / "artifact.md"
     short_term_path = tmp_path / "short_term.md"
     memory_path = tmp_path / "memory.md"
+    schedule_path = tmp_path / "structured_schedule.json"
 
     monkeypatch.setattr(nlco_textual, "CONSTRAINTS_FILE", constraints_path)
     monkeypatch.setattr(nlco_textual, "ARTIFACT_FILE", artifact_path)
     monkeypatch.setattr(nlco_textual, "SHORT_TERM_PATH", short_term_path)
     monkeypatch.setattr(nlco_textual, "MEMORY_FILE", memory_path)
+    monkeypatch.setattr(nlco_textual, "STRUCTURED_SCHEDULE_FILE", schedule_path)
 
     def fake_setup(self) -> None:
         self._primary_lm = object()
@@ -98,7 +100,10 @@ def app_factory(monkeypatch, tmp_path):
             if name == "Critic":
                 return SimpleNamespace(critique="stub critique")
             if name == "Refiner":
-                return SimpleNamespace(refined_artifact=refined_text)
+                return SimpleNamespace(
+                    refined_artifact=refined_text,
+                    structured_schedule=[],
+                )
             return SimpleNamespace()
 
         monkeypatch.setattr(nlco_textual, "run_with_metrics", fake_run_with_metrics)
@@ -109,6 +114,7 @@ def app_factory(monkeypatch, tmp_path):
             self._update_stage_log("planning", "plan ok")
             self._update_stage_log("critique", "stub critique")
             self._update_stage_log("refine", refined_text)
+            self._update_stage_log("schedule", "[]")
             report = nlco_textual.AffectReport(
                 emotions=["focused"],
                 urgency="low",

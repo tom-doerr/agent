@@ -46,9 +46,9 @@ class PlanningModule(dspy.Module):
         signature = (
             dspy.Signature(
                 {
+                    "constraints": dspy.InputField(desc="User constraints to respect."),
                     "plan": dspy.InputField(desc="Current planning TOML contents."),
                     "artifact": dspy.InputField(desc="Latest artifact (schedule, tasks, etc.)."),
-                    "constraints": dspy.InputField(desc="User constraints to respect."),
                     "context": dspy.InputField(desc="Runtime context string."),
                 },
                 instructions=textwrap.dedent(
@@ -222,4 +222,3 @@ class PlanningModule(dspy.Module):
                 parent[part] = {}
             parent = parent[part]
         return parent, key
-

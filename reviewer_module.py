@@ -11,8 +11,8 @@ from rich.panel import Panel
 
 
 class ReviewSignature(dspy.Signature):
-    artifact: str = dspy.InputField(desc="Current artifact text (tasks and schedule).")
     constraints: str = dspy.InputField(desc="User constraints / notes.")
+    artifact: str = dspy.InputField(desc="Current artifact text (tasks and schedule).")
     context: str = dspy.InputField(desc="Runtime context string (datetime, system info, etc.).")
     summary: str = dspy.InputField(desc="Raw output of `timew summary`.")
     proposed_action: Literal["start", "stop", "none"] = dspy.InputField(desc="Action the planner intends to take.")
