@@ -27,6 +27,7 @@ from executive_module import ExecutiveModule
 from planning_module import PlanningModule
 from affect_module import AffectModule
 from nlco_scheduler import evaluate_run_decision
+from refiner_signature import RefineSignature, normalize_schedule, schedule_to_json, render_schedule_timeline
 
 # Print DSPy version at startup
 print(f"DSPy version: {dspy.__version__}")
@@ -68,24 +69,20 @@ class Edit(BaseModel):
     replace: str = Field(..., description="Replacement text for the search term.")
 
 
-class RefineSig(dspy.Signature):
-    artifact: str = dspy.InputField()
-    constraints: str = dspy.InputField()
-    critique: str = dspy.InputField()
-    search_replace_errors: list[Edit] = dspy.InputField(desc="Search and replace errors from previous iterations that couldn't be applied because the search block didn't match any part in the artifact")
-    context: str = dspy.InputField()
-    edits: list[Edit] = dspy.OutputField()
-
-# class Refining(dspySign
-
-refiner = dspy.Predict('artifact, constraints, critique, context -> refined_artifact', instructions="Refine the artifact based on the critique.")
-# refiner = dspy.Predict(RefineSig, instructions="Refine the artifact based on the critique and constraints. Return a list of edits with search terms and replacements.")
-critic = dspy.Predict('artifact, constraints, context -> critique',
+refiner = dspy.Predict(
+    RefineSignature,
+    instructions=(
+        "Refine the artifact based on the critique while keeping the full schedule written in the artifact text. "
+        "Populate structured_schedule with a well-formed list of ScheduleBlock entries that exactly mirrors the schedule in the refined artifact."
+    ),
+)
+critic = dspy.Predict('constraints, artifact, context -> critique',
                       instructions="Critique the artifact based on the constraints and common sense.")
 is_finished_checker = dspy.Predict('history -> is_finished: bool, reasoning')
 
 CONSTRAINTS_FILE = Path('constraints.md')
 ARTIFACT_FILE = Path('artifact.md')
+STRUCTURED_SCHEDULE_FILE = Path('structured_schedule.json')
 
 MAX_ITERATIONS = 3
 
@@ -94,11 +91,12 @@ def _now_str() -> str:
     return datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
 
-async def iteration_loop():
+async def iteration_loop(*, max_iterations: Optional[int] = None):
     start_mtime = CONSTRAINTS_FILE.stat().st_mtime
     history = []
     search_replace_errors = []
-    for i in range(MAX_ITERATIONS):
+    iteration_cap = max_iterations if max_iterations is not None else MAX_ITERATIONS
+    for i in range(iteration_cap):
         console.rule(f"{_now_str()} · Iteration {i + 1}")
 
         mlflow_run = None
@@ -146,6 +144,34 @@ async def iteration_loop():
                 artifact=artifact,
             )
             refined = refined_prediction.refined_artifact
+            try:
+                schedule_blocks = normalize_schedule(getattr(refined_prediction, "structured_schedule", []))
+            except ValueError as schedule_error:
+                console.print(
+                    Panel(
+                        f"Structured schedule output was invalid: {schedule_error}",
+                        title=f"Structured Schedule @ {_now_str()}",
+                        border_style="red",
+                    )
+                )
+                schedule_blocks = []
+            schedule_json = schedule_to_json(schedule_blocks)
+            STRUCTURED_SCHEDULE_FILE.write_text(schedule_json + "\n")
+            if schedule_blocks:
+                console.print(
+                    Panel(
+                        render_schedule_timeline(schedule_blocks),
+                        title=f"Schedule Timeline @ {_now_str()}",
+                        border_style="green",
+                    )
+                )
+                console.print(
+                    Panel(
+                        schedule_json,
+                        title=f"Structured Schedule @ {_now_str()}",
+                        border_style="green",
+                    )
+                )
             # prediction = refiner(artifact=artifact, constraints=constraints, critique=critique, search_replace_errors=search_replace_errors, context=context)
             # print('edits: ', prediction)
             # edits = prediction.edits  # Extract the edits list from the Prediction object
@@ -213,7 +239,8 @@ async def main_loop():
         if decision.should_run:
             last_mtime = decision.next_last_mtime
             last_run_time = decision.next_last_run_time
-            await iteration_loop()
+            scheduled_iteration_cap = 1 if decision.trigger == "scheduled" else None
+            await iteration_loop(max_iterations=scheduled_iteration_cap)
         elif decision.is_stale_skip:
             last_mtime = decision.next_last_mtime
             last_run_time = decision.next_last_run_time

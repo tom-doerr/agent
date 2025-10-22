@@ -161,6 +161,10 @@ pre.viewer {
   white-space: pre-wrap;
 }
 
+#schedule-panel {
+  min-height: 18rem;
+}
+
 #artifact-panel {
   min-height: calc(100vh - 260px);
 }
@@ -196,6 +200,33 @@ pre.viewer {
   align-items: center;
   font-size: 0.85rem;
   color: var(--muted);
+}
+
+.schedule-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+}
+
+.schedule-table th,
+.schedule-table td {
+  padding: 0.5rem 0.75rem;
+  text-align: left;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.schedule-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.schedule-empty,
+.schedule-error {
+  margin: 0;
+  color: var(--muted);
+}
+
+.schedule-error {
+  color: #f8a5ae;
 }
 
 .help {
@@ -236,4 +267,55 @@ pre.viewer {
 
 .logout-form button:hover {
   background: rgba(76, 201, 240, 0.15);
+}
+
+.login-panel {
+  gap: 1rem;
+}
+.login-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin-top: 1rem;
+}
+.login-form label {
+  font-size: 0.9rem;
+  color: var(--muted);
+}
+.login-form input {
+  padding: 0.6rem;
+  border: 1px solid var(--border);
+  border-radius: 0.4rem;
+  background: #0e1117;
+  color: var(--text-primary);
+}
+.login-form input:focus {
+  border-color: var(--accent);
+  outline: none;
+}
+.login-form .button.primary {
+  align-self: flex-start;
+}
+.form-error {
+  color: #ff6b6b;
+  font-size: 0.9rem;
+}
+.divider {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 1.5rem 0 0.5rem;
+  color: var(--muted);
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+.divider::before,
+.divider::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+  margin: 0 0.75rem;
 }

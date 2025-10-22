@@ -7,8 +7,58 @@
   <p class="help">Authenticate to submit constraints and view the artifact dashboard.</p>
   <a class="button" href="{{ login_url }}">Continue with GitHub</a>
   {% else %}
-  <p class="help">Authentication is not yet configured. Set the GitHub OAuth environment variables to enable sign-in.</p>
+  <p class="help">Use the form below to sign in.</p>
   {% endif %}
+  <div class="divider"><span>or</span></div>
+  <form id="login-form" class="login-form">
+    <label for="login-username">Username or email</label>
+    <input id="login-username" name="username" type="text" autocomplete="username" required />
+    <label for="login-password">Password</label>
+    <input id="login-password" name="password" type="password" autocomplete="current-password" required />
+    <button type="submit" class="button primary">Sign in</button>
+    <p id="login-error" class="form-error" hidden>Unable to sign in. Check your credentials.</p>
+  </form>
   <p class="help">Need API access? The FastAPI Users endpoints are available under <code>/auth</code> and <code>/auth/jwt</code>.</p>
 </section>
+<script>
+(function(){
+  const form = document.getElementById('login-form');
+  if(!form){return;}
+  const errorEl = document.getElementById('login-error');
+  form.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    errorEl.hidden = true;
+    const submitBtn = form.querySelector('button[type="submit"]');
+    submitBtn.disabled = true;
+    const formData = new FormData(form);
+    const params = new URLSearchParams();
+    for (const [key, value] of formData.entries()) {
+      params.append(key, value);
+    }
+    try {
+      const response = await fetch('/auth/jwt/login', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+        body: params.toString(),
+      });
+      if (response.ok) {
+        window.location.href = '/';
+        return;
+      }
+      const data = await response.json().catch(() => ({}));
+      if (data && data.detail) {
+        errorEl.textContent = Array.isArray(data.detail) ? data.detail.map((item) => item.msg || item.detail || item).join(' ') : data.detail;
+      } else {
+        errorEl.textContent = 'Unable to sign in. Check your credentials.';
+      }
+      errorEl.hidden = false;
+    } catch (err) {
+      errorEl.textContent = 'Network error. Please try again.';
+      errorEl.hidden = false;
+    } finally {
+      submitBtn.disabled = false;
+    }
+  });
+})();
+</script>
 {% endblock %}

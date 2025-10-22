@@ -21,6 +21,11 @@ async def test_iteration_loop_triggers_async_memory(monkeypatch, tmp_path):
     monkeypatch.setattr(nlco_iter, "ARTIFACT_FILE", artifact_path)
     monkeypatch.setattr(nlco_iter, "MAX_ITERATIONS", 1)
     monkeypatch.setattr(nlco_iter, "MLFLOW_ENABLED", False)
+    monkeypatch.setattr(
+        nlco_iter,
+        "STRUCTURED_SCHEDULE_FILE",
+        tmp_path / "structured_schedule.json",
+    )
 
     monkeypatch.setattr(nlco_iter, "create_context_string", lambda: "context")
 
@@ -51,6 +56,7 @@ async def test_iteration_loop_triggers_async_memory(monkeypatch, tmp_path):
 
     class RefinerResult:
         refined_artifact = "Refined artifact"
+        structured_schedule: list[dict[str, str]] = []
 
     def fake_critic(*, constraints, context, artifact):
         assert constraints == "Keep focus"

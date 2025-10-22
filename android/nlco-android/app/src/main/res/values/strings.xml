@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">NLCO Mobile</string>
+    <string name="login">Log in</string>
+    <string name="email">Email</string>
+    <string name="password">Password</string>
+    <string name="logout">Log out</string>
+    <string name="refresh">Refresh</string>
+    <string name="submit">Submit</string>
+    <string name="message_hint">Write a new constraint…</string>
+</resources>

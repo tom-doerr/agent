@@ -24,6 +24,14 @@ dspy.configure(lm=lm)
 reply_module = dspy.Predict('user_message -> agent_reply', system_prompt="You are a helpful assistant.")
 coding_module = dspy.Predict('user_message -> python_code')
 safety_checker_module = dspy.Predict('user_message, python_code -> is_safe: bool')
+# TODO
+# satisfaction 
+# surprise
+# plan
+# wm update
+# wm retrieve
+
+
 
 while True:
     user_message = input(">  ")
@@ -32,6 +40,7 @@ while True:
     python_code = coding_module(user_message=user_message).python_code
     print(f'Generated code:\n{python_code}')
     is_safe = safety_checker_module(user_message=user_message, python_code=python_code)
+    print(f'is_safe: {is_safe}')
     if is_safe:
         print("Executing code:")
         exec(python_code)

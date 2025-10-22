@@ -1,0 +1,37 @@
+<section class="panel" id="schedule-panel"
+         hx-get="/partials/schedule"
+         hx-trigger="load, every 10s"
+         hx-target="#schedule-panel"
+         hx-swap="outerHTML">
+  <div class="footer-meta">
+    <h2>Schedule</h2>
+    <span>Updated {{ schedule.age_label }}</span>
+  </div>
+
+  {% if schedule.error %}
+    <p class="schedule-error">{{ schedule.error }}</p>
+  {% endif %}
+
+  {% if schedule.blocks %}
+    <table class="schedule-table">
+      <thead>
+        <tr>
+          <th scope="col">Start</th>
+          <th scope="col">End</th>
+          <th scope="col">Activity</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for block in schedule.blocks %}
+          <tr>
+            <td>{{ block.start_time }}</td>
+            <td>{{ block.end_time }}</td>
+            <td>{{ block.description }}</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% else %}
+    <p class="schedule-empty">No structured schedule captured yet.</p>
+  {% endif %}
+</section>
