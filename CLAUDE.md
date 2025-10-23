@@ -90,7 +90,7 @@ poetry run agent-manual
 Highlights:
 - `/model` prompt toggles between the two DeepSeek v3.2 experimental presets (`chat` vs `reasoner`), both using the `openrouter/deepseek/deepseek-v3.2-exp` slug with different reasoning budgets.
 - `run_shell` tool shows the shell command, DSPy safety verdict, and captured output directly in the Textual log.
-- Uses the lightweight `ReadableReAct` wrapper so each step (thought/tool/observation) streams into the UI with emoji markers.
+- Uses a custom `ReadableReAct` DSPy module (no upstream fallback) so each step (thought/tool/observation) streams into the UI, the raw LM transcript is preserved, and the runtime exposes it via `runtime.get_agent()`.
 - Config persisted to `~/.config/agent-manual/config.json` (override with `AGENT_MANUAL_CONFIG` or `--config` CLI flag); updates made via CLI or `/model` are saved and reloaded on next launch.
 - `max_tokens` is configurable via CLI (`--max-tokens`), the config file, or `/max_tokens` inside the TUI, and persists across runs.
 - Dedicated memory pane mirrors the persisted `memory.json` alongside the main log; the async `MemoryModule` produces Pydantic-validated slot updates (<=100 chars) after each tool step and keeps file + UI in sync.
@@ -99,11 +99,15 @@ Highlights:
 - `/modules` opens a menu to assign models per DSPy module (agent vs memory); selections persist in `module_models` within the config.
 - Status pane shows active models/modules, live elapsed timer, and request state while the TUI is working; all errors bubble into the log and status banner.
 - Animated spinner (`⠋⠙⠹…`) appears under the status while DSPy work is in progress, flipping to the result once the step finishes so users see live feedback during long calls.
+- Theme refreshed around a deep-red accent: consistent borders, red scrollbars, and a compact top bar keep the layout balanced.
+- Side pane now includes “DSPy Raw” which shows the unparsed conversation payloads so you can inspect exactly what DSPy saw each turn.
+- Press `Ctrl+,` to open the in-app settings overlay—cycle through models or edit `max_tokens` inline, with inline descriptions for every knob.
 - `?` toggles a help modal, `g` then `i` focuses the prompt input, and `ESC` exits it; user, agent, and system messages are color-coded in the log for clarity.
 - New `send_message` tool lets the agent reply directly to the user (message is emitted in the log/status without additional tooling).
 - Memory summarization now uses a DSPy `Predict` call (`MemoryModule.SummarySignature`) to produce structured updates; validators in `MemorySlotUpdate` enforce max length with inline documentation.
 - Tests: `DSPY_CACHEDIR=/tmp/.dspy_cache pytest tests/test_agent_manual.py -q`
 - E2E (requires OpenRouter/OpenAI creds): `zsh -ic 'cd /home/tom/git/agent && DSPY_CACHEDIR=/tmp/.dspy_cache pytest tests/test_agent_manual_e2e.py -q'`
+- Unit coverage for the Textual shell lives in `agent_manual_pkg/tests/test_tui.py`; from `agent_manual_pkg/` run `pytest` to validate theme, overlay, and raw-history wiring.
 
 ### Webapp
 ```bash

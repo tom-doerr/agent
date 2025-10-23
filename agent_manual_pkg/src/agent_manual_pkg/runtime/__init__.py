@@ -12,6 +12,7 @@ from ..signatures import AgentSignature
 SIGNATURE = AgentSignature
 
 build_lm = _configuration.build_lm
+get_agent = _configuration.get_agent
 configure_model = _configuration.configure_model
 configure_memory_model = _configuration.configure_memory_model
 configure_satisfaction_goals_model = _configuration.configure_satisfaction_goals_model
@@ -19,7 +20,6 @@ configure_satisfaction_score_model = _configuration.configure_satisfaction_score
 get_module_model = _configuration.get_module_model
 
 __all__ = [
-    "AGENT",
     "CURRENT_MODEL",
     "LM",
     "MODEL_PRESETS",
@@ -35,6 +35,7 @@ __all__ = [
     "configure_model",
     "configure_satisfaction_goals_model",
     "configure_satisfaction_score_model",
+    "get_agent",
     "get_module_model",
     "ls",
     "run_shell",
@@ -43,7 +44,7 @@ __all__ = [
 
 
 def __getattr__(name: str) -> Any:  # pragma: no cover - simple delegation
-    if name in {"AGENT", "CURRENT_MODEL", "LM"}:
+    if name in {"CURRENT_MODEL", "LM"}:
         return getattr(_configuration, name)
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 

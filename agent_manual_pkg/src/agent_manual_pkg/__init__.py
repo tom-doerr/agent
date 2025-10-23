@@ -1,7 +1,6 @@
 """Expose the Textual DSPy TUI components."""
 
 from .app import (
-    AGENT,
     CURRENT_MODEL,
     LM,
     MEMORY_MODULE,
@@ -13,6 +12,7 @@ from .app import (
     MemorySlotUpdate,
     configure_model,
     configure_memory_model,
+    get_agent,
     get_module_model,
     ls,
     main,
@@ -23,7 +23,6 @@ from .config import get_config, get_config_path, load_config, set_config_path, u
 from .app import load_memory_slots, save_memory_slots
 
 __all__ = [
-    "AGENT",
     "CURRENT_MODEL",
     "LM",
     "MEMORY_MODULE",
@@ -38,6 +37,7 @@ __all__ = [
     "get_config",
     "get_config_path",
     "load_config",
+    "get_agent",
     "ReadableReAct",
     "get_module_model",
     "ls",

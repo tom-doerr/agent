@@ -4,7 +4,7 @@ import asyncio
 import uuid
 from dataclasses import dataclass
 import time
-from typing import Any, Dict, List, Optional, Set
+from typing import Any, Callable, Dict, List, Optional, Set
 
 from rich.text import Text
 from textual.app import App, ComposeResult, ScreenStackError
@@ -13,7 +13,8 @@ from textual.events import Key
 from textual.reactive import reactive
 from textual.screen import ModalScreen
 from textual.timer import Timer
-from textual.widgets import Footer, Input, RichLog, Static
+from textual.widgets import Footer, Input, OptionList, RichLog, Static
+from textual.widgets.option_list import Option
 
 from . import runtime
 from .config import get_config
@@ -48,20 +49,158 @@ class Job:
     prompt: str
 
 
+@dataclass
+class SettingDefinition:
+    key: str
+    label: str
+    description: str
+    getter: Callable[[], Any]
+    setter: Callable[[Any], None]
+    parser: Callable[[str], Any] | None = None
+    options: List[str] | None = None
+
+
+class SettingsOverlay(ModalScreen[None]):
+    BINDINGS = [
+        ("escape", "dismiss", "Close"),
+    ]
+
+    def __init__(self, settings: List[SettingDefinition], on_update: Callable[[], None]):
+        super().__init__()
+        self._settings = {setting.key: setting for setting in settings}
+        self._order = [setting.key for setting in settings]
+        self._active: Optional[str] = self._order[0] if self._order else None
+        self._on_update = on_update
+        self._editing = False
+
+    def compose(self) -> ComposeResult:
+        options = [
+            Option(self._render_label(key), id=key)
+            for key in self._order
+        ]
+        yield Vertical(
+            Static("Settings", id="settings-title"),
+            OptionList(*options, id="settings-options"),
+            Static("Enter to edit • Use ↑/↓ to select • Esc closes", id="settings-help"),
+            Input(id="settings-input", placeholder="Type value and press Enter"),
+            Static("", id="settings-description"),
+        )
+
+    def on_mount(self) -> None:
+        input_widget = self.query_one("#settings-input", Input)
+        input_widget.display = False
+        self._update_description()
+
+    def on_option_list_option_highlighted(self, event: OptionList.OptionHighlighted) -> None:  # type: ignore[override]
+        self._active = event.option.id
+        self._editing = False
+        self._hide_input()
+        self._refresh_options(highlight=self._active)
+        self._update_description()
+
+    def on_option_list_option_selected(self, event: OptionList.OptionSelected) -> None:  # type: ignore[override]
+        self._active = event.option.id
+        self._handle_selection()
+
+    def on_input_submitted(self, event: Input.Submitted) -> None:
+        if not self._active:
+            return
+        setting = self._settings[self._active]
+        value = event.value.strip()
+        if not value:
+            self._hide_input()
+            return
+        try:
+            parsed = setting.parser(value) if setting.parser else value
+            setting.setter(parsed)
+        except Exception as exc:  # pragma: no cover - defensive
+            description = self.query_one("#settings-description", Static)
+            description.update(f"{setting.description}\n\nError: {exc}")
+            return
+        event.input.display = False
+        event.input.value = ""
+        self._editing = False
+        self._refresh_options(highlight=self._active)
+        self._update_description()
+        self._notify_update()
+
+    def _handle_selection(self) -> None:
+        if not self._active:
+            return
+        setting = self._settings[self._active]
+        if setting.options:
+            current = str(setting.getter())
+            options = setting.options
+            try:
+                idx = options.index(current)
+            except ValueError:
+                idx = -1
+            new_value = options[(idx + 1) % len(options)]
+            setting.setter(new_value)
+            self._refresh_options(highlight=self._active)
+            self._update_description()
+            self._notify_update()
+            return
+        input_widget = self.query_one("#settings-input", Input)
+        input_widget.display = True
+        input_widget.value = str(setting.getter() or "")
+        input_widget.focus()
+        self._editing = True
+
+    def _render_label(self, key: str) -> str:
+        setting = self._settings[key]
+        value = setting.getter()
+        return f"{setting.label}: {value}"
+
+    def _refresh_options(self, highlight: Optional[str] = None) -> None:
+        option_list = self.query_one("#settings-options", OptionList)
+        current_highlight = highlight or self._active
+        option_list.clear_options()
+        for key in self._order:
+            option = Option(self._render_label(key), id=key)
+            option_list.add_option(option)
+        if current_highlight and current_highlight in self._order:
+            index = self._order.index(current_highlight)
+            option_list.highlighted = index  # type: ignore[attr-defined]
+
+    def _update_description(self) -> None:
+        description = self.query_one("#settings-description", Static)
+        if not self._active:
+            description.update("")
+            return
+        setting = self._settings[self._active]
+        description.update(f"{setting.label}\n{setting.description}\nCurrent: {setting.getter()}")
+
+    def _hide_input(self) -> None:
+        input_widget = self.query_one("#settings-input", Input)
+        input_widget.display = False
+        input_widget.value = ""
+
+    def _notify_update(self) -> None:
+        self._on_update()
 class TUI(App):
+    BINDINGS = [("ctrl+comma", "show_settings", "Settings")]
     CSS = (
-        "Screen { layout: vertical; } "
-        "#status { padding: 0 1; border: solid $boost; } "
-        "#content { height: 1fr; layout: horizontal; } "
+        "Screen { layout: vertical; background: #0f0b0d; color: #f7f1f2; } "
+        "#top-bar { layout: horizontal; height: auto; min-height: 1; padding: 0 1; background: #1a0c0d; border: solid #3b1416; } "
+        "#status { width: 1fr; padding: 0 1; } "
+        "#top-right { layout: horizontal; width: auto; align-horizontal: right; } "
+        "#spinner { padding: 0 1; color: #c96161; } "
+        "#reasoning { padding: 0 1; color: #ff4d4f; text-style: bold; } "
+        "#content { height: 1fr; layout: horizontal; background: #130a0b; padding: 0 1 1 1; } "
         "#side-pane { width: 1fr; layout: vertical; } "
-        "#satisfaction { height: 1fr; border: solid $accent; padding: 0 1; } "
-        "#memory { height: 1fr; border: solid $accent; padding: 0 1; } "
-        "#log { width: 2fr; border: solid $accent; padding: 0 1; } "
-        ".user-msg { color: $success; } "
-        ".agent-msg { color: $warning; } "
-        ".system-msg { color: $text-muted; } "
-        ".answer-msg { color: $accent; text-style: bold; } "
-        ".context-msg { color: $boost; text-style: italic; }"
+        "#side-pane > RichLog { border: solid #3b1416; border-title-align: left; padding: 0 1; margin-bottom: 1; background: #1a0c0d; scrollbar-color: #ff4d4f #1a0c0d; } "
+        "#log { width: 2fr; border: solid #3b1416; border-title-align: left; padding: 0 1; margin-left: 1; background: #1a0c0d; scrollbar-color: #ff4d4f #1a0c0d; } "
+        ".user-msg { color: #f7f1f2; } "
+        ".agent-msg { color: #d3a4a6; text-style: italic; } "
+        ".system-msg { color: #d3a4a6; } "
+        ".answer-msg { color: #ff4d4f; text-style: bold; } "
+        ".context-msg { color: #ff4d4f; text-style: italic; } "
+        "#settings-title { text-style: bold; color: #ff4d4f; padding: 0 1; } "
+        "#settings-options { border: solid #3b1416; background: #1a0c0d; } "
+        "#settings-help { color: #d3a4a6; padding: 0 1; } "
+        "#settings-description { color: #f7f1f2; padding: 0 1; border: solid #3b1416; background: #1a0c0d; } "
+        "#settings-input { border: solid #3b1416; background: #0f0b0d; color: #f7f1f2; } "
     )
     running = reactive(False)
 
@@ -89,8 +228,15 @@ class TUI(App):
         self._satisfaction_error: Optional[str] = None
 
     def compose(self) -> ComposeResult:
-        yield Static(id="status")
-        yield Static(id="spinner")
+        yield Horizontal(
+            Static(id="status"),
+            Horizontal(
+                Static(id="spinner"),
+                Static(id="reasoning"),
+                id="top-right",
+            ),
+            id="top-bar",
+        )
         yield Input(
             placeholder="Ask anything (e.g., 'What files are here? Use ls(\".\")'). Press Enter…",
             id="in",
@@ -99,6 +245,8 @@ class TUI(App):
             Vertical(
                 RichLog(id="satisfaction", wrap=True, auto_scroll=True),
                 RichLog(id="memory", wrap=True, auto_scroll=True),
+                RichLog(id="dspy", wrap=True, auto_scroll=True),
+                RichLog(id="raw", wrap=False, auto_scroll=True),
                 id="side-pane",
             ),
             RichLog(id="log", wrap=True, auto_scroll=True),
@@ -112,52 +260,75 @@ class TUI(App):
         self.query_one(Input).focus()
         self._refresh_memory_view()
         self._refresh_satisfaction_view()
+        self._label_panes()
+        self.query_one("#dspy", RichLog).clear()
+        self.query_one("#raw", RichLog).clear()
+        self._update_reasoning_label()
         self._set_status("Idle")
         self._set_spinner(None)
 
     async def _process_job(self, job: Job, log: RichLog, loop: asyncio.AbstractEventLoop) -> None:
         jid = job.id[:8]
         log.write(Text(f"▶ {job.prompt!r}", style="system-msg"))
+        dspy_log = self.query_one("#dspy", RichLog)
+        dspy_log.write(Text(f"▶ {job.prompt!r}", style="system-msg"))
+        raw_log = self.query_one("#raw", RichLog)
+        raw_log.write(f"▶ {job.prompt!r}")
 
-        def run_agent() -> Dict[str, Any]:
-            return runtime.AGENT.run(job.prompt)
+        def run_agent():
+            agent = runtime.get_agent()
+            return agent(prompt=job.prompt)
 
-        result = await loop.run_in_executor(None, run_agent)
-        for step in result["steps"]:
+        prediction = await loop.run_in_executor(None, run_agent)
+        steps = getattr(prediction, "steps", [])
+        for step in steps:
             thought = step.get("thought", "")
             tool = step.get("tool", "")
             args = step.get("args", {})
             obs = step.get("observation", "")
             if thought:
                 log.write(Text(f"🤔 {thought}", style="context-msg"))
+                dspy_log.write(Text(f"🤔 {thought}", style="context-msg"))
             if tool and tool != "finish":
                 log.write(Text(f"🔧 {tool} {args}", style="context-msg"))
+                dspy_log.write(Text(f"🔧 {tool} {args}", style="context-msg"))
             if tool == "run_shell" and isinstance(obs, dict):
                 cmd = obs.get("command", "")
                 log.write(Text(f"🖥️ command: {cmd}", style="context-msg"))
+                dspy_log.write(Text(f"🖥️ command: {cmd}", style="context-msg"))
                 safety = obs.get("safety")
                 if isinstance(safety, dict):
                     summary = "passed" if safety.get("passed") else f"blocked ({safety.get('detail', '')})"
                     log.write(Text(f"🛡️ safety: {summary}", style="context-msg"))
+                    dspy_log.write(Text(f"🛡️ safety: {summary}", style="context-msg"))
                 out = obs.get("output", "")
                 if out:
                     log.write(Text(f"📥 output: {out}", style="context-msg"))
+                    dspy_log.write(Text(f"📥 output: {out}", style="context-msg"))
                 status = obs.get("status")
                 if status:
                     icon = "⚠️" if status != "ok" else "✅"
                     log.write(Text(f"{icon} status: {status}", style="context-msg"))
+                    dspy_log.write(Text(f"{icon} status: {status}", style="context-msg"))
             elif obs:
                 log.write(Text(f"📥 {obs}", style="context-msg"))
+                dspy_log.write(Text(f"📥 {obs}", style="context-msg"))
 
-        updates = await loop.run_in_executor(None, lambda: MEMORY_MODULE(prompt=job.prompt, steps=result["steps"]))
+        raw_history = getattr(prediction, "raw_history", [])
+        for chunk in raw_history:
+            raw_log.write(chunk)
+        raw_log.write("")
+
+        updates = await loop.run_in_executor(None, lambda: MEMORY_MODULE(prompt=job.prompt, steps=steps))
         if updates:
             self._active_modules.add("memory")
             self.apply_memory_updates(updates)
             self._refresh_memory_view()
             self.query_one("#memory", RichLog).scroll_end()
 
-        answer = result.get("answer", "")
+        answer = getattr(prediction, "answer", "")
         log.write(Text(f"✅ {answer}\n", style="answer-msg"))
+        dspy_log.write(Text(f"✅ {answer}", style="answer-msg"))
         if isinstance(answer, str) and answer.strip():
             self._history.append({"role": "assistant", "content": answer.strip()})
 
@@ -329,6 +500,105 @@ class TUI(App):
         if changed:
             save_memory_slots(self.memory_slots)
 
+    def _label_panes(self) -> None:
+        panes = {
+            "#satisfaction": "Satisfaction",
+            "#memory": "Memory",
+            "#dspy": "DSPy History",
+            "#raw": "DSPy Raw",
+            "#log": "Agent Log",
+        }
+        for selector, title in panes.items():
+            pane = self.query_one(selector, RichLog)
+            pane.border_title = title
+            pane.border_title_align = "left"
+
+    def action_show_settings(self) -> None:
+        overlay = SettingsOverlay(self._build_settings(), self._settings_changed)
+        self.push_screen(overlay)
+
+    def _build_settings(self) -> List[SettingDefinition]:
+        models = list(runtime.MODEL_PRESETS.keys())
+
+        def agent_model_get() -> str:
+            return runtime.get_module_model("agent")
+
+        def agent_model_set(value: str) -> None:
+            runtime.configure_model(value)
+
+        def max_tokens_get() -> int:
+            cfg = get_config()
+            return cfg.max_tokens or runtime.MODEL_PRESETS[agent_model_get()]["max_tokens"]
+
+        def max_tokens_set(value: int) -> None:
+            runtime.configure_model(agent_model_get(), max_tokens=value)
+
+        def memory_model_get() -> str:
+            return runtime.get_module_model("memory")
+
+        def memory_model_set(value: str) -> None:
+            runtime.configure_memory_model(value)
+
+        def goals_model_get() -> str:
+            return runtime.get_module_model("satisfaction_goals")
+
+        def goals_model_set(value: str) -> None:
+            runtime.configure_satisfaction_goals_model(value)
+
+        def score_model_get() -> str:
+            return runtime.get_module_model("satisfaction_score")
+
+        def score_model_set(value: str) -> None:
+            runtime.configure_satisfaction_score_model(value)
+
+        return [
+            SettingDefinition(
+                key="agent_model",
+                label="Agent Model",
+                description="Language model used for the main agent loop.",
+                getter=agent_model_get,
+                setter=agent_model_set,
+                options=models,
+            ),
+            SettingDefinition(
+                key="max_tokens",
+                label="Max Tokens",
+                description="Upper bound on completion tokens for the agent model.",
+                getter=max_tokens_get,
+                setter=max_tokens_set,
+                parser=int,
+            ),
+            SettingDefinition(
+                key="memory_model",
+                label="Memory Model",
+                description="Model that summarizes interactions into memory slots.",
+                getter=memory_model_get,
+                setter=memory_model_set,
+                options=models,
+            ),
+            SettingDefinition(
+                key="goals_model",
+                label="Goals Model",
+                description="Model used to generate instrumental goals for satisfaction tracking.",
+                getter=goals_model_get,
+                setter=goals_model_set,
+                options=models,
+            ),
+            SettingDefinition(
+                key="score_model",
+                label="Satisfaction Model",
+                description="Model that scores progress against the current goals.",
+                getter=score_model_get,
+                setter=score_model_set,
+                options=models,
+            ),
+        ]
+
+    def _settings_changed(self) -> None:
+        state = "Running" if self.running else "Idle"
+        self._update_reasoning_label()
+        self._set_status(state, running=self.running)
+
     def _refresh_memory_view(self) -> None:
         memory_log = self.query_one("#memory", RichLog)
         memory_log.clear()
@@ -436,6 +706,7 @@ class TUI(App):
             parts.append(f"Error: {error}")
         status_text = " · ".join(parts)
         self.query_one("#status", Static).update(status_text)
+        self._update_reasoning_label()
         self._update_spinner_timer(running)
 
     def _update_spinner_timer(self, running: bool) -> None:
@@ -471,6 +742,17 @@ class TUI(App):
     @staticmethod
     def _spinner_frames() -> List[str]:
         return ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"]
+
+    def _update_reasoning_label(self) -> None:
+        label = self.query_one("#reasoning", Static)
+        label.update(self._reasoning_summary())
+
+    def _reasoning_summary(self) -> str:
+        model_key = runtime.get_module_model("agent")
+        preset = runtime.MODEL_PRESETS.get(model_key, {})
+        reasoning = preset.get("reasoning") or {}
+        effort = reasoning.get("max_tokens")
+        return f"Reasoning Effort: {effort}" if effort is not None else "Reasoning Effort: –"
 
     def _handle_shortcut(self, key: str, from_input: bool = False) -> bool:
         if from_input:
