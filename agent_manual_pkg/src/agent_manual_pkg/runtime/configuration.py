@@ -91,7 +91,6 @@ def configure_satisfaction_score_model(model_key: str, persist: bool = True) -> 
     _set_module_model("satisfaction_score", model_key, persist=persist)
 
 
-configure_model(CURRENT_MODEL, persist=False)
 
 
 def get_agent() -> ReadableReAct:
