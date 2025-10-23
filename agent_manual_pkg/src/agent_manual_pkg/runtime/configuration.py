@@ -16,7 +16,7 @@ if cfg_initial.model != CURRENT_MODEL:
     update_config(model=CURRENT_MODEL)
 
 LM: dspy.LM | None = None
-AGENT: ReadableReAct | None = None
+_AGENT: ReadableReAct | None = None
 
 
 def _resolve_tokens(model_key: str, max_tokens: int | None) -> int:
@@ -59,10 +59,10 @@ def configure_model(model_key: str, max_tokens: int | None = None, persist: bool
 
     cfg = update_config(persist=persist, **updates)
 
-    global CURRENT_MODEL, LM, AGENT
+    global CURRENT_MODEL, LM, _AGENT
     CURRENT_MODEL = cfg.model
     LM = dspy.settings.lm
-    AGENT = ReadableReAct(AgentSignature, tools=TOOLS, max_iters=8)
+    _AGENT = ReadableReAct(AgentSignature, tools=TOOLS, max_iters=8)
 
 
 def configure_memory_model(model_key: str, persist: bool = True) -> None:
@@ -92,3 +92,9 @@ def configure_satisfaction_score_model(model_key: str, persist: bool = True) -> 
 
 
 configure_model(CURRENT_MODEL, persist=False)
+
+
+def get_agent() -> ReadableReAct:
+    if _AGENT is None:
+        configure_model(get_config().model, persist=False)
+    return _AGENT  # type: ignore[return-value]

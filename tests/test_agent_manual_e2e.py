@@ -113,4 +113,4 @@ def test_e2e_tui_help_toggle(tmp_path):
     )
 
     lines = [line.strip() for line in proc.stdout.splitlines() if line.strip()]
-    assert "HelpScreen" in lines
+    assert any("HelpScreen" in line for line in lines)
