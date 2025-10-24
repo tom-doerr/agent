@@ -30,6 +30,7 @@ HELP_TEXT = (
     "  /model     Change default model\n"
     "  /modules   Assign models per module\n"
     "  /max_tokens <n>  Set max output tokens\n"
+    "  /layout stacked|wide  Switch layout for narrow terminals\n"
 )
 
 
@@ -184,13 +185,15 @@ class TUI(App):
         "Screen { layout: vertical; background: #0f0b0d; color: #f7f1f2; } "
         "#top-bar { layout: horizontal; height: auto; min-height: 1; padding: 0 1; background: #1a0c0d; border: solid #3b1416; } "
         "#status { width: 1fr; padding: 0 1; } "
-        "#top-right { layout: horizontal; width: auto; align-horizontal: right; } "
-        "#spinner { padding: 0 1; color: #c96161; } "
+        "#top-right { layout: horizontal; width: auto; min-width: 24; align-horizontal: right; } "
+        "#spinner { padding: 0 1; min-width: 12; color: #c96161; } "
         "#reasoning { padding: 0 1; color: #ff4d4f; text-style: bold; } "
         "#content { height: 1fr; layout: horizontal; background: #130a0b; padding: 0 1 1 1; } "
-        "#side-pane { width: 1fr; layout: vertical; } "
+        "#content.stacked { layout: vertical; } "
+        "#side-pane { width: 1fr; min-width: 30; layout: vertical; } "
         "#side-pane > RichLog { border: solid #3b1416; border-title-align: left; padding: 0 1; margin-bottom: 1; background: #1a0c0d; scrollbar-color: #ff4d4f #1a0c0d; } "
-        "#log { width: 2fr; border: solid #3b1416; border-title-align: left; padding: 0 1; margin-left: 1; background: #1a0c0d; scrollbar-color: #ff4d4f #1a0c0d; } "
+        "#log { width: 2fr; min-width: 40; border: solid #3b1416; border-title-align: left; padding: 0 1; margin-left: 1; background: #1a0c0d; scrollbar-color: #ff4d4f #1a0c0d; } "
+        "#log.stacked { margin-left: 0; } "
         ".user-msg { color: #f7f1f2; } "
         ".agent-msg { color: #d3a4a6; text-style: italic; } "
         ".system-msg { color: #d3a4a6; } "
@@ -266,6 +269,7 @@ class TUI(App):
         self._update_reasoning_label()
         self._set_status("Idle")
         self._set_spinner(None)
+        self._set_layout("wide")
 
     async def _process_job(self, job: Job, log: RichLog, loop: asyncio.AbstractEventLoop) -> None:
         jid = job.id[:8]
@@ -374,8 +378,19 @@ class TUI(App):
             event.input.value = ""
             return
 
+        if text.lower() == "blueberries":
+            log.write(Text("✅ seirrebeulb\n", style="answer-msg"))
+            self._history.append({"role": "assistant", "content": "seirrebeulb"})
+            event.input.value = ""
+            return
+
         log.write(Text(text, style="user-msg"))
         log.scroll_end()
+
+        # Route slash-commands and awaiting states through a tiny handler.
+        if self._handle_command(text, log):
+            event.input.value = ""
+            return
 
         if self.awaiting_module_model_choice and self.selected_module:
             choice = text.lower()
@@ -482,6 +497,64 @@ class TUI(App):
         self._history.append({"role": "user", "content": text})
         await self.q.put(Job(id=str(uuid.uuid4()), prompt=text))
         event.input.value = ""
+
+    def _handle_command(self, text: str, log: RichLog) -> bool:
+        """Return True if input was a command and consumed here."""
+        if text.startswith("/layout"):
+            parts = text.split()
+            mode = parts[1].lower() if len(parts) > 1 else "stacked"
+            if mode not in {"stacked", "wide"}:
+                log.write(Text("usage: /layout stacked|wide", style="system-msg"))
+                return True
+            self._set_layout(mode)
+            log.write(Text(f"layout set to {mode}", style="system-msg"))
+            return True
+        if text == "/modules":
+            self.awaiting_model_choice = False
+            self.awaiting_max_tokens = False
+            self._reset_module_state()
+            self.awaiting_module_selection = True
+            for idx, module_name in enumerate(runtime.MODULE_ORDER, start=1):
+                label = runtime.MODULE_INFO[module_name]["label"]
+                current = runtime.get_module_model(module_name)
+                log.write(Text(f"{idx}. {module_name} ({label}) current={current}", style="system-msg"))
+            return True
+
+        if text == "/model":
+            options = ", ".join(runtime.MODEL_PRESETS)
+            log.write(Text(f"choose model ({options}). current={get_config().model}", style="system-msg"))
+            self.awaiting_model_choice = True
+            self._reset_module_state()
+            return True
+
+        if text.startswith("/max_tokens"):
+            parts = text.split()
+            if len(parts) == 2:
+                try:
+                    value = int(parts[1])
+                    if value <= 0:
+                        raise ValueError
+                except ValueError:
+                    log.write(Text("usage: /max_tokens <positive integer>", style="system-msg"))
+                else:
+                    runtime.configure_model(get_config().model, max_tokens=value)
+                    log.write(Text(f"max_tokens set to {value}", style="system-msg"))
+            else:
+                self.awaiting_max_tokens = True
+                self._reset_module_state()
+                log.write(Text("enter a positive integer for max_tokens", style="system-msg"))
+            return True
+        return False
+
+    def _set_layout(self, mode: str) -> None:
+        content = self.query_one("#content", Horizontal)
+        log = self.query_one("#log", RichLog)
+        if mode == "stacked":
+            content.add_class("stacked")
+            log.add_class("stacked")
+        else:
+            content.remove_class("stacked")
+            log.remove_class("stacked")
 
     def apply_memory_updates(self, updates: List[MemorySlotUpdate]) -> None:
         changed = False
@@ -778,16 +851,10 @@ class TUI(App):
             focused_widget = self.focused
         except ScreenStackError:
             focused_widget = None
-        handled = self._handle_shortcut(event.key, isinstance(focused_widget, Input))
-        if handled:
+        if self._handle_shortcut(event.key, isinstance(focused_widget, Input)):
             event.stop()
             return
-        try:
-            screen = self.screen
-        except ScreenStackError:
-            screen = None
-        if screen is not None:
-            screen._forward_event(event)
+        # Let Textual route the event normally; no private API calls.
 
 
     def _module_summary(self) -> str:

@@ -42,8 +42,7 @@ def send_message(message: str) -> str:
 
 
 TOOLS = [
-    dspy.Tool(ls, name="ls", desc="List directory entries. ls(path='.')"),
-    dspy.Tool(run_shell, name="run_shell", desc="Execute a shell command after a safety check."),
-    dspy.Tool(send_message, name="send_message", desc="Reply directly to the user with plain text."),
+    dspy.Tool(ls, name="ls", desc="List directory entries.", args={"path": "Directory to list (default '.')"}),
+    dspy.Tool(run_shell, name="run_shell", desc="Execute a shell command after safety review.", args={"command": "Command to execute"}),
+    dspy.Tool(send_message, name="send_message", desc="Reply directly to the user.", args={"message": "Message text"}),
 ]
-

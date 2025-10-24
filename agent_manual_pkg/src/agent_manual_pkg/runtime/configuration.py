@@ -4,17 +4,14 @@ from typing import Any, Dict
 
 import dspy
 
-from ..config import get_config, load_config, update_config
+from ..config import get_config, update_config
 from ..signatures import AgentSignature
 from .agent import ReadableReAct
 from .models import MODEL_PRESETS, MODULE_INFO, MODULE_ORDER
 from .tools import TOOLS
 
-cfg_initial = load_config()
-CURRENT_MODEL = cfg_initial.model if cfg_initial.model in MODEL_PRESETS else "chat"
-if cfg_initial.model != CURRENT_MODEL:
-    update_config(model=CURRENT_MODEL)
-
+# Defer all config I/O to the CLI entrypoint.
+CURRENT_MODEL = "chat"
 LM: dspy.LM | None = None
 _AGENT: ReadableReAct | None = None
 
