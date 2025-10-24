@@ -1,63 +1,58 @@
-# Agent Project - SimpleDSPy Agent
+# deepseek-batch
 
-This project features a DSPy-based agent that can run commands and interact with users. It uses OpenRouter models for processing requests.
+Minimal, no-frills batching with DeepSeek over OpenRouter, using dspy to select the best answer from parallel candidates.
 
-## Setup
+- Uses OpenRouter `chat/completions`
+- Sends N identical requests in parallel
+- Feeds original prompt + candidates to a small dspy `Predict` to pick one
+- CLI: `deepseek-batch "your prompt" -n 5`
+- TUI: `deepseek-batch-tui` (Textual)
+ - Tree CLI: `deepseek-tree "your prompt" --init-n 4 --expand-k 2 --iters 2`
 
-1.  **Ensure you are in the project root directory: `/home/tom/git/agent/`**
+Env vars:
+- `OPENROUTER_API_KEY` (required)
+- `OPENROUTER_MODEL` (default: `deepseek/deepseek-v3.2`; set to your preferred DeepSeek model on OpenRouter)
 
-2.  **Run the setup script**
-    ```bash
-    ./setup_env.sh
-    ```
-    This creates a Python virtual environment in `.venv`, installs the requirements and
-    generates an `.env.example` file. Copy `.env.example` to `.env` and fill in your
-    API keys.
+Examples:
 
-3.  **(Manual setup)** If you prefer to do things manually, create and activate the virtual
-    environment and install dependencies yourself:
-    ```bash
-    python3.11 -m venv .venv
-    source .venv/bin/activate
-    uv pip install -r requirements.txt
-    ```
+```
+export OPENROUTER_API_KEY=...  # required
+export OPENROUTER_MODEL=deepseek/deepseek-v3.2
 
-4.  **Set up OpenRouter API key:**
-    *   Create a free account at [OpenRouter](https://openrouter.ai/)
-    *   Add your API key to environment variables:
-        ```bash
-        echo "export OPENROUTER_API_KEY='your_api_key'" >> ~/.bashrc
-        source ~/.bashrc
-        ```
+# CLI
+deepseek-batch "Outline a README structure" -n 4
 
-5.  **Run the SimpleDSPy agent:**
-    ```bash
-    python agent_simpledspy.py
-    ```
+# TUI (optional)
+# pip install .[tui]
+deepseek-batch-tui
 
-## Training Data Management
+# Tree search CLI
+deepseek-tree "Summarize this text" --init-n 4 --expand-k 2 --iters 2
 
-The agent's performance depends on quality training data stored in `.simpledspy/modules/`. To improve results:
+# Python
+from deepseek_batch import batch_best, BestOfBatch
+print(batch_best("Outline a README structure", n=4))
 
-1.  **Review logged interactions:**
-    ```bash
-    less .simpledspy/modules/*/logged.jsonl
-    ```
+# As a dspy module on raw text
+bo = BestOfBatch(n=4)
+print(bo("Give me 3 bullet points"))
 
-2.  **Add good samples to training data:**
-    Copy well-performing examples from `logged.jsonl` to corresponding `training.jsonl` files
+# With a dspy Signature
+import dspy
 
-3.  **Correct problematic samples:**
-    Edit `training.jsonl` to fix incorrect responses
+class Summarize(dspy.Signature):
+    """One-sentence summary"""
+    passage: str
+    summary: str
 
-4.  **Add new training examples:**
-    Create new entries in `training.jsonl` for desired behaviors
+print(BestOfBatch(n=3)(Summarize, passage="DSPy is a framework ..."))
+```
 
-## Development
+Note: Special test hook — if input is exactly `blueberries`, it returns the reversed string `seirrebeulb`.
 
-*   The main agent script is `agent_simpledspy.py`
-*   Training data is stored in `.simpledspy/modules/`
-*   Use `--lm` flag to switch models: `flash`, `r1`, or `dv3`
-    ```bash
-    python agent_simpledspy.py --lm r1
-    ```
+Quick dev:
+
+```
+python -m pip install -e .
+pytest -q tests  # runs offline tests only
+```
