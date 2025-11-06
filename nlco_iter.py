@@ -5,6 +5,8 @@ import datetime
 from pathlib import Path
 import re
 from typing import Optional
+import json
+import os
 
 from pydantic import BaseModel, Field
 
@@ -86,9 +88,50 @@ STRUCTURED_SCHEDULE_FILE = Path('structured_schedule.json')
 
 MAX_ITERATIONS = 3
 
+_MODEL_LOG_PATH = Path(os.getenv("NLCO_MODEL_LOG", ".nlco/model_log.jsonl"))
+
 
 def _now_str() -> str:
     return datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+
+def _extract_reasoning_from_message(msg: dict) -> str | None:
+    """Return provider-native reasoning text, if present.
+    - DeepSeek API: message["reasoning_content"] (string)
+    - OpenRouter: message["reasoning"] may be a dict with "text" or "summary".
+    """
+    if not isinstance(msg, dict):
+        return None
+    rc = msg.get("reasoning_content")
+    if isinstance(rc, str) and rc.strip():
+        return rc.strip()
+    r = msg.get("reasoning")
+    if isinstance(r, dict):
+        text = r.get("text") or r.get("summary")
+        if isinstance(text, str) and text.strip():
+            return text.strip()
+    return None
+
+
+def _extract_last_reasoning_text() -> str | None:
+    try:
+        resp = lm.history[-1]["response"]
+        msg = resp["choices"][0]["message"]
+    except Exception:
+        return None
+    return _extract_reasoning_from_message(msg)
+
+
+def _log_model(stage: str, *, output: str | None, reasoning: str | None) -> None:
+    _MODEL_LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
+    rec = {
+        "ts": datetime.datetime.now().isoformat(timespec="seconds"),
+        "stage": stage,
+        "output": output or "",
+        "reasoning": reasoning or "",
+    }
+    with _MODEL_LOG_PATH.open("a", encoding="utf-8") as fh:
+        fh.write(json.dumps(rec, ensure_ascii=False) + "\n")
 
 
 async def iteration_loop(*, max_iterations: Optional[int] = None):
@@ -114,6 +157,14 @@ async def iteration_loop(*, max_iterations: Optional[int] = None):
                 context=context,
                 artifact=artifact,
             )
+            try:
+                summary = (
+                    f"emotions={affect_report.emotions}, urgency={affect_report.urgency}, "
+                    f"confidence={affect_report.confidence}"
+                ) if affect_report else None
+                _log_model("Affect", output=summary, reasoning=_extract_last_reasoning_text())
+            except Exception:
+                pass
 
             log_iteration_to_mlflow(i + 1, affect_report, executive_summary=None)
 
@@ -134,6 +185,14 @@ async def iteration_loop(*, max_iterations: Optional[int] = None):
             )
             critique = critique_prediction.critique
             console.print(Panel(critique, title=f"Critique @ {_now_str()}", border_style="yellow"))
+            try:
+                _log_model("Critic", output=critique, reasoning=_extract_last_reasoning_text())
+            except Exception:
+                pass
+            # Show model-native reasoning (if provided by the provider)
+            reasoning = _extract_last_reasoning_text()
+            if reasoning:
+                console.print(Panel(reasoning, title="Model Reasoning · Critic", border_style="blue"))
 
             refined_prediction = run_with_metrics(
                 'Refiner',
@@ -144,6 +203,13 @@ async def iteration_loop(*, max_iterations: Optional[int] = None):
                 artifact=artifact,
             )
             refined = refined_prediction.refined_artifact
+            try:
+                _log_model("Refiner", output=refined, reasoning=_extract_last_reasoning_text())
+            except Exception:
+                pass
+            reasoning = _extract_last_reasoning_text()
+            if reasoning:
+                console.print(Panel(reasoning, title="Model Reasoning · Refiner", border_style="blue"))
             try:
                 schedule_blocks = normalize_schedule(getattr(refined_prediction, "structured_schedule", []))
             except ValueError as schedule_error:

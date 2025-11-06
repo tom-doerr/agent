@@ -24,7 +24,7 @@ def install_fake_dspy(best_choice: int = 1):
         m._configured = lm
 
     m.best_choice = best_choice
-    m._calls = []  # (sig, kwargs) for non-PickBest
+    m._calls = []  # (sig, kwargs)
     m._configured = None
 
     class Predict:
@@ -36,7 +36,6 @@ def install_fake_dspy(best_choice: int = 1):
                 class Obj:
                     def __init__(self, v):
                         self.best = v
-
                 return Obj(m.best_choice)
             if getattr(self.sig, "__name__", "") == "PairwiseBetter":
                 left, right = kwargs.get("left", ""), kwargs.get("right", "")
@@ -45,7 +44,6 @@ def install_fake_dspy(best_choice: int = 1):
                     def __init__(self, b):
                         self.better = b
                 return Obj(better)
-            # record and return a printable object
             idx = len(m._calls)
             m._calls.append((self.sig, kwargs))
 
@@ -54,7 +52,6 @@ def install_fake_dspy(best_choice: int = 1):
                     if "previous" in kwargs:
                         return f"{kwargs['previous']}+"
                     return "BASE"
-
             return Out()
 
     m.Signature = Signature
@@ -62,32 +59,25 @@ def install_fake_dspy(best_choice: int = 1):
     m.Predict = Predict
     m.OpenAI = OpenAI
     m.configure = configure
-
     sys.modules["dspy"] = m
-    # Provide a tiny httpx stub if missing (tests never call it)
+
+    # httpx stub (not used by these tests but harmless)
     if "httpx" not in sys.modules:
         httpx = types.ModuleType("httpx")
-
         class AsyncClient:
             def __init__(self, *a, **kw):
                 pass
-
             async def __aenter__(self):
                 return self
-
             async def __aexit__(self, *exc):
                 return False
-
             async def post(self, *a, **kw):
                 class Resp:
                     def raise_for_status(self):
                         pass
-
                     def json(self):
                         return {"choices": [{"message": {"content": "stub"}}]}
-
                 return Resp()
-
         httpx.AsyncClient = AsyncClient
         sys.modules["httpx"] = httpx
     return m
@@ -95,18 +85,12 @@ def install_fake_dspy(best_choice: int = 1):
 
 @contextmanager
 def fresh_pkg():
-    for name in [
-        "deepseek_batch",
-        "deepseek_batch.cli",
-    ]:
+    for name in ["deepseek_batch", "deepseek_batch.cli", "deepseek_batch.cli_tree", "deepseek_batch.tui"]:
         sys.modules.pop(name, None)
     try:
         yield
     finally:
-        for name in [
-            "deepseek_batch",
-            "deepseek_batch.cli",
-        ]:
+        for name in ["deepseek_batch", "deepseek_batch.cli", "deepseek_batch.cli_tree", "deepseek_batch.tui"]:
             sys.modules.pop(name, None)
 
 
@@ -116,3 +100,4 @@ def import_pkg():
     if root not in sys.path:
         sys.path.insert(0, root)
     return importlib.import_module("deepseek_batch")
+

@@ -11,7 +11,7 @@ from typing import Optional
 from textual import events
 from textual.app import App, ComposeResult
 from textual.containers import Container, Vertical
-from textual.widgets import Footer, Header, Input, Log, Static, TextArea
+from textual.widgets import Footer, Header, Input, Log, Static, Markdown
 
 ARTIFACT_FILE = Path("artifact.md")
 CONSTRAINTS_FILE = Path("constraints.md")
@@ -385,6 +385,7 @@ class TimestampLogApp(App):
         self._artifact_timer = None
         self._last_constraints_date: Optional[date] = None
         self._artifact_status_message = "Artifact status: initializing…"
+        self._pending_g = False  # for 'gi' shortcut
 
     def compose(self) -> ComposeResult:
         yield Header()
@@ -393,21 +394,19 @@ class TimestampLogApp(App):
         yield VimInput(placeholder="Type here and press Enter...", id="input")
         with Vertical(id="artifact-container"):
             yield Static("Artifact", id="artifact-title")
-            yield TextArea(id="artifact-view")
+            yield Markdown(id="artifact-view")
             yield Static("Artifact status: initializing…", id="artifact-status")
         yield Static(self._help_text(), id="help-panel")
         yield Footer()
 
     def on_mount(self) -> None:
-        self._artifact_view = self.query_one("#artifact-view", TextArea)
+        self._artifact_view = self.query_one("#artifact-view", Markdown)
         self._artifact_title = self.query_one("#artifact-title", Static)
         self._artifact_status = self.query_one("#artifact-status", Static)
         self._log_widget = self.query_one("#log", Log)
         self._input = self.query_one("#input", Input)
         self._help_panel = self.query_one("#help-panel", Static)
-        self._artifact_view.read_only = True
-        self._artifact_view.show_line_numbers = False
-        self._artifact_view.cursor_line = 1
+        # Markdown is read-only by design; no extra setup needed
         self._log_widget.highlight = False
         self._log_widget.wrap = True
         self.set_focus(self._input)
@@ -446,6 +445,23 @@ class TimestampLogApp(App):
         self._append_to_constraints(current_date, formatted_line)
         self._input.value = ""
 
+    def on_key(self, event: events.Key) -> None:  # minimal 'gi' shortcut
+        # Only act when focus is NOT on the input box
+        if getattr(self.focused, "id", None) == "input" or isinstance(self.focused, VimInput):
+            self._pending_g = False
+            return
+        if event.key == "g":
+            self._pending_g = True
+            event.stop()
+            return
+        if event.key == "i" and self._pending_g:
+            self.set_focus(self._input)
+            self._pending_g = False
+            event.stop()
+            return
+        # any other key cancels the sequence
+        self._pending_g = False
+
     def _load_artifact(self) -> None:
         mtime: Optional[float] = None
         try:
@@ -464,8 +480,7 @@ class TimestampLogApp(App):
 
         self._artifact_mtime = mtime
         self._artifact_title.update(f"Artifact — {self._artifact_path}")
-        self._artifact_view.text = content
-        self._artifact_view.cursor_line = 1
+        self._artifact_view.update(content)
         self._update_artifact_status()
 
     def _maybe_refresh_artifact(self) -> None:
@@ -475,7 +490,7 @@ class TimestampLogApp(App):
             if self._artifact_mtime is not None:
                 self._artifact_mtime = None
                 self._artifact_title.update(f"Artifact — {self._artifact_path}")
-                self._artifact_view.text = "(artifact not found)"
+                self._artifact_view.update("(artifact not found)")
                 self._update_artifact_status()
             return
         except Exception:  # pragma: no cover - diagnostics only

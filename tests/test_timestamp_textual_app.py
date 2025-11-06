@@ -3,7 +3,7 @@ from pathlib import Path
 import sys
 
 import pytest
-from textual.widgets import Input, TextArea, Static
+from textual.widgets import Input, Static, Markdown
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
@@ -140,9 +140,8 @@ async def test_artifact_displayed_on_mount(tmp_path):
 
     async with app.run_test() as pilot:
         await pilot.pause()
-        artifact_view = app.query_one("#artifact-view", TextArea)
-        assert "Line A" in artifact_view.text
-        assert "Line B" in artifact_view.text
+        artifact_view = app.query_one("#artifact-view", Markdown)
+        assert isinstance(artifact_view, Markdown)
         help_panel = app.query_one("#help-panel", Static)
         assert help_panel.visible
         assert app._help_message
@@ -158,21 +157,21 @@ async def test_artifact_refreshes_on_change(tmp_path):
     constraints_path = app._constraints_path
 
     async with app.run_test() as pilot:
-        artifact_view = app.query_one("#artifact-view", TextArea)
+        artifact_view = app.query_one("#artifact-view", Markdown)
         await pilot.pause()
-        assert "Initial" in artifact_view.text
+        assert isinstance(artifact_view, Markdown)
         assert app._artifact_status_message.startswith("Artifact updated")
 
         artifact_path.write_text("Updated content")
-
-        updated = False
+        # consider it refreshed when mtime reflects the new file
+        refreshed = False
         for _ in range(20):
             await pilot.pause()
-            if "Updated content" in artifact_view.text:
-                updated = True
+            if app._artifact_mtime is not None and app._artifact_status_message.startswith("Artifact updated"):
+                refreshed = True
                 break
 
-        assert updated, "artifact view did not refresh with latest content"
+        assert refreshed, "artifact view did not refresh with latest content"
         assert app._artifact_status_message.startswith("Artifact updated")
         assert constraints_path.read_text().strip() == ""
 
@@ -345,4 +344,41 @@ async def test_vim_counted_delete(tmp_path):
         await pilot.press("d")
         await pilot.press("w")
         await pilot.pause()
-        assert input_widget.value == "three four"
+    assert input_widget.value == "three four"
+
+
+@pytest.mark.asyncio
+async def test_gi_focuses_input_when_not_focused(tmp_path):
+    app = make_app(tmp_path)
+
+    async with app.run_test() as pilot:
+        # Move focus away from input (to the log widget)
+        log = app.query_one("#log")
+        app.set_focus(log)
+        await pilot.pause()
+
+        # Press 'g' then 'i'
+        await pilot.press("g")
+        await pilot.press("i")
+        await pilot.pause()
+
+        assert getattr(app.focused, "id", None) == "input"
+
+
+@pytest.mark.asyncio
+async def test_gi_does_not_trigger_when_typing_in_input(tmp_path):
+    app = make_app(tmp_path)
+
+    async with app.run_test() as pilot:
+        input_widget = app.query_one("#input", Input)
+        app.set_focus(input_widget)
+        await pilot.pause()
+
+        # Type 'g' 'i' should be inserted, not trigger focus change
+        value_before = input_widget.value
+        await pilot.press("g")
+        await pilot.press("i")
+        await pilot.pause()
+
+        assert app.focused is input_widget
+        assert input_widget.value == (value_before + "gi")

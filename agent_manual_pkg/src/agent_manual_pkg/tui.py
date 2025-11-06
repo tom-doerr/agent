@@ -271,6 +271,11 @@ class TUI(App):
         self._set_spinner(None)
         self._set_layout("wide")
 
+    async def on_unmount(self) -> None:
+        for task in list(self._worker_tasks):
+            task.cancel()
+        self._worker_tasks.clear()
+
     async def _process_job(self, job: Job, log: RichLog, loop: asyncio.AbstractEventLoop) -> None:
         jid = job.id[:8]
         log.write(Text(f"▶ {job.prompt!r}", style="system-msg"))
