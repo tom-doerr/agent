@@ -1,4 +1,4 @@
- Agent Notes (updated 2025-11-05)
+Agent Notes (updated 2025-11-05)
 
 - NLCO iter TUI lives in `nlco_textual.py` (`NLCOTextualApp`). Run: `python nlco_textual.py`.
 - Headless alternative is `nlco_iter.py` (console loop). Run: `python nlco_iter.py`.
@@ -32,6 +32,9 @@ Textual Markdown
 - Textual provides a `Markdown` widget that parses Markdown with a GFM-like parser (tables, task lists, strikethrough, autolinks).
 - For interactive/spreadsheet-like tables, use `DataTable`; Markdown tables are static.
 - TimestampLogApp now renders `artifact.md` via `Markdown` (read-only) instead of a `TextArea`.
+
+Release
+- v0.1.1 (2025-11-06): reasoning trace panels in `nlco_iter`, JSONL model logging, TimestampLogApp Markdown view + `gi` input focus, tests updated.
 
 Quick usage
 - TUI: press `r` to run one iteration, `Ctrl+S` to save, `Ctrl+L` to clear logs.
