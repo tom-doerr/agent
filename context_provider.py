@@ -128,8 +128,9 @@ def get_home_status():
 
 def create_context_string():
     """Create the full context string for the AI."""
+    now = datetime.datetime.now()
     context_parts = [
-        f"Datetime: {datetime.datetime.now():%Y-%m-%d %H:%M:%S}",
+        f"Datetime: {now:%Y-%m-%d %H:%M:%S} ({now:%A})",
         f"Weather: {get_weather_info()}",
     ]
     

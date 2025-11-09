@@ -185,6 +185,7 @@ artifact.md
 
 # Log files
 *.log
+.nlco/
 
 # Environment variables
 .env

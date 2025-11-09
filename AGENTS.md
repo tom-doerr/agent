@@ -11,6 +11,7 @@ Things to keep in mind
 - MLflow is optional; `nlco_textual.py` enables it if available and writes `structured_schedule.json` in repo root.
 - Constraints and artifact paths are fixed: `constraints.md`, `artifact.md`, `memory.md`, `short_term_memory.md`.
 - `timestamp_textual_app.py` appends to `constraints.md` and can be used alongside NLCO tools, but beware of concurrent writes to the same file.
+ - Context now includes weekday explicitly: `Datetime: YYYY-MM-DD HH:MM:SS (Friday)` for better temporal grounding.
 
 Models & budgets (NLCO iter)
 - Primary LM: `deepseek/deepseek-reasoner` with `max_tokens=40000` (`nlco_iter.py:35`, `nlco_textual.py:203`).
@@ -36,14 +37,42 @@ Textual Markdown
 Release
 - v0.1.1 (2025-11-06): reasoning trace panels in `nlco_iter`, JSONL model logging, TimestampLogApp Markdown view + `gi` input focus, tests updated.
 
+Nootropics log (read-only)
+- NLCO Textual UI now shows the last 72h of entries from `~/.nootropics_log.jsonl` in a side panel.
+- Strictly read-only: the loader never writes or truncates the file.
+- Env var `NLCO_NOOTROPICS_LOG` can point to a different JSONL file for testing.
+- Minimal schema: each line must be JSON with an ISO `ts` field; lines without `ts` are skipped.
+
+Caching placement
+- To maximize DSPy cache reuse, nootropics data is appended to the `context` input (not `constraints`).
+- This keeps the `constraints` string stable across runs and pushes variable nootropics lines "behind" constraints in the prompt ordering.
+- Both `nlco_iter.py` and `nlco_textual.py` add a `Nootropics (last 72h)` section at the end of `context`.
+
+NLCO iter tests
+- Added tests covering headless iteration behavior without touching real LMs:
+  - `tests/test_nlco_iter_logging_and_schedule.py` ensures artifact update, structured schedule JSON write, and JSONL model logs with reasoning.
+  - `tests/test_nlco_iter_nootropics_context.py` asserts nootropics appear only in `context` and that `constraints` remain unchanged.
+  - Existing `tests/test_nlco_iter.py` validates async memory invocation and artifact write.
+- Note: Running the entire repo test suite may fail due to duplicate test module names in `packages/deepseek-batch/tests/`. Run selective tests for NLCO iter.
+
 Quick usage
 - TUI: press `r` to run one iteration, `Ctrl+S` to save, `Ctrl+L` to clear logs.
 - Headless: scheduler decides when to run; finished-check is currently disabled.
  - Timestamp app: new `gi` shortcut focuses the input if focus is elsewhere.
 
+Layout tweak (2025-11-07)
+- Increased artifact editor area relative to constraints: `#constraints-pane` height 12, `#editor-row` height 30.
+- Added `tests/test_nlco_textual_layout.py` to pin these values.
+
+Constraints pane behavior
+- The constraints pane now tails the last ~40 lines of `constraints.md`, so it reflects external edits (e.g., TimestampLogApp) rather than just the in-app message list.
+- Input submissions still append to the in-app list and rewrite `constraints.md` from that list when running an iteration; avoid concurrent writers to the same file.
+- Test: `tests/test_nlco_textual_constraints_tail.py` ensures the pane shows only the tail.
+
 Potential rough edges observed
 - `nlco_iter.py` disables finished-check (`if False:`), so it may iterate indefinitely unless externally stopped.
 - `nlco_textual.py` writes files in place; concurrent runs could clobber state.
+- Timewarrior context: headless `nlco_iter.py` currently does not call `TimewarriorModule.run`, so no Timewarrior info is added to the model context. In the Textual UI, `TimewarriorModule.run` is invoked and its output is shown in the "Timewarrior" pane, but it is not injected into the `context` string passed to Critic/Refiner.
 
 Future test ideas
 - Add a Textual `App.run_test()` smoke test to ensure `NLCOTextualApp` composes and updates logs without launching a real UI.
@@ -58,3 +87,10 @@ Timewarrior Control — Conceptual Plan
 - Control policy: default to deterministic rules from `structured_schedule.json` (start/stop on block boundaries; derive tags from the active block). Use the LLM reviewer only when schedule vs. context disagree.
 - Safety and UX: add a 2–3 minute hysteresis to avoid flapping; add a dry-run flag; allow manual overrides via constraints lines (e.g., `timew:start tag1 tag2`, `timew:stop`).
 - Observability: record `{ts, action, tags, justification, stdout/stderr}` to `.nlco/timew_log.jsonl`; unit-test both “timew missing” and normal paths.
+
+Artifact improvement (concept-only, 2025-11-08)
+- Minimal acceptance gate: only replace the baseline artifact when a tiny rubric score improves. No fallbacks.
+- Rubric inputs: constraints-derived checklist coverage, schedule consistency, and fewer TODO/TBD markers; return 0..100.
+- Loop tweak: compute score(prev) and score(candidate); accept candidate if strictly higher (or equal with fewer TODOs). Keep a “best so far”.
+- Focus cue: use `Affect.suggested_focus` to generate a one-liner “focus for next iteration” and pass it to the refiner.
+- Tests proposed (not yet implemented): two-unchanged-hashes stop, accept-only-on-improvement, and context-frozen-per-iteration.

@@ -31,6 +31,7 @@ from metrics_utils import run_with_metrics
 from planning_module import PlanningModule
 from timewarrior_module import TimewarriorModule
 from refiner_signature import RefineSignature, normalize_schedule, schedule_to_json, render_schedule_timeline
+from nootropics_log import load_recent_nootropics_lines
 
 try:  # Optional MLflow support
     import mlflow
@@ -105,7 +106,7 @@ class NLCOTextualApp(App):
         border-bottom: solid $surface-lighten-2;
     }
     #constraints-pane {
-        height: 18;
+        height: 12;
         padding: 1;
         border-bottom: solid $surface-lighten-2;
     }
@@ -123,7 +124,7 @@ class NLCOTextualApp(App):
         margin-right: 1;
     }
     #editor-row {
-        height: 24;
+        height: 30;
         padding: 1;
         border-bottom: solid $surface-lighten-2;
         overflow: hidden;
@@ -245,7 +246,7 @@ class NLCOTextualApp(App):
             yield Button("Save editors (Ctrl+S)", id="save-editors-button", variant="primary")
             yield Button("Clear logs (Ctrl+L)", id="clear-button", variant="warning")
         with Vertical(id="constraints-pane"):
-            yield Label("Constraints (messages)", classes="stage-title")
+            yield Label("Constraints (recent lines)", classes="stage-title")
             yield Log(id="constraints-log")
             with Horizontal(id="message-input-row"):
                 yield Input(placeholder="Type a new constraint message…", id="message-input")
@@ -258,6 +259,8 @@ class NLCOTextualApp(App):
             with Vertical(classes="stage-container"):
                 yield Label("Context", classes="stage-title")
                 yield Static("", id="context-view")
+                yield Label("Nootropics (last 72h)", classes="stage-title")
+                yield Log(id="nootropics-log")
                 yield Label("Timewarrior", classes="stage-title")
                 yield Log(id="timewarrior-log")
                 yield Label("Memory", classes="stage-title")
@@ -299,6 +302,7 @@ class NLCOTextualApp(App):
         self._load_constraint_messages()
         self._load_artifact_editor()
         self._load_memory_log()
+        self._load_nootropics_log()
         self.query_one("#message-input", Input).focus()
 
     def action_run_iteration(self) -> None:
@@ -414,6 +418,9 @@ class NLCOTextualApp(App):
                 artifact = ARTIFACT_FILE.read_text()
                 constraints = constraints_text
                 context = create_context_string()
+                _noo = load_recent_nootropics_lines()
+                if _noo:
+                    context += "\n\nNootropics (last 72h)\n" + "\n".join(_noo)
                 self.call_from_thread(self._update_context, context)
                 flush_log()
 
@@ -540,6 +547,7 @@ class NLCOTextualApp(App):
     # UI update helpers (main thread only)
     # ------------------------------------------------------------------
     def _clear_stage_views(self) -> None:
+        self.query_one("#nootropics-log", Log).clear()
         self.query_one("#timewarrior-log", Log).clear()
         self.query_one("#memory-log", Log).clear()
         self.query_one("#planning-log", Log).clear()
@@ -616,6 +624,20 @@ class NLCOTextualApp(App):
     def _load_memory_log(self) -> None:
         self._update_memory_display(None)
 
+    def _load_nootropics_log(self) -> None:
+        log = self.query_one("#nootropics-log", Log)
+        log.clear()
+        try:
+            lines = load_recent_nootropics_lines()
+        except Exception as exc:  # pragma: no cover - defensive
+            log.write(f"<error loading nootropics log: {exc}>")
+            return
+        if not lines:
+            log.write("<no entries in last 72h>")
+            return
+        for line in lines:
+            log.write(line)
+
     def _update_memory_display(self, feedback: Optional[str]) -> None:
         log = self.query_one("#memory-log", Log)
         log.clear()
@@ -635,11 +657,17 @@ class NLCOTextualApp(App):
     def _refresh_constraints_log(self) -> None:
         log = self.query_one("#constraints-log", Log)
         log.clear()
-        if not self._constraint_messages:
-            log.write("No constraint messages yet.")
-            return
-        for idx, message in enumerate(self._constraint_messages, 1):
-            log.write(f"{idx}. {message}")
+        # Show the last few lines from constraints.md to reflect external edits (e.g., TimestampLogApp)
+        tail_lines = 40
+        try:
+            if not CONSTRAINTS_FILE.exists():
+                log.write("No constraints yet.")
+                return
+            lines = CONSTRAINTS_FILE.read_text().splitlines()
+            for line in lines[-tail_lines:]:
+                log.write(line or " ")
+        except Exception as exc:  # pragma: no cover - defensive
+            log.write(f"<error reading constraints: {exc}>")
 
     def _handle_new_message(self, text: str) -> None:
         message = (text or "").strip()
