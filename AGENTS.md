@@ -79,7 +79,7 @@ Quick usage
  - Timestamp app: new `gi` shortcut focuses the input if focus is elsewhere.
 
 Iteration counts
-- After a constraints.md change (headless), the loop runs up to `MAX_ITERATIONS` (currently 3) in one invocation.
+- After a constraints.md change (headless), the loop runs up to `MAX_ITERATIONS` (now 30) in one invocation.
 - On scheduled hourly ticks (no changes), it runs exactly 1 iteration per tick.
 - In the TUI, each press of `r` runs exactly 1 iteration.
 
