@@ -1,4 +1,4 @@
-Agent Notes (updated 2025-11-05)
+Agent Notes (updated 2025-11-10)
 
 - NLCO iter TUI lives in `nlco_textual.py` (`NLCOTextualApp`). Run: `python nlco_textual.py`.
 - Headless alternative is `nlco_iter.py` (console loop). Run: `python nlco_iter.py`.
@@ -36,6 +36,20 @@ Textual Markdown
 
 Release
 - v0.1.1 (2025-11-06): reasoning trace panels in `nlco_iter`, JSONL model logging, TimestampLogApp Markdown view + `gi` input focus, tests updated.
+- v0.1.2 (2025-11-10): TimestampLogApp adds a minimal UTF-8 TTY preflight to avoid Textual `UnicodeDecodeError` on misconfigured terminals; new tests in `tests/test_timestamp_textual_preflight.py`.
+
+TTY / UTF-8 preflight (TimestampLogApp)
+- Symptom: `UnicodeDecodeError` from `textual.drivers.linux_driver` on launch when the terminal isn’t UTF-8 or `stty iutf8` isn’t set.
+- Change: `timestamp_textual_app.py` now checks for (a) TTY stdin/stdout, (b) UTF-8 locale, and (c) `stty iutf8`. If any fail, it exits with a clear message rather than crashing inside Textual.
+- How to fix env: ensure a UTF-8 locale (e.g., `export LANG=en_US.UTF-8`) and enable UTF-8 input on the TTY: `stty iutf8`.
+- Tests: `tests/test_timestamp_textual_preflight.py` exercises the three failure modes with monkeypatching.
+
+Troubleshooting: `iutf8` disabled
+- Enable for current shell: `stty iutf8` (run in the same pane you launch the app from).
+- Verify: `stty -a | grep -E -- '-?iutf8'` → should show `iutf8` (not `-iutf8`).
+- Persist for interactive shells (bash/zsh): add to `~/.bashrc` or `~/.zshrc`:
+  - `[ -t 0 ] && stty iutf8 || true`
+- tmux/screen: run `stty iutf8` inside each pane; to persist, keep the shell-rc line above (it runs only in interactive TTYs).
 
 Nootropics log (read-only)
 - NLCO Textual UI now shows the last 72h of entries from `~/.nootropics_log.jsonl` in a side panel.
@@ -59,6 +73,11 @@ Quick usage
 - TUI: press `r` to run one iteration, `Ctrl+S` to save, `Ctrl+L` to clear logs.
 - Headless: scheduler decides when to run; finished-check is currently disabled.
  - Timestamp app: new `gi` shortcut focuses the input if focus is elsewhere.
+
+Iteration counts
+- After a constraints.md change (headless), the loop runs up to `MAX_ITERATIONS` (currently 3) in one invocation.
+- On scheduled hourly ticks (no changes), it runs exactly 1 iteration per tick.
+- In the TUI, each press of `r` runs exactly 1 iteration.
 
 Layout tweak (2025-11-07)
 - Increased artifact editor area relative to constraints: `#constraints-pane` height 12, `#editor-row` height 30.

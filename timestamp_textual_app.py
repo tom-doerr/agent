@@ -581,5 +581,40 @@ class TimestampLogApp(App):
         self._last_constraints_date = current_date
 
 
+def _ensure_utf8_tty() -> None:
+    """Fail fast if the terminal input/output isn't UTF-8 TTY.
+
+    Textual's Linux driver decodes raw keyboard bytes as UTF-8. If the
+    terminal isn't a real TTY, or if UTF-8 input isn't enabled, it can
+    crash with UnicodeDecodeError. Keep behavior explicit rather than
+    adding silent fallbacks.
+    """
+    import os
+    import sys
+    import subprocess
+
+    if not sys.stdin.isatty() or not sys.stdout.isatty():
+        print("timestamp_textual_app: requires an interactive UTF-8 terminal (stdin/stdout TTY).", file=sys.stderr)
+        raise SystemExit(2)
+
+    locale_hint = (os.environ.get("LC_ALL") or os.environ.get("LC_CTYPE") or os.environ.get("LANG") or "")
+    if "utf" not in locale_hint.lower():
+        print("Non-UTF-8 locale detected. Set LANG/LC_ALL to en_US.UTF-8 and run: stty iutf8", file=sys.stderr)
+        raise SystemExit(2)
+
+    try:
+        proc = subprocess.run(["stty", "-a"], capture_output=True, text=True, check=False)
+        if proc.returncode == 0:
+            out = proc.stdout or ""
+            has_flag = "iutf8" in out and "-iutf8" not in out
+            if not has_flag:
+                print("TTY UTF-8 input not enabled. Run: stty iutf8", file=sys.stderr)
+                raise SystemExit(2)
+    except Exception:
+        # If stty isn't available or fails, continue; locale/TTY checks above still apply.
+        pass
+
+
 if __name__ == "__main__":
+    _ensure_utf8_tty()
     TimestampLogApp().run()
