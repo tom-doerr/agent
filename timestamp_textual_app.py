@@ -614,7 +614,18 @@ def _ensure_utf8_tty() -> None:
         # If stty isn't available or fails, continue; locale/TTY checks above still apply.
         pass
 
+def main() -> None:
+    import sys
+    _ensure_utf8_tty()
+    try:
+        TimestampLogApp().run()
+    except UnicodeDecodeError:
+        print(
+            "Textual received non-UTF-8 bytes from TTY. Ensure your terminal, keyboard/paste, and stty are UTF-8 (try: stty iutf8).",
+            file=sys.stderr,
+        )
+        raise SystemExit(2)
+
 
 if __name__ == "__main__":
-    _ensure_utf8_tty()
-    TimestampLogApp().run()
+    main()
