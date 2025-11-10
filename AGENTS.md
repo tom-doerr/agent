@@ -52,6 +52,9 @@ Troubleshooting: `iutf8` disabled
   - `[ -t 0 ] && stty iutf8 || true`
 - tmux/screen: run `stty iutf8` inside each pane; to persist, keep the shell-rc line above (it runs only in interactive TTYs).
 
+Repo housekeeping (2025-11-10)
+- Committed and pushed v0.1.2 changes: UTF-8 TTY preflight in `timestamp_textual_app.py`, error hint in `main()`, and tests `test_timestamp_textual_preflight.py`+`test_timestamp_textual_main.py`.
+
 Nootropics log (read-only)
 - NLCO Textual UI now shows the last 72h of entries from `~/.nootropics_log.jsonl` in a side panel.
 - Strictly read-only: the loader never writes or truncates the file.
