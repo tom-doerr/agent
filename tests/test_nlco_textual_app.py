@@ -96,9 +96,8 @@ def app_factory(monkeypatch, tmp_path):
     def factory(refined_text: str = "refined artifact", initial_artifact: str = "", initial_memory: str = ""):
         artifact_path.write_text(initial_artifact)
         memory_path.write_text(initial_memory)
+
         def fake_run_with_metrics(name, func, **kwargs):
-            if name == "Critic":
-                return SimpleNamespace(critique="stub critique")
             if name == "Refiner":
                 return SimpleNamespace(
                     refined_artifact=refined_text,
@@ -108,11 +107,11 @@ def app_factory(monkeypatch, tmp_path):
 
         monkeypatch.setattr(nlco_textual, "run_with_metrics", fake_run_with_metrics)
         app = nlco_textual.NLCOTextualApp()
+
         def fake_iteration(self, *, iteration_index: int, constraints_text: str) -> None:
             self._update_stage_log("timewarrior", "time ok")
             self._update_stage_log("memory", "memory ok")
             self._update_stage_log("planning", "plan ok")
-            self._update_stage_log("critique", "stub critique")
             self._update_stage_log("refine", refined_text)
             self._update_stage_log("schedule", "[]")
             report = nlco_textual.AffectReport(
@@ -127,6 +126,7 @@ def app_factory(monkeypatch, tmp_path):
             nlco_textual.ARTIFACT_FILE.write_text(refined_text)
             self._update_artifact(refined_text)
             self._update_artifact_editor(refined_text)
+
         app._run_iteration = MethodType(fake_iteration, app)
         return app, constraints_path, artifact_path, memory_path
 

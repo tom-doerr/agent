@@ -1,5 +1,4 @@
-"""Shared DSPy signature and helpers for the refiner's structured schedule output."""
-
+"""Shared DSPy signature and helpers for schedule utilities and the refiner signature."""
 from __future__ import annotations
 
 import json
@@ -18,21 +17,27 @@ class ScheduleBlock(BaseModel):
     description: str = Field(..., description="Concise description of the activity in this block.")
 
 
+class SystemState(BaseModel):
+    """Minimal system state passed to the refiner.
+
+    For now it contains only the last time the artifact was changed, as an ISO timestamp.
+    """
+
+    last_artifact_update: str = Field(
+        ..., description="ISO timestamp of the last artifact modification (previous write)."
+    )
+
+
 class RefineSignature(dspy.Signature):
-    """Refiner signature returning both artifact text and a structured schedule."""
+    """Refiner signature returning only the refined artifact text (no structured schedule)."""
 
     constraints: str = dspy.InputField(desc="Active constraints influencing the artifact.")
+    system_state: SystemState = dspy.InputField(desc="Minimal system state (last artifact update time).")
     artifact: str = dspy.InputField(desc="Current artifact to refine.")
-    critique: str = dspy.InputField(desc="Critique to address during refinement.")
     context: str = dspy.InputField(desc="Ambient context string (dates, telemetry, etc.).")
     refined_artifact: str = dspy.OutputField(
         desc=(
-            "Updated artifact after refinement. Must continue to include the full human-readable schedule narrative."
-        )
-    )
-    structured_schedule: list[ScheduleBlock] = dspy.OutputField(
-        desc=(
-            "Chronological list of schedule entries that mirrors exactly the schedule captured in the refined artifact."
+            "Updated artifact after refinement. Keep the full human-readable schedule narrative if present, but no structured schedule output is required."
         )
     )
 

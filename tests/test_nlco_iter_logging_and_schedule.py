@@ -62,9 +62,8 @@ async def test_logs_and_schedule_written(monkeypatch, tmp_path: Path):
 
     # Artifact updated
     assert artifact.read_text() == "a1"
-    # Schedule written and JSON-decodable
-    data = json.loads(schedule.read_text())
-    assert isinstance(data, list) and data and data[0]["description"] == "work"
+    # Structured schedule output removed: file may not be created
+    assert not schedule.exists()
     # JSONL logs contain Refiner (and may include Affect); Critic disabled
     if log_path.exists() and log_path.read_text().strip():
         lines = [json.loads(x) for x in log_path.read_text().splitlines() if x.strip()]
@@ -107,4 +106,5 @@ async def test_invalid_schedule_falls_back_to_empty(monkeypatch, tmp_path: Path)
     await nlco_iter.iteration_loop(max_iterations=1)
 
     assert artifact.read_text() == "a1"
-    assert schedule.read_text().strip() == "[]"
+    # Structured schedule output removed: no file
+    assert not schedule.exists()

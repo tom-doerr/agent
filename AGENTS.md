@@ -8,7 +8,7 @@ Agent Notes (updated 2025-11-10)
 
 Things to keep in mind
 - Textual and Rich must be installed to run the TUI.
-- MLflow is optional; `nlco_textual.py` enables it if available and writes `structured_schedule.json` in repo root.
+- MLflow is optional; `nlco_textual.py` enables it if available. Structured schedule JSON is no longer produced by the refiner.
 - Constraints and artifact paths are fixed: `constraints.md`, `artifact.md`, `memory.md`, `short_term_memory.md`.
 - `timestamp_textual_app.py` appends to `constraints.md` and can be used alongside NLCO tools, but beware of concurrent writes to the same file.
  - Context now includes weekday explicitly: `Datetime: YYYY-MM-DD HH:MM:SS (Friday)` for better temporal grounding.
@@ -52,7 +52,28 @@ Release
  - v0.1.9 (2025-11-11): Add `timestamp_tui.sh` wrapper which sets UTF‑8 locale, enables `iutf8`, and runs the app with `--lenient-input --fallback-encoding cp1252`. Test `tests/test_timestamp_shell_wrapper.py` asserts wrapper contents.
  - v0.1.10 (2025-11-11): Ensure `timestamp_tui.sh` has executable bit set in repo workspace.
  - v0.1.11 (2025-11-11): Document copy‑paste one‑liner and step‑by‑step shell hardening commands.
- - v0.1.11 (2025-11-11): Document quick shell hardening commands (UTF‑8 locale + `iutf8`) for ad‑hoc sessions.
+- v0.1.11 (2025-11-11): Document quick shell hardening commands (UTF‑8 locale + `iutf8`) for ad‑hoc sessions.
+- v0.1.12 (2025-11-11): Add `--right-margin N` to adjust Log right padding at runtime (env `TIMESTAMP_RIGHT_MARGIN`). Helps phones/SSH clients that clip the last column. Test: `tests/test_timestamp_cli_right_margin.py`.
+- v0.1.13 (2025-11-11): Add `--pad-eol` (env `TIMESTAMP_PAD_EOL=1`) to append a single space when rendering each log line, without writing it to file—works around last-column clipping that margins don’t solve. Test: `tests/test_timestamp_cli_pad_eol.py`.
+- v0.1.14 (2025-11-11): Make help reliable on mobile/SSH by adding `F1` binding for `toggle_help` (some clients translate `Ctrl+H` to backspace). Added tests: `tests/test_timestamp_help_binding_and_action.py`.
+- v0.1.15 (2025-11-11): Make artifact Markdown view scrollable via CSS `overflow: auto`, allow focusing it (`ga` shortcut) and mark focusable. Tests: `tests/test_timestamp_artifact_scrollable.py`, `tests/test_timestamp_artifact_focus_shortcut.py`.
+- v0.1.16 (2025-11-11): Replace the upper Log with a scrollable Constraints Markdown pane. It renders `constraints.md` directly and auto-refreshes. Shortcut `gi` focuses input, `ga` focuses artifact. Tests: `tests/test_timestamp_constraints_view_load.py`; updated CSS test to reference `#constraints-view` padding.
+- v0.1.17 (2025-11-11): Default the Constraints pane to show the bottom (latest entries). On each load/refresh, we call `scroll_end()`; if supported, `auto_scroll=True` is set. Test updated in `tests/test_timestamp_constraints_view_load.py` to assert scrolling.
+- v0.1.18 (2025-11-11): Make auto-scroll polite: it’s disabled while the constraints pane is focused, and can be turned off with `--no-auto-scroll` (env `TIMESTAMP_AUTO_SCROLL=0`). Tests: `tests/test_timestamp_no_auto_scroll_flag.py`, `tests/test_timestamp_constraints_focus_blocks_autoscroll.py`.
+- v0.1.19 (2025-11-11): More tests for constraints pane: mtime-driven refresh (`tests/test_timestamp_constraints_refresh_mtime.py`), missing-file handling (`tests/test_timestamp_constraints_missing_file.py`), and `gi` input-focus shortcut (`tests/test_timestamp_input_focus_shortcut.py`).
+- v0.1.20 (2025-11-11): Remove structured schedule output from the Refiner. `RefineSignature` now returns only `refined_artifact`; headless and TUI paths no longer write or parse `structured_schedule.json`. Tests updated accordingly.
+- v0.1.21 (2025-11-11): Remove Critic module and input from Refiner. `RefineSignature` drops the `critique` field; headless and Textual flows no longer call or display Critic. TUI “Critique” panel removed. Tests updated.
+- v0.1.22 (2025-11-11): Add `SystemState` Pydantic model with `last_artifact_update` (ISO). Passed to the Refiner right after `constraints` in both headless and Textual flows. Tests: `tests/test_system_state_refiner_input_headless.py`, `tests/test_system_state_refiner_input_textual.py`.
+- v0.1.23 (2025-11-11): Make `nlco_textual.py` executable. You can now run it directly with `./nlco_textual.py`.
+ - v0.1.24 (2025-11-11): Repo housekeeping — commit and push TUI + pipeline changes (mobile SSH fixes, scrollable panes, constraints view overhaul, removal of Critic/structured schedule, new SystemState input) and tests.
+
+Quick Run — Textual Apps (cheat sheet)
+- Install deps once: `source .venv/bin/activate || true; pip install -r requirements.txt`
+- NLCO TUI (iterations UI): `python nlco_textual.py`
+  - Keys: `r` run, `Ctrl+S` save, `Ctrl+L` clear, `q` quit
+- Timestamp TUI (notes/constraints): `./timestamp_tui.sh` (recommended)
+  - Alt: `./timestamp_textual_app.py --lenient-input --fallback-encoding cp1252`
+  - Phone/SSH hardening: `stty iutf8 && export LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8`
 
 TTY / UTF-8 preflight (TimestampLogApp)
 - Symptom: `UnicodeDecodeError` from `textual.drivers.linux_driver` on launch when the terminal isn’t UTF-8 or `stty iutf8` isn’t set.
@@ -159,7 +180,7 @@ Potential rough edges observed
 
 Future test ideas
 - Add a Textual `App.run_test()` smoke test to ensure `NLCOTextualApp` composes and updates logs without launching a real UI.
-- Validate that running one iteration creates/updates `structured_schedule.json`.
+- Validate that running one iteration updates the artifact. Structured schedule JSON is no longer produced by default.
 - Model lineage update (2025-09-29)
   - DeepSeek docs state both `deepseek-chat` and `deepseek-reasoner` were upgraded to `DeepSeek-V3.2-Exp`; `chat` = non-thinking mode, `reasoner` = thinking mode. Over OpenRouter, reasoning appears in the `reasoning` field; via DeepSeek API it appears as `message.reasoning_content`.
 Timewarrior Control — Conceptual Plan
@@ -177,3 +198,8 @@ Artifact improvement (concept-only, 2025-11-08)
 - Loop tweak: compute score(prev) and score(candidate); accept candidate if strictly higher (or equal with fewer TODOs). Keep a “best so far”.
 - Focus cue: use `Affect.suggested_focus` to generate a one-liner “focus for next iteration” and pass it to the refiner.
 - Tests proposed (not yet implemented): two-unchanged-hashes stop, accept-only-on-improvement, and context-frozen-per-iteration.
+Memory handling (summary, 2025-11-11)
+- File `memory.md` is the persistent knowledge base; edits are made only when durable info should be kept.
+- Module `MemoryModule` runs a small ReAct loop with tools `show_memory`, `replace_memory`, `append_memory`, `reset_memory` and writes back only if changes occurred.
+- Headless and Textual flows both use the primary LM for memory updates; a short result string is printed to the Memory pane when changes happen.
+- We don’t inject `memory.md` back into the model context yet (display-only except for edits). Short-term breadcrumbs go to `short_term_memory.md` separately.

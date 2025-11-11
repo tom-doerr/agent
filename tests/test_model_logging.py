@@ -10,11 +10,11 @@ def test_log_model_writes_jsonl(tmp_path, monkeypatch):
     mod = importlib.import_module("nlco_iter")
     importlib.reload(mod)
 
-    mod._log_model("Critic", output="hello", reasoning="why")
+    mod._log_model("Refiner", output="hello", reasoning="why")
     data = log_path.read_text().strip().splitlines()
     assert len(data) == 1
     rec = json.loads(data[0])
-    assert rec["stage"] == "Critic"
+    assert rec["stage"] == "Refiner"
     assert rec["output"] == "hello"
     assert rec["reasoning"] == "why"
 

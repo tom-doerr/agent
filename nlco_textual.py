@@ -30,7 +30,7 @@ from memory_module import MemoryModule
 from metrics_utils import run_with_metrics
 from planning_module import PlanningModule
 from timewarrior_module import TimewarriorModule
-from refiner_signature import RefineSignature, normalize_schedule, schedule_to_json, render_schedule_timeline
+from refiner_signature import RefineSignature, SystemState
 from nootropics_log import load_recent_nootropics_lines
 
 try:  # Optional MLflow support
@@ -204,15 +204,10 @@ class NLCOTextualApp(App):
         self._primary_lm = dspy.LM("deepseek/deepseek-reasoner", max_tokens=40_000)
         dspy.configure(lm=self._primary_lm)
         self._support_lm = dspy.LM("deepseek/deepseek-chat", max_tokens=4_000, temperature=0)
-        self._critic = dspy.Predict(
-            "constraints, artifact, context -> critique",
-            instructions="Critique the artifact based on the constraints and common sense.",
-        )
         self._refiner = dspy.Predict(
             RefineSignature,
             instructions=(
-                "Refine the artifact based on the critique while keeping the full schedule written in the artifact text. "
-                "Populate structured_schedule with a well-formed list of ScheduleBlock entries that exactly mirrors the schedule in the refined artifact."
+                "Refine the artifact based on the critique while keeping any human-readable schedule narrative within the artifact text."
             ),
         )
 
@@ -270,8 +265,6 @@ class NLCOTextualApp(App):
             with Vertical(classes="stage-container"):
                 yield Label("Affect", classes="stage-title")
                 yield Log(id="affect-log")
-                yield Label("Critique", classes="stage-title")
-                yield Log(id="critique-log")
                 yield Label("Refinement", classes="stage-title")
                 yield Log(id="refine-log")
                 yield Label("Structured Schedule", classes="stage-title")
@@ -486,34 +479,27 @@ class NLCOTextualApp(App):
                     mlflow_enabled=self._mlflow_enabled,
                 )
 
-                critique = ""
-                flush_log()
-                self.call_from_thread(self._update_stage_log, "critique", "Critic disabled")
+                try:
+                    prev_mtime = ARTIFACT_FILE.stat().st_mtime
+                except FileNotFoundError:
+                    import datetime as _dt
+                    prev_mtime = _dt.datetime.now().timestamp()
+                import datetime as _dt
+                _state = SystemState(
+                    last_artifact_update=_dt.datetime.fromtimestamp(prev_mtime).isoformat(timespec="seconds")
+                )
 
                 refine_pred = run_with_metrics(
                     "Refiner",
                     self._refiner,
                     artifact=artifact,
                     constraints=constraints,
-                    critique=critique,
+                    system_state=_state,
                     context=context,
                 )
                 refined = getattr(refine_pred, "refined_artifact", "")
-                try:
-                    schedule_blocks = normalize_schedule(getattr(refine_pred, "structured_schedule", []))
-                except ValueError as schedule_error:
-                    structured_schedule_display = f"Structured schedule output was invalid: {schedule_error}"
-                    STRUCTURED_SCHEDULE_FILE.write_text("[]\n")
-                    timeline_display = "Timeline unavailable (invalid schedule output)."
-                else:
-                    schedule_json = schedule_to_json(schedule_blocks)
-                    STRUCTURED_SCHEDULE_FILE.write_text(schedule_json + "\n")
-                    if schedule_blocks:
-                        structured_schedule_display = schedule_json
-                        timeline_display = render_schedule_timeline(schedule_blocks)
-                    else:
-                        structured_schedule_display = "Structured schedule is empty."
-                        timeline_display = "Timeline unavailable (no blocks)."
+                structured_schedule_display = "Structured schedule disabled."
+                timeline_display = ""
                 flush_log()
                 self.call_from_thread(self._update_stage_log, "refine", refined)
                 combined_schedule_display = f"{timeline_display}\n\n{structured_schedule_display}".strip()
@@ -545,7 +531,6 @@ class NLCOTextualApp(App):
         self.query_one("#memory-log", Log).clear()
         self.query_one("#planning-log", Log).clear()
         self.query_one("#affect-log", Log).clear()
-        self.query_one("#critique-log", Log).clear()
         self.query_one("#refine-log", Log).clear()
         self.query_one("#schedule-log", Log).clear()
         self.query_one("#artifact-log", Log).clear()
@@ -570,7 +555,6 @@ class NLCOTextualApp(App):
         widget_map = {
             "timewarrior": "#timewarrior-log",
             "planning": "#planning-log",
-            "critique": "#critique-log",
             "refine": "#refine-log",
             "schedule": "#schedule-log",
         }

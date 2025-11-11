@@ -356,23 +356,26 @@ class TimestampLogApp(App):
         height: 1fr;
         border: solid $surface-lighten-2;
         margin-bottom: 1;
+        overflow: auto;  /* allow scrolling when content overflows */
     }
-    #log-container {
+    #constraints-container {
         height: 1fr;
         padding: 1;
     }
     #input {
         margin: 0 1 1 1;
     }
-    Log {
+    #constraints-view {
         border: solid $surface-lighten-2;
         /* Give a 1-col right margin to avoid last-column clipping on some mobile SSH terminals */
         padding: 1 2;
+        overflow: auto;
     }
     """
 
     BINDINGS = [
-        ("ctrl+h", "toggle_help", "Help"),
+        ("ctrl+h", "toggle_help", "Help"),  # some terminals map this to backspace
+        ("f1", "toggle_help", "Help"),       # reliable alternative
         ("ctrl+c", "quit", "Quit"),
     ]
 
@@ -382,21 +385,28 @@ class TimestampLogApp(App):
         artifact_path: Path | None = None,
         constraints_path: Path | None = None,
         artifact_refresh_seconds: float = 2.0,
+        constraints_refresh_seconds: float = 2.0,
     ) -> None:
         super().__init__()
         self._artifact_path = artifact_path or ARTIFACT_FILE
         self._constraints_path = constraints_path or CONSTRAINTS_FILE
         self._artifact_refresh_seconds = max(artifact_refresh_seconds, 0.1)
+        self._constraints_refresh_seconds = max(constraints_refresh_seconds, 0.1)
         self._artifact_mtime: Optional[float] = None
         self._artifact_timer = None
+        self._constraints_mtime: Optional[float] = None
+        self._constraints_timer = None
+        # Default to auto-scroll unless disabled via env
+        self._auto_scroll = os.environ.get("TIMESTAMP_AUTO_SCROLL", "1").lower() not in {"0", "false", "no"}
         self._last_constraints_date: Optional[date] = None
         self._artifact_status_message = "Artifact status: initializing…"
         self._pending_g = False  # for 'gi' shortcut
 
     def compose(self) -> ComposeResult:
         yield Header()
-        with Container(id="log-container"):
-            yield Log(id="log")
+        with Vertical(id="constraints-container"):
+            yield Static("Constraints", id="constraints-title")
+            yield Markdown(id="constraints-view")
         yield VimInput(placeholder="Type here and press Enter...", id="input")
         with Vertical(id="artifact-container"):
             yield Static("Artifact", id="artifact-title")
@@ -407,21 +417,42 @@ class TimestampLogApp(App):
 
     def on_mount(self) -> None:
         self._artifact_view = self.query_one("#artifact-view", Markdown)
+        self._constraints_view = self.query_one("#constraints-view", Markdown)
         self._artifact_title = self.query_one("#artifact-title", Static)
+        self._constraints_title = self.query_one("#constraints-title", Static)
         self._artifact_status = self.query_one("#artifact-status", Static)
-        self._log_widget = self.query_one("#log", Log)
         self._input = self.query_one("#input", Input)
         self._help_panel = self.query_one("#help-panel", Static)
         # Markdown is read-only by design; no extra setup needed
-        self._log_widget.highlight = False
-        self._log_widget.wrap = True
+        # Make artifact view focusable so it can be scrolled with keyboard
+        try:
+            self._artifact_view.can_focus = True
+        except Exception:
+            pass
+        # Prefer showing the end of constraints by default, but allow scrolling when focused
+        self._auto_scroll = os.environ.get("TIMESTAMP_AUTO_SCROLL", "1").lower() not in {"0", "false", "no"}
+        self._pad_eol = os.environ.get("TIMESTAMP_PAD_EOL", "").lower() in {"1", "true", "yes"}
+        # Allow overriding right padding to dodge last-column clipping on some terminals
+        try:
+            right_pad = int(os.environ.get("TIMESTAMP_RIGHT_MARGIN", "2"))
+        except ValueError:
+            right_pad = 2
+        try:
+            self._constraints_view.styles.padding = (1, right_pad, 1, 1)
+        except Exception:
+            pass
         self.set_focus(self._input)
         self._last_entry_date: date | None = None
         self._prepare_constraints()
         self.call_later(self._load_artifact)
+        self.call_later(self._load_constraints)
         self._artifact_timer = self.set_interval(
             self._artifact_refresh_seconds,
             self._maybe_refresh_artifact,
+        )
+        self._constraints_timer = self.set_interval(
+            self._constraints_refresh_seconds,
+            self._maybe_refresh_constraints,
         )
         self._artifact_status_timer = self.set_interval(
             1.0,
@@ -444,14 +475,14 @@ class TimestampLogApp(App):
         current_time = self._current_time()
         current_date = current_time.date()
         if self._last_entry_date != current_date:
-            self._log_widget.write_line(current_time.strftime("# %Y-%m-%d"))
             self._last_entry_date = current_date
         formatted_line = self._format_line(message, current_time)
-        self._log_widget.write_line(formatted_line)
+        # Keep file clean; don't persist padding; update constraints file, then view
         self._append_to_constraints(current_date, formatted_line)
+        self._load_constraints()
         self._input.value = ""
 
-    def on_key(self, event: events.Key) -> None:  # minimal 'gi' shortcut
+    def on_key(self, event: events.Key) -> None:  # minimal 'gi' / 'ga' shortcuts
         # Only act when focus is NOT on the input box
         if getattr(self.focused, "id", None) == "input" or isinstance(self.focused, VimInput):
             self._pending_g = False
@@ -462,6 +493,11 @@ class TimestampLogApp(App):
             return
         if event.key == "i" and self._pending_g:
             self.set_focus(self._input)
+            self._pending_g = False
+            event.stop()
+            return
+        if event.key == "a" and self._pending_g:
+            self.set_focus(self._artifact_view)
             self._pending_g = False
             event.stop()
             return
@@ -524,6 +560,50 @@ class TimestampLogApp(App):
             ago = f"{hours}h {minutes}m"
         self._artifact_status_message = f"Artifact updated {ago} ago"
         self._artifact_status.update(self._artifact_status_message)
+
+    def _load_constraints(self) -> None:
+        mtime: Optional[float] = None
+        try:
+            stat = self._constraints_path.stat()
+        except FileNotFoundError:
+            content = "(constraints not found)"
+        except Exception as exc:  # pragma: no cover - unexpected failure
+            content = f"(error reading constraints: {exc})"
+        else:
+            try:
+                content = self._constraints_path.read_text(encoding="utf-8")
+                mtime = stat.st_mtime
+            except Exception as exc:  # pragma: no cover
+                content = f"(error reading constraints: {exc})"
+                mtime = None
+        self._constraints_mtime = mtime
+        self._constraints_title.update(f"Constraints — {self._constraints_path}")
+        self._constraints_view.update(content)
+        # Scroll to bottom by default unless user is actively browsing constraints
+        try:
+            is_constraints_focused = self.focused is self._constraints_view  # type: ignore[comparison-overlap]
+        except Exception:
+            is_constraints_focused = False
+        if self._auto_scroll and not is_constraints_focused:
+            try:
+                self._constraints_view.scroll_end(animate=False)  # type: ignore[attr-defined]
+            except Exception:
+                pass
+
+    def _maybe_refresh_constraints(self) -> None:
+        try:
+            stat = self._constraints_path.stat()
+        except FileNotFoundError:
+            if self._constraints_mtime is not None:
+                self._constraints_mtime = None
+                self._constraints_title.update(f"Constraints — {self._constraints_path}")
+                self._constraints_view.update("(constraints not found)")
+            return
+        except Exception:
+            return
+        mtime = stat.st_mtime
+        if self._constraints_mtime is None or mtime > self._constraints_mtime:
+            self._load_constraints()
 
     def _help_text(self) -> str:
         return (
@@ -719,12 +799,21 @@ def _parse_cli(argv: list[str]) -> None:
     parser = argparse.ArgumentParser(add_help=False)
     parser.add_argument("--lenient-input", action="store_true")
     parser.add_argument("--fallback-encoding", dest="fallback", default=None)
+    parser.add_argument("--right-margin", dest="right_margin", type=int, default=None)
+    parser.add_argument("--no-auto-scroll", action="store_true")
+    parser.add_argument("--pad-eol", action="store_true")
     # Ignore unknown flags so we stay minimal
     ns, _ = parser.parse_known_args(argv)
     if ns.lenient_input:
         os.environ.setdefault("TIMESTAMP_LENIENT_INPUT", "1")
     if ns.fallback:
         os.environ["TEXTUAL_FALLBACK_ENCODING"] = ns.fallback
+    if ns.right_margin is not None:
+        os.environ["TIMESTAMP_RIGHT_MARGIN"] = str(ns.right_margin)
+    if ns.pad_eol:
+        os.environ.setdefault("TIMESTAMP_PAD_EOL", "1")
+    if ns.no_auto_scroll:
+        os.environ["TIMESTAMP_AUTO_SCROLL"] = "0"
 
 
 if __name__ == "__main__":

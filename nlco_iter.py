@@ -30,7 +30,7 @@ from executive_module import ExecutiveModule
 from planning_module import PlanningModule
 from affect_module import AffectModule
 from nlco_scheduler import evaluate_run_decision
-from refiner_signature import RefineSignature, normalize_schedule, schedule_to_json, render_schedule_timeline
+from refiner_signature import RefineSignature, SystemState
 
 # Print DSPy version at startup
 print(f"DSPy version: {dspy.__version__}")
@@ -75,13 +75,10 @@ class Edit(BaseModel):
 refiner = dspy.Predict(
     RefineSignature,
     instructions=(
-        "Refine the artifact based on the critique while keeping the full schedule written in the artifact text. "
-        "Populate structured_schedule with a well-formed list of ScheduleBlock entries that exactly mirrors the schedule in the refined artifact."
+        "Refine the artifact based on the critique while keeping the full human-readable schedule narrative in the artifact text."
     ),
 )
-critic = dspy.Predict('constraints, artifact, context -> critique',
-                      instructions="Critique the artifact based on the constraints and common sense.")
-DISABLE_CRITIC = True
+# Critic module removed; refiner operates without an explicit critique input.
 is_finished_checker = dspy.Predict('history -> is_finished: bool, reasoning')
 
 CONSTRAINTS_FILE = Path('constraints.md')
@@ -150,6 +147,13 @@ async def iteration_loop(*, max_iterations: Optional[int] = None):
 
         try:
             artifact = ARTIFACT_FILE.read_text()
+            try:
+                prev_mtime = ARTIFACT_FILE.stat().st_mtime
+            except FileNotFoundError:
+                prev_mtime = datetime.datetime.now().timestamp()
+            system_state = SystemState(
+                last_artifact_update=datetime.datetime.fromtimestamp(prev_mtime).isoformat(timespec="seconds")
+            )
             constraints = CONSTRAINTS_FILE.read_text().strip()
             context = create_context_string()
             _noo = load_recent_nootropics_lines()
@@ -181,32 +185,11 @@ async def iteration_loop(*, max_iterations: Optional[int] = None):
                 )
             )
 
-            if DISABLE_CRITIC:
-                critique = ""
-                console.print(Panel("Critic disabled", title=f"Critique @ {_now_str()}", border_style="yellow"))
-            else:
-                critique_prediction = run_with_metrics(
-                    'Critic',
-                    critic,
-                    constraints=constraints,
-                    context=context,
-                    artifact=artifact,
-                )
-                critique = critique_prediction.critique
-                console.print(Panel(critique, title=f"Critique @ {_now_str()}", border_style="yellow"))
-                try:
-                    _log_model("Critic", output=critique, reasoning=_extract_last_reasoning_text())
-                except Exception:
-                    pass
-                reasoning = _extract_last_reasoning_text()
-                if reasoning:
-                    console.print(Panel(reasoning, title="Model Reasoning · Critic", border_style="blue"))
-
             refined_prediction = run_with_metrics(
                 'Refiner',
                 refiner,
                 constraints=constraints,
-                critique=critique,
+                system_state=system_state,
                 context=context,
                 artifact=artifact,
             )
@@ -218,34 +201,7 @@ async def iteration_loop(*, max_iterations: Optional[int] = None):
             reasoning = _extract_last_reasoning_text()
             if reasoning:
                 console.print(Panel(reasoning, title="Model Reasoning · Refiner", border_style="blue"))
-            try:
-                schedule_blocks = normalize_schedule(getattr(refined_prediction, "structured_schedule", []))
-            except ValueError as schedule_error:
-                console.print(
-                    Panel(
-                        f"Structured schedule output was invalid: {schedule_error}",
-                        title=f"Structured Schedule @ {_now_str()}",
-                        border_style="red",
-                    )
-                )
-                schedule_blocks = []
-            schedule_json = schedule_to_json(schedule_blocks)
-            STRUCTURED_SCHEDULE_FILE.write_text(schedule_json + "\n")
-            if schedule_blocks:
-                console.print(
-                    Panel(
-                        render_schedule_timeline(schedule_blocks),
-                        title=f"Schedule Timeline @ {_now_str()}",
-                        border_style="green",
-                    )
-                )
-                console.print(
-                    Panel(
-                        schedule_json,
-                        title=f"Structured Schedule @ {_now_str()}",
-                        border_style="green",
-                    )
-                )
+            # Structured schedule output removed from refiner; no JSON is produced.
             # prediction = refiner(artifact=artifact, constraints=constraints, critique=critique, search_replace_errors=search_replace_errors, context=context)
             # print('edits: ', prediction)
             # edits = prediction.edits  # Extract the edits list from the Prediction object
@@ -254,7 +210,7 @@ async def iteration_loop(*, max_iterations: Optional[int] = None):
             console.print(refined)
 
             ARTIFACT_FILE.write_text(refined)
-            history += [f'Iteration {i + 1}', artifact, constraints, critique, refined]
+            history += [f'Iteration {i + 1}', artifact, constraints, refined]
         finally:
             if mlflow_run is not None:
                 mlflow.end_run()
