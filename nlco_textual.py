@@ -643,6 +643,11 @@ class NLCOTextualApp(App):
             lines = CONSTRAINTS_FILE.read_text().splitlines()
             for line in lines[-tail_lines:]:
                 log.write(line or " ")
+            # Ensure the bottom of the file is visible
+            try:
+                log.scroll_end()
+            except Exception:
+                pass
         except Exception as exc:  # pragma: no cover - defensive
             log.write(f"<error reading constraints: {exc}>")
 

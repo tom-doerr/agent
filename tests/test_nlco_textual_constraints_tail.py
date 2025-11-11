@@ -43,3 +43,4 @@ async def test_constraints_pane_shows_tail(monkeypatch, tmp_path: Path):
         assert txt.startswith("L11")  # tail of 40 out of 50 starts at L11
         assert "L49" in txt
         assert "L50" in txt
+        assert txt.endswith("L50")  # bottom line is visible

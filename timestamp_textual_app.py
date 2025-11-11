@@ -377,6 +377,8 @@ class TimestampLogApp(App):
         ("ctrl+h", "toggle_help", "Help"),  # some terminals map this to backspace
         ("f1", "toggle_help", "Help"),       # reliable alternative
         ("ctrl+c", "quit", "Quit"),
+        ("pageup", "artifact_page_up", "Artifact Up"),
+        ("pagedown", "artifact_page_down", "Artifact Down"),
     ]
 
     def __init__(
@@ -563,6 +565,13 @@ class TimestampLogApp(App):
 
     def _load_constraints(self) -> None:
         mtime: Optional[float] = None
+        def _tail_text(text: str, lines: int) -> str:
+            if lines <= 0:
+                return text
+            parts = text.splitlines()
+            if len(parts) <= lines:
+                return text
+            return "\n".join(parts[-lines:])
         try:
             stat = self._constraints_path.stat()
         except FileNotFoundError:
@@ -576,6 +585,16 @@ class TimestampLogApp(App):
             except Exception as exc:  # pragma: no cover
                 content = f"(error reading constraints: {exc})"
                 mtime = None
+        # Show the bottom (tail) by default to surface latest notes
+        try:
+            tail = int(os.environ.get("TIMESTAMP_CONSTRAINTS_TAIL", "200"))
+        except ValueError:
+            tail = 200
+        content = _tail_text(content, tail)
+        # Respect newlines in Markdown by converting to explicit line breaks
+        # (Markdown treats single newlines as soft wraps). Two trailing spaces
+        # force a <br>, preserving the original line structure.
+        content = content.replace("\n", "  \n")
         self._constraints_mtime = mtime
         self._constraints_title.update(f"Constraints — {self._constraints_path}")
         self._constraints_view.update(content)
@@ -620,6 +639,36 @@ class TimestampLogApp(App):
         if not self._help_visible:
             self._help_panel.update("")
             self._help_message = ""
+
+    def action_artifact_page_down(self) -> None:
+        view = getattr(self, "_artifact_view", None)
+        if view is None:
+            return
+        for method, args in (
+            ("scroll_page_down", {}),
+            ("scroll_relative", {"y": 10}),
+            ("scroll_end", {"animate": False}),
+        ):
+            try:
+                getattr(view, method)(**args)
+                break
+            except Exception:
+                continue
+
+    def action_artifact_page_up(self) -> None:
+        view = getattr(self, "_artifact_view", None)
+        if view is None:
+            return
+        for method, args in (
+            ("scroll_page_up", {}),
+            ("scroll_relative", {"y": -10}),
+            ("scroll_home", {"animate": False}),
+        ):
+            try:
+                getattr(view, method)(**args)
+                break
+            except Exception:
+                continue
 
     def _prepare_constraints(self) -> None:
         path = self._constraints_path
@@ -801,6 +850,7 @@ def _parse_cli(argv: list[str]) -> None:
     parser.add_argument("--fallback-encoding", dest="fallback", default=None)
     parser.add_argument("--right-margin", dest="right_margin", type=int, default=None)
     parser.add_argument("--no-auto-scroll", action="store_true")
+    parser.add_argument("--constraints-tail", dest="constraints_tail", type=int, default=None)
     parser.add_argument("--pad-eol", action="store_true")
     # Ignore unknown flags so we stay minimal
     ns, _ = parser.parse_known_args(argv)
@@ -814,6 +864,8 @@ def _parse_cli(argv: list[str]) -> None:
         os.environ.setdefault("TIMESTAMP_PAD_EOL", "1")
     if ns.no_auto_scroll:
         os.environ["TIMESTAMP_AUTO_SCROLL"] = "0"
+    if ns.constraints_tail is not None:
+        os.environ["TIMESTAMP_CONSTRAINTS_TAIL"] = str(ns.constraints_tail)
 
 
 if __name__ == "__main__":

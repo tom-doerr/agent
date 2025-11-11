@@ -65,7 +65,20 @@ Release
 - v0.1.21 (2025-11-11): Remove Critic module and input from Refiner. `RefineSignature` drops the `critique` field; headless and Textual flows no longer call or display Critic. TUI “Critique” panel removed. Tests updated.
 - v0.1.22 (2025-11-11): Add `SystemState` Pydantic model with `last_artifact_update` (ISO). Passed to the Refiner right after `constraints` in both headless and Textual flows. Tests: `tests/test_system_state_refiner_input_headless.py`, `tests/test_system_state_refiner_input_textual.py`.
 - v0.1.23 (2025-11-11): Make `nlco_textual.py` executable. You can now run it directly with `./nlco_textual.py`.
- - v0.1.24 (2025-11-11): Repo housekeeping — commit and push TUI + pipeline changes (mobile SSH fixes, scrollable panes, constraints view overhaul, removal of Critic/structured schedule, new SystemState input) and tests.
+- v0.1.24 (2025-11-11): Repo housekeeping — commit and push TUI + pipeline changes (mobile SSH fixes, scrollable panes, constraints view overhaul, removal of Critic/structured schedule, new SystemState input) and tests.
+- v0.1.25 (2025-11-11): Temporarily removed `nlco_textual.py` via `git rm`. The NLCO Textual app is disabled until restored; use the headless loop (`python nlco_iter.py`) or `timestamp_textual_app.py` for notes.
+- v0.1.26 (2025-11-11): TimestampLogApp now tails `constraints.md` by default (last 200 lines) and scrolls to bottom. Flags/env: `--constraints-tail N` (env `TIMESTAMP_CONSTRAINTS_TAIL`) to adjust; `--no-auto-scroll` to stop snapping to end.
+- v0.1.27 (2025-11-11): Tests for artifact scroll actions and fallbacks (`tests/test_timestamp_artifact_scroll_actions.py`).
+ - v0.1.28 (2025-11-11): TimestampLogApp respects newlines in the constraints view by emitting Markdown line breaks. Test: `tests/test_timestamp_constraints_newlines.py`.
+
+Structured Memory — Options (2025-11-11)
+- Option A (light): add sectioned headings in `memory.md` (Policies/Procedures/Glossary) and constrain tools to edit within a selected section; add tests for section targeting.
+- Option B (tags): require a tiny YAML front‑matter per block (`tags: [policy, time]`, `updated:`). Provide a minimal `append_memory --tags` helper and validate via tests.
+- Option C (index JSON): maintain `.nlco/memory_index.json` with `{id, title, tags, updated, offset}` for quick lookup; unit‑test index build and lookup.
+- Option D (RAG-lite): embed memory blocks once (e.g., 384‑d float per block) and select top‑k to show to the LM; start with a toy cosine impl + tests on selection only.
+- Option E (recency window): inject only blocks updated in last N days into `context` when memory changed; add a test that verifies injection happens only on recent edits.
+- Option F (write rules): add a 2‑rule acceptance gate: “non‑transient + reusable”; if not satisfied, do not write. Test with examples.
+- Option G (CLI): tiny `./mem.py list|show|append` to manipulate memory deterministically; add smoke tests for the commands.
 
 Quick Run — Textual Apps (cheat sheet)
 - Install deps once: `source .venv/bin/activate || true; pip install -r requirements.txt`
@@ -163,6 +176,7 @@ Constraints pane behavior
 - The constraints pane now tails the last ~40 lines of `constraints.md`, so it reflects external edits (e.g., TimestampLogApp) rather than just the in-app message list.
 - Input submissions still append to the in-app list and rewrite `constraints.md` from that list when running an iteration; avoid concurrent writers to the same file.
 - Test: `tests/test_nlco_textual_constraints_tail.py` ensures the pane shows only the tail.
+- The pane scrolls to the end after refresh, so the bottom of the file is always visible.
 
 Short‑term memory
 - File: `short_term_memory.md`.
