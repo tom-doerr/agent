@@ -88,7 +88,7 @@ CONSTRAINTS_FILE = Path('constraints.md')
 ARTIFACT_FILE = Path('artifact.md')
 STRUCTURED_SCHEDULE_FILE = Path('structured_schedule.json')
 
-MAX_ITERATIONS = 30
+MAX_ITERATIONS = 3
 
 _MODEL_LOG_PATH = Path(os.getenv("NLCO_MODEL_LOG", ".nlco/model_log.jsonl"))
 
