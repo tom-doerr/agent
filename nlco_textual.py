@@ -31,7 +31,8 @@ from metrics_utils import run_with_metrics
 from planning_module import PlanningModule
 from timewarrior_module import TimewarriorModule
 from refiner_signature import RefineSignature, SystemState
-from nootropics_log import load_recent_nootropics_lines
+from nootropics_log import append_nootropics_section, load_recent_nootropics_lines
+from constraints_io import tail_lines as constraints_tail_lines, append_line
 
 try:  # Optional MLflow support
     import mlflow
@@ -410,9 +411,7 @@ class NLCOTextualApp(App):
                 artifact = ARTIFACT_FILE.read_text()
                 constraints = constraints_text
                 context = create_context_string()
-                _noo = load_recent_nootropics_lines()
-                if _noo:
-                    context += "\n\nNootropics (last 72h)\n" + "\n".join(_noo)
+                context = append_nootropics_section(context)
                 self.call_from_thread(self._update_context, context)
                 flush_log()
 
@@ -639,8 +638,8 @@ class NLCOTextualApp(App):
             if not CONSTRAINTS_FILE.exists():
                 log.write("No constraints yet.")
                 return
-            lines = CONSTRAINTS_FILE.read_text().splitlines()
-            for line in lines[-tail_lines:]:
+            lines = constraints_tail_lines(CONSTRAINTS_FILE, tail_lines)
+            for line in lines:
                 log.write(line or " ")
             # Ensure the bottom of the file is visible
             try:
@@ -656,13 +655,7 @@ class NLCOTextualApp(App):
             return
         # Append to constraints.md directly to avoid stale in-memory copies
         try:
-            existing = CONSTRAINTS_FILE.read_text() if CONSTRAINTS_FILE.exists() else ""
-        except Exception:
-            existing = ""
-        sep = "\n" if existing and not existing.endswith("\n") else ""
-        try:
-            with CONSTRAINTS_FILE.open("a", encoding="utf-8") as fh:
-                fh.write(f"{sep}{message}\n")
+            append_line(CONSTRAINTS_FILE, message)
         except Exception as exc:
             self._append_console_log(f"Failed to append constraint: {exc}\n")
             return

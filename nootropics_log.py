@@ -41,3 +41,9 @@ def load_recent_nootropics_lines(hours: int = 72, limit: int = 30, path: Optiona
         return []
     return recent[-limit:]
 
+
+def append_nootropics_section(context: str, *, hours: int = 72, limit: int = 30, path: Optional[Path | str] = None) -> str:
+    lines = load_recent_nootropics_lines(hours=hours, limit=limit, path=path)
+    if not lines:
+        return context
+    return context + "\n\nNootropics (last 72h)\n" + "\n".join(lines)

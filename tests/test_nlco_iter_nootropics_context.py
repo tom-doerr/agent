@@ -23,8 +23,9 @@ async def test_headless_context_includes_nootropics(monkeypatch, tmp_path: Path)
     monkeypatch.setattr(nlco_iter, "create_context_string", lambda: "CTX")
     monkeypatch.setattr(nlco_iter, "_extract_last_reasoning_text", lambda: None)
 
-    # Nootropics lines
-    monkeypatch.setattr(nlco_iter, "load_recent_nootropics_lines", lambda: ['{"ts":"2025-11-06 10:00:00","note":"alpha"}'])
+    # Nootropics lines via helper
+    import nootropics_log as nl
+    monkeypatch.setattr(nl, "load_recent_nootropics_lines", lambda **kwargs: ['{"ts":"2025-11-06 10:00:00","note":"alpha"}'])
 
     # Async memory stub
     async def _mem_async(**kwargs):

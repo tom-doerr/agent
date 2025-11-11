@@ -22,7 +22,7 @@ except Exception:  # pragma: no cover - optional dependency
     Version = None
 
 from context_provider import create_context_string
-from nootropics_log import load_recent_nootropics_lines
+from nootropics_log import append_nootropics_section
 from metrics_utils import run_with_metrics
 from timewarrior_module import TimewarriorModule
 from memory_module import MemoryModule
@@ -156,9 +156,7 @@ async def iteration_loop(*, max_iterations: Optional[int] = None):
             )
             constraints = CONSTRAINTS_FILE.read_text().strip()
             context = create_context_string()
-            _noo = load_recent_nootropics_lines()
-            if _noo:
-                context += "\n\nNootropics (last 72h)\n" + "\n".join(_noo)
+            context = append_nootropics_section(context)
             console.print(Panel(context, title=f"Context @ {_now_str()}", border_style="cyan"))
 
             affect_report = affect_module.run(

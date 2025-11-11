@@ -145,6 +145,7 @@ Nootropics log (read-only)
 - Strictly read-only: the loader never writes or truncates the file.
 - Env var `NLCO_NOOTROPICS_LOG` can point to a different JSONL file for testing.
 - Minimal schema: each line must be JSON with an ISO `ts` field; lines without `ts` are skipped.
+- Helper: `append_nootropics_section(context)` now appends the section; both headless and TUI call this instead of duplicating string glue.
 
 Caching placement
 - To maximize DSPy cache reuse, nootropics data is appended to the `context` input (not `constraints`).
@@ -181,6 +182,7 @@ Constraints pane behavior
 File-first constraints behavior
 - Run uses the live file contents, not an internal buffer.
 - Test: `tests/test_constraints_append_live_read.py` appends twice and verifies the worker receives both lines.
+- Helper: `constraints_io.tail_lines` and `constraints_io.append_line` centralize file tailing and appending.
 
 Short‑term memory
 - File: `short_term_memory.md`.
