@@ -16,6 +16,7 @@ Things to keep in mind
 Models & budgets (NLCO iter)
 - Primary LM: `deepseek/deepseek-reasoner` with `max_tokens=40000` (`nlco_iter.py:35`, `nlco_textual.py:203`).
 - Support LM for subsystems: `deepseek/deepseek-chat` with `max_tokens=4000`, `temperature=0` (`nlco_iter.py:39`, `nlco_textual.py:205`).
+- Memory now uses the primary LM (reasoner) in both headless and TUI paths.
 - No explicit OpenRouter reasoning budget is set; if routed via OpenRouter, provider defaults apply. We do not pass `reasoning`/`max_reasoning_tokens` today.
 
 Reasoning trace display

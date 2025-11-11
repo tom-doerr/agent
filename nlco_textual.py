@@ -441,7 +441,7 @@ class NLCOTextualApp(App):
                     time_status or "No change",
                 )
 
-                memory_module = MemoryModule(self._support_lm, console=console)
+                memory_module = MemoryModule(self._primary_lm, console=console)
                 memory_feedback = memory_module.run(
                     artifact=artifact,
                     constraints=constraints,
