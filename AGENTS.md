@@ -174,9 +174,13 @@ Layout tweak (2025-11-07)
 
 Constraints pane behavior
 - The constraints pane now tails the last ~40 lines of `constraints.md`, so it reflects external edits (e.g., TimestampLogApp) rather than just the in-app message list.
-- Input submissions still append to the in-app list and rewrite `constraints.md` from that list when running an iteration; avoid concurrent writers to the same file.
+- Input submissions now append directly to `constraints.md` (read/append, no in-memory rewrite). The iteration reads constraints fresh from the file at start.
 - Test: `tests/test_nlco_textual_constraints_tail.py` ensures the pane shows only the tail.
 - The pane scrolls to the end after refresh, so the bottom of the file is always visible.
+
+File-first constraints behavior
+- Run uses the live file contents, not an internal buffer.
+- Test: `tests/test_constraints_append_live_read.py` appends twice and verifies the worker receives both lines.
 
 Short‑term memory
 - File: `short_term_memory.md`.

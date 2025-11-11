@@ -302,8 +302,8 @@ class NLCOTextualApp(App):
         if self.is_running:
             return
         self._persist_artifact_editor()
-        constraints_snapshot = self._get_constraints_text()
-        self._persist_constraints_file(constraints_snapshot)
+        # Read constraints directly from the file at run time
+        constraints_snapshot = CONSTRAINTS_FILE.read_text() if CONSTRAINTS_FILE.exists() else ""
         self.iteration_counter += 1
         iteration_index = self.iteration_counter
         self.is_running = True
@@ -331,7 +331,6 @@ class NLCOTextualApp(App):
 
     def action_save_editors(self) -> None:
         self._persist_artifact_editor()
-        self._persist_constraints_file()
         self._append_console_log("Editors saved to files.\n")
 
     async def action_quit(self) -> None:  # noqa: D401 - override default docstring
@@ -655,10 +654,20 @@ class NLCOTextualApp(App):
         message = (text or "").strip()
         if not message:
             return
-        self._constraint_messages.append(message)
+        # Append to constraints.md directly to avoid stale in-memory copies
+        try:
+            existing = CONSTRAINTS_FILE.read_text() if CONSTRAINTS_FILE.exists() else ""
+        except Exception:
+            existing = ""
+        sep = "\n" if existing and not existing.endswith("\n") else ""
+        try:
+            with CONSTRAINTS_FILE.open("a", encoding="utf-8") as fh:
+                fh.write(f"{sep}{message}\n")
+        except Exception as exc:
+            self._append_console_log(f"Failed to append constraint: {exc}\n")
+            return
         self._refresh_constraints_log()
-        self._persist_constraints_file()
-        self._append_console_log(f"Recorded constraint message #{len(self._constraint_messages)}.")
+        self._append_console_log("Constraint appended.\n")
 
     def _get_constraints_text(self) -> str:
         return "\n\n".join(self._constraint_messages).strip()

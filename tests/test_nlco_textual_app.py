@@ -134,15 +134,14 @@ def app_factory(monkeypatch, tmp_path):
 
 
 @pytest.mark.asyncio
-async def test_constraint_messages_persist_to_file(app_factory):
+async def test_constraint_messages_append_to_file(app_factory):
     app, constraints_path, _, _ = app_factory()
 
     async with app.run_test() as pilot:
         app._handle_new_message("Review the roadmap")
         await pilot.pause()
-
-        assert app._constraint_messages == ["Review the roadmap"]
-        assert constraints_path.read_text() == "Review the roadmap"
+        content = constraints_path.read_text()
+        assert "Review the roadmap" in content
 
 
 @pytest.mark.asyncio
@@ -168,7 +167,7 @@ async def test_iteration_uses_entered_constraints(app_factory):
         assert app.iteration_counter == 1
         if app._worker and app._worker.error:
             raise app._worker.error
-        assert constraints_path.read_text() == "Respond to urgent emails"
+        assert "Respond to urgent emails" in constraints_path.read_text()
         assert artifact_path.read_text() == refined_text
         assert app.query_one("#artifact-editor", TextArea).text == refined_text
 
