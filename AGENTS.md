@@ -17,6 +17,11 @@ Models & budgets (NLCO iter)
 - Primary LM: `deepseek/deepseek-reasoner` with `max_tokens=40000` (`nlco_iter.py:35`, `nlco_textual.py:203`).
 - Support LM for subsystems: `deepseek/deepseek-chat` with `max_tokens=4000`, `temperature=0` (`nlco_iter.py:39`, `nlco_textual.py:205`).
 - Memory now uses the primary LM (reasoner) in both headless and TUI paths.
+
+Memory module limits
+- `MemoryModule.max_iters` = 4 by default. Each ReAct step can call a tool (e.g., `replace_memory` or `append_memory`).
+- One `replace_memory` call replaces all occurrences of the search string in `memory.md` (not just one), and increments the edit counter.
+- Effective bound per invocation: up to 4 tool-driven edits, but fewer if the ReAct loop decides to stop early.
 - No explicit OpenRouter reasoning budget is set; if routed via OpenRouter, provider defaults apply. We do not pass `reasoning`/`max_reasoning_tokens` today.
 
 Reasoning trace display
@@ -38,6 +43,16 @@ Textual Markdown
 Release
 - v0.1.1 (2025-11-06): reasoning trace panels in `nlco_iter`, JSONL model logging, TimestampLogApp Markdown view + `gi` input focus, tests updated.
 - v0.1.2 (2025-11-10): TimestampLogApp adds a minimal UTF-8 TTY preflight to avoid Textual `UnicodeDecodeError` on misconfigured terminals; new tests in `tests/test_timestamp_textual_preflight.py`.
+- v0.1.3 (2025-11-11): Add a 1‑column right padding to the `Log` widget in `timestamp_textual_app.py` to avoid last‑column clipping observed on some mobile SSH clients (e.g., JuiceSSH/Termux). New test `tests/test_timestamp_textual_layout_margin.py` pins this CSS.
+- v0.1.4 (2025-11-11): Optional lenient input hook for Textual: set `TIMESTAMP_LENIENT_INPUT=1` to monkeypatch `textual.drivers.linux_driver.decode` to fall back to `cp1252` (or `TEXTUAL_FALLBACK_ENCODING`) when non‑UTF‑8 bytes arrive. Tests: `tests/test_timestamp_textual_lenient_input.py`.
+- v0.1.5 (2025-11-11): Fix script entry NameError by defining the lenient hook before `main()`/`__main__` guard; add `tests/test_timestamp_textual_entry_order.py` to ensure running the script directly doesn’t raise NameError and exits cleanly.
+- v0.1.6 (2025-11-11): Add tests: constraints append behavior (`tests/test_timestamp_constraints_append.py`), lenient warn-once (`tests/test_timestamp_textual_lenient_warn_once.py`), preflight success path (`tests/test_timestamp_textual_preflight_success.py`), and timestamp formatting (`tests/test_timestamp_format_line.py`).
+- v0.1.7 (2025-11-11): Add CLI flags to TimestampLogApp script: `--lenient-input` to enable decode fallback and `--fallback-encoding ENC` to select the fallback codec (default `cp1252`). Test `tests/test_timestamp_textual_cli_lenient.py` verifies the flag path without launching a real UI.
+ - v0.1.8 (2025-11-11): Strengthen lenient input: in addition to patching `linux_driver.decode`, also patch `linux_driver.read` to sanitize non‑UTF‑8 bytes (`fallback → UTF‑8`) before they reach the decoder. This addresses cases where the driver binds the original `decode` at definition time.
+ - v0.1.9 (2025-11-11): Add `timestamp_tui.sh` wrapper which sets UTF‑8 locale, enables `iutf8`, and runs the app with `--lenient-input --fallback-encoding cp1252`. Test `tests/test_timestamp_shell_wrapper.py` asserts wrapper contents.
+ - v0.1.10 (2025-11-11): Ensure `timestamp_tui.sh` has executable bit set in repo workspace.
+ - v0.1.11 (2025-11-11): Document copy‑paste one‑liner and step‑by‑step shell hardening commands.
+ - v0.1.11 (2025-11-11): Document quick shell hardening commands (UTF‑8 locale + `iutf8`) for ad‑hoc sessions.
 
 TTY / UTF-8 preflight (TimestampLogApp)
 - Symptom: `UnicodeDecodeError` from `textual.drivers.linux_driver` on launch when the terminal isn’t UTF-8 or `stty iutf8` isn’t set.
@@ -52,6 +67,41 @@ Troubleshooting: `iutf8` disabled
 - Persist for interactive shells (bash/zsh): add to `~/.bashrc` or `~/.zshrc`:
   - `[ -t 0 ] && stty iutf8 || true`
 - tmux/screen: run `stty iutf8` inside each pane; to persist, keep the shell-rc line above (it runs only in interactive TTYs).
+
+Right edge clipping (mobile SSH)
+- Symptom: rightmost character of many lines is missing when running TimestampLogApp over JuiceSSH/Termux.
+- Likely cause: terminal last-column/autowrap quirk or off‑by‑one width reporting over SSH. Textual/Rich will happily write into the last cell; some terminals fail to render it.
+- Mitigation (2025-11-11): increased right padding on the `Log` widget (`padding: 1 2;`) so content stays one cell away from the terminal’s right edge.
+- Quick check on client: compare `tput cols` vs `stty -a | grep -o 'columns [0-9]\+'`; they should match. Ensure `TERM=xterm-256color` and locale is UTF‑8. Minimal probe: `printf '%*sX\n' "$COLUMNS" ''` should visibly print an `X` in the last column.
+
+Non‑UTF‑8 input over SSH (2025-11-11)
+- Symptom: Textual prints a background thread traceback with `UnicodeDecodeError: invalid start byte 0x..` from `textual.drivers.linux_driver.decode`.
+- Cause: the SSH client sends bytes that aren’t UTF‑8 (often CP1252 like 0x99 for ™). `iutf8` doesn’t transcode; it just changes line editing. Textual expects UTF‑8 and crashes.
+- Fix on the remote shell: `export LANG=en_US.UTF-8; export LC_ALL=en_US.UTF-8; stty iutf8` (run inside tmux panes too). Verify with `locale charmap` → `UTF-8` and `stty -a` shows `iutf8`.
+- Fix on the client (examples): set JuiceSSH/Termux character encoding to UTF‑8 and disable any legacy encoding. Avoid pasting content that yields CP1252 bytes; the hex for ™ should be `e2 84 a2` (UTF‑8), not `99`.
+- Probe: run `xxd -p` then paste a ™ and press Enter; if you see `99`, your client isn’t sending UTF‑8.
+- App behavior: we warn pre‑launch, but Textual may still show its own traceback if non‑UTF‑8 bytes arrive later. We prefer environment fixes over code fallbacks to keep the app minimal.
+- Opt‑in fallback: set `TIMESTAMP_LENIENT_INPUT=1` (and optionally `TEXTUAL_FALLBACK_ENCODING=cp1252`) to enable a small monkeypatch that decodes bad bytes via cp1252. This is intentionally off by default to avoid hiding real issues.
+- CLI alternative: run `./timestamp_textual_app.py --lenient-input [--fallback-encoding cp1252]` to toggle without env vars. Flags are parsed minimally and ignore unknown args.
+Quick run (lenient input)
+- One line: `./timestamp_textual_app.py --lenient-input --fallback-encoding cp1252`
+- With env hardening for this shell:
+  - `export LANG=en_US.UTF-8` (or keep `C.UTF-8`)
+  - `export LC_ALL=en_US.UTF-8`
+  - `stty iutf8`
+  - `./timestamp_textual_app.py --lenient-input --fallback-encoding cp1252`
+
+Shell wrapper (shortest path)
+- Run: `./timestamp_tui.sh`
+- It sets `LANG`/`LC_ALL`, runs `stty iutf8` if on a TTY, then executes the TUI with lenient input.
+
+Quick shell hardening (no run)
+- Per‑pane: `stty iutf8`
+- Locale: `export LANG=en_US.UTF-8` and `export LC_ALL=en_US.UTF-8`
+- Optional: `export TERM=xterm-256color`
+
+Copy‑paste one‑liner (only harden shell)
+- `stty iutf8 && export LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8 TERM=xterm-256color`
 
 Repo housekeeping (2025-11-10)
 - Committed and pushed v0.1.2 changes: UTF-8 TTY preflight in `timestamp_textual_app.py`, error hint in `main()`, and tests `test_timestamp_textual_preflight.py`+`test_timestamp_textual_main.py`.

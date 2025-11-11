@@ -4,6 +4,11 @@
 from __future__ import annotations
 
 from datetime import date, datetime
+import os
+import sys
+import codecs
+
+_lenient_warned = False
 import re
 from pathlib import Path
 from typing import Optional
@@ -361,7 +366,8 @@ class TimestampLogApp(App):
     }
     Log {
         border: solid $surface-lighten-2;
-        padding: 1;
+        /* Give a 1-col right margin to avoid last-column clipping on some mobile SSH terminals */
+        padding: 1 2;
     }
     """
 
@@ -614,9 +620,81 @@ def _ensure_utf8_tty() -> None:
         # If stty isn't available or fails, continue; locale/TTY checks above still apply.
         pass
 
+def _maybe_enable_lenient_input() -> None:
+    """Optionally monkeypatch Textual's Linux driver decode to be lenient.
+
+    Enabled when `TIMESTAMP_LENIENT_INPUT` is set in the environment.
+    On UTF-8 decode errors, falls back to cp1252 (or `TEXTUAL_FALLBACK_ENCODING`).
+    Keeps the code minimal and opt-in to avoid masking real issues by default.
+    """
+    if not os.environ.get("TIMESTAMP_LENIENT_INPUT"):
+        return
+    try:
+        from textual.drivers import linux_driver as _ld  # type: ignore
+    except Exception:
+        return
+
+    original_decode = getattr(_ld, "decode", None)
+    if not callable(original_decode):
+        original_decode = None
+
+    utf8_dec = codecs.getincrementaldecoder("utf-8")()
+    fallback_enc = os.environ.get("TEXTUAL_FALLBACK_ENCODING", "cp1252")
+
+    def safe_decode(data: bytes, final: bool = False) -> str:  # type: ignore[override]
+        global _lenient_warned
+        try:
+            return utf8_dec.decode(data, final)
+        except UnicodeDecodeError:
+            # Reset decoder to a clean state and decode lossy via fallback
+            try:
+                utf8_dec.reset()  # type: ignore[attr-defined]
+            except Exception:
+                pass
+            if not _lenient_warned:
+                print(
+                    f"[timestamp_textual_app] lenient input enabled: falling back to {fallback_enc} for non-UTF-8 bytes.",
+                    file=sys.stderr,
+                )
+                _lenient_warned = True
+            try:
+                return data.decode(fallback_enc, errors="replace")
+            except Exception:
+                # As a last resort, map bytes 1:1 to Unicode code points
+                return data.decode("latin-1", errors="replace")
+
+    # Only patch once
+    if original_decode is not None and getattr(_ld, "decode", None) is not safe_decode:
+        _ld.decode = safe_decode  # type: ignore[assignment]
+
+    # Also patch linux_driver.read to sanitize bytes before decode, in case the
+    # driver binds the original decode at definition time.
+    orig_read = getattr(_ld, "read", None)
+    if callable(orig_read):
+        def safe_read(fd: int, n: int) -> bytes:  # type: ignore[override]
+            b = orig_read(fd, n)
+            try:
+                b.decode("utf-8")
+                return b
+            except UnicodeDecodeError:
+                if not _lenient_warned:
+                    print(
+                        f"[timestamp_textual_app] lenient input: sanitizing bytes via {fallback_enc}→utf-8.",
+                        file=sys.stderr,
+                    )
+                    # do not flip the global warn flag here; decode() may warn too
+                return (
+                    b.decode(fallback_enc, errors="replace")
+                     .encode("utf-8", errors="replace")
+                )
+        _ld.read = safe_read  # type: ignore[assignment]
+
+
 def main() -> None:
     import sys
+    _parse_cli(sys.argv[1:])
     _ensure_utf8_tty()
+    _maybe_enable_lenient_input()
     try:
         TimestampLogApp().run()
     except UnicodeDecodeError:
@@ -625,6 +703,28 @@ def main() -> None:
             file=sys.stderr,
         )
         raise SystemExit(2)
+
+
+def _parse_cli(argv: list[str]) -> None:
+    """Minimal flag parser to toggle lenient input.
+
+    Flags:
+      --lenient-input            Enable decode fallback inside Textual driver
+      --fallback-encoding ENC    Fallback codec (default: cp1252)
+    """
+    try:
+        import argparse
+    except Exception:
+        return
+    parser = argparse.ArgumentParser(add_help=False)
+    parser.add_argument("--lenient-input", action="store_true")
+    parser.add_argument("--fallback-encoding", dest="fallback", default=None)
+    # Ignore unknown flags so we stay minimal
+    ns, _ = parser.parse_known_args(argv)
+    if ns.lenient_input:
+        os.environ.setdefault("TIMESTAMP_LENIENT_INPUT", "1")
+    if ns.fallback:
+        os.environ["TEXTUAL_FALLBACK_ENCODING"] = ns.fallback
 
 
 if __name__ == "__main__":
