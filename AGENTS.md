@@ -175,6 +175,7 @@ Timestamp app constraints
 - TimestampLogApp now uses a fixed constraints height of 8 (`#constraints-container { height: 8; }`).
 - Uses the shared `constraints_io.tail_lines` for tailing and scrolls to bottom by default.
 - Test: `tests/test_timestamp_constraints_height.py` pins the height.
+- Tests: `tests/test_timestamp_constraints_display.py` verifies the tail content and scroll-to-end behavior; `tests/test_timestamp_constraints_tail_default.py` ensures default tail (200) doesn't trim small files.
 
 Refactor: Timestamp app split
 - `timestamp_vim_input.py` contains the minimal `VimInput` widget.
