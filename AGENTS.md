@@ -1,21 +1,21 @@
-Agent Notes (updated 2025-11-10)
+Agent Notes (updated 2025-11-11)
 
-- NLCO iter TUI lives in `nlco_textual.py` (`NLCOTextualApp`). Run: `python nlco_textual.py`.
+- NLCO Textual TUI has been removed (nlco_textual.py deleted). Use headless `nlco_iter.py` or `timestamp_textual_app.py` for constraints capture and artifact viewing.
 - Headless alternative is `nlco_iter.py` (console loop). Run: `python nlco_iter.py`.
 - You do NOT need both at once; the TUI runs iterations itself. Avoid concurrent runs (shared files).
 - Another TUI exists: `timestamp_textual_app.py` (`TimestampLogApp`). This is a lightweight note pad that prefixes lines with the current time and appends them to `constraints.md` under daily headings. It does not run the NLCO iteration pipeline or any DSPy modules; it only shows `artifact.md` and its last-updated age.
 - Files touched: none (informational change only).
 
 Things to keep in mind
-- Textual and Rich must be installed to run the TUI.
-- MLflow is optional; `nlco_textual.py` enables it if available. Structured schedule JSON is no longer produced by the refiner.
+- Textual and Rich must be installed to run the Timestamp TUI.
+- MLflow is optional for headless; structured schedule JSON is no longer produced by the refiner.
 - Constraints and artifact paths are fixed: `constraints.md`, `artifact.md`, `memory.md`, `short_term_memory.md`.
 - `timestamp_textual_app.py` appends to `constraints.md` and can be used alongside NLCO tools, but beware of concurrent writes to the same file.
  - Context now includes weekday explicitly: `Datetime: YYYY-MM-DD HH:MM:SS (Friday)` for better temporal grounding.
 
 Models & budgets (NLCO iter)
-- Primary LM: `deepseek/deepseek-reasoner` with `max_tokens=40000` (`nlco_iter.py:35`, `nlco_textual.py:203`).
-- Support LM for subsystems: `deepseek/deepseek-chat` with `max_tokens=4000`, `temperature=0` (`nlco_iter.py:39`, `nlco_textual.py:205`).
+- Primary LM: `deepseek/deepseek-reasoner` with `max_tokens=40000` (see `nlco_iter.py`).
+- Support LM for subsystems: `deepseek/deepseek-chat` with `max_tokens=4000`, `temperature=0` (used in various support modules).
 - Memory now uses the primary LM (reasoner) in both headless and TUI paths.
 
 Memory module limits
