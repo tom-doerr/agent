@@ -58,17 +58,10 @@ async def test_iteration_loop_triggers_async_memory(monkeypatch, tmp_path):
         refined_artifact = "Refined artifact"
         structured_schedule: list[dict[str, str]] = []
 
-    def fake_critic(*, constraints, context, artifact):
-        assert constraints == "Keep focus"
-        assert context == "context"
-        assert artifact == "Draft artifact"
-        return CriticResult()
-
     def fake_refiner(*, constraints, context, critique, artifact):
-        assert critique == "Needs edits"
+        # Critic disabled; critique may be empty
         return RefinerResult()
 
-    monkeypatch.setattr(nlco_iter, "critic", fake_critic)
     monkeypatch.setattr(nlco_iter, "refiner", fake_refiner)
 
     await nlco_iter.iteration_loop()

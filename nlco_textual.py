@@ -486,16 +486,9 @@ class NLCOTextualApp(App):
                     mlflow_enabled=self._mlflow_enabled,
                 )
 
-                critique_pred = run_with_metrics(
-                    "Critic",
-                    self._critic,
-                    artifact=artifact,
-                    constraints=constraints,
-                    context=context,
-                )
-                critique = getattr(critique_pred, "critique", "")
+                critique = ""
                 flush_log()
-                self.call_from_thread(self._update_stage_log, "critique", critique)
+                self.call_from_thread(self._update_stage_log, "critique", "Critic disabled")
 
                 refine_pred = run_with_metrics(
                     "Refiner",

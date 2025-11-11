@@ -19,7 +19,7 @@ Models & budgets (NLCO iter)
 - No explicit OpenRouter reasoning budget is set; if routed via OpenRouter, provider defaults apply. We do not pass `reasoning`/`max_reasoning_tokens` today.
 
 Reasoning trace display
-- nlco_iter now prints a “Model Reasoning · Critic/Refiner” panel when the provider returns native reasoning:
+- nlco_iter prints a “Model Reasoning · Refiner” panel when the provider returns native reasoning. Critic is currently disabled.
   - DeepSeek API: reads `message.reasoning_content`.
   - OpenRouter: reads `message.reasoning.{text|summary}`.
 - To force reasoning over OpenRouter, pass the unified `reasoning` parameter (e.g., `{"enabled": true}` or `{"effort": "medium"}`) via your LM config; we kept runtime code minimal and non-intrusive.
@@ -96,6 +96,7 @@ Potential rough edges observed
 - `nlco_iter.py` disables finished-check (`if False:`), so it may iterate indefinitely unless externally stopped.
 - `nlco_textual.py` writes files in place; concurrent runs could clobber state.
 - Timewarrior context: headless `nlco_iter.py` currently does not call `TimewarriorModule.run`, so no Timewarrior info is added to the model context. In the Textual UI, `TimewarriorModule.run` is invoked and its output is shown in the "Timewarrior" pane, but it is not injected into the `context` string passed to Critic/Refiner.
+ - Critic stage disabled (2025-11-08): We skip the Critic call and pass an empty critique to Refiner. The TUI shows “Critic disabled” in the Critique panel.
 
 Future test ideas
 - Add a Textual `App.run_test()` smoke test to ensure `NLCOTextualApp` composes and updates logs without launching a real UI.

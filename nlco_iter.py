@@ -81,6 +81,7 @@ refiner = dspy.Predict(
 )
 critic = dspy.Predict('constraints, artifact, context -> critique',
                       instructions="Critique the artifact based on the constraints and common sense.")
+DISABLE_CRITIC = True
 is_finished_checker = dspy.Predict('history -> is_finished: bool, reasoning')
 
 CONSTRAINTS_FILE = Path('constraints.md')
@@ -180,23 +181,26 @@ async def iteration_loop(*, max_iterations: Optional[int] = None):
                 )
             )
 
-            critique_prediction = run_with_metrics(
-                'Critic',
-                critic,
-                constraints=constraints,
-                context=context,
-                artifact=artifact,
-            )
-            critique = critique_prediction.critique
-            console.print(Panel(critique, title=f"Critique @ {_now_str()}", border_style="yellow"))
-            try:
-                _log_model("Critic", output=critique, reasoning=_extract_last_reasoning_text())
-            except Exception:
-                pass
-            # Show model-native reasoning (if provided by the provider)
-            reasoning = _extract_last_reasoning_text()
-            if reasoning:
-                console.print(Panel(reasoning, title="Model Reasoning · Critic", border_style="blue"))
+            if DISABLE_CRITIC:
+                critique = ""
+                console.print(Panel("Critic disabled", title=f"Critique @ {_now_str()}", border_style="yellow"))
+            else:
+                critique_prediction = run_with_metrics(
+                    'Critic',
+                    critic,
+                    constraints=constraints,
+                    context=context,
+                    artifact=artifact,
+                )
+                critique = critique_prediction.critique
+                console.print(Panel(critique, title=f"Critique @ {_now_str()}", border_style="yellow"))
+                try:
+                    _log_model("Critic", output=critique, reasoning=_extract_last_reasoning_text())
+                except Exception:
+                    pass
+                reasoning = _extract_last_reasoning_text()
+                if reasoning:
+                    console.print(Panel(reasoning, title="Model Reasoning · Critic", border_style="blue"))
 
             refined_prediction = run_with_metrics(
                 'Refiner',
