@@ -17,6 +17,7 @@ from textual import events
 from textual.app import App, ComposeResult
 from textual.containers import Container, Vertical
 from textual.widgets import Footer, Header, Input, Log, Static, Markdown
+from constraints_io import tail_lines as constraints_tail_lines
 
 ARTIFACT_FILE = Path("artifact.md")
 CONSTRAINTS_FILE = Path("constraints.md")
@@ -359,7 +360,7 @@ class TimestampLogApp(App):
         overflow: auto;  /* allow scrolling when content overflows */
     }
     #constraints-container {
-        height: 1fr;
+        height: 8;
         padding: 1;
     }
     #input {
@@ -566,6 +567,7 @@ class TimestampLogApp(App):
     def _load_constraints(self) -> None:
         mtime: Optional[float] = None
         def _tail_text(text: str, lines: int) -> str:
+            # Keep compatibility but prefer file-tail helper elsewhere
             if lines <= 0:
                 return text
             parts = text.splitlines()
@@ -580,17 +582,17 @@ class TimestampLogApp(App):
             content = f"(error reading constraints: {exc})"
         else:
             try:
-                content = self._constraints_path.read_text(encoding="utf-8")
+                # Tail via helper for consistency
+                try:
+                    tail = int(os.environ.get("TIMESTAMP_CONSTRAINTS_TAIL", "200"))
+                except ValueError:
+                    tail = 200
+                lines = constraints_tail_lines(self._constraints_path, tail)
+                content = "\n".join(lines)
                 mtime = stat.st_mtime
             except Exception as exc:  # pragma: no cover
                 content = f"(error reading constraints: {exc})"
                 mtime = None
-        # Show the bottom (tail) by default to surface latest notes
-        try:
-            tail = int(os.environ.get("TIMESTAMP_CONSTRAINTS_TAIL", "200"))
-        except ValueError:
-            tail = 200
-        content = _tail_text(content, tail)
         # Respect newlines in Markdown by converting to explicit line breaks
         # (Markdown treats single newlines as soft wraps). Two trailing spaces
         # force a <br>, preserving the original line structure.

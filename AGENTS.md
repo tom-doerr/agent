@@ -173,6 +173,11 @@ Layout tweak (2025-11-07)
 - Increased artifact editor area relative to constraints: `#constraints-pane` height 8, `#editor-row` height 30.
 - Added `tests/test_nlco_textual_layout.py` to pin these values.
 
+Timestamp app constraints
+- TimestampLogApp now uses a fixed constraints height of 8 (`#constraints-container { height: 8; }`).
+- Uses the shared `constraints_io.tail_lines` for tailing and scrolls to bottom by default.
+- Test: `tests/test_timestamp_constraints_height.py` pins the height.
+
 Constraints pane behavior
 - The constraints pane now tails the last ~40 lines of `constraints.md`, so it reflects external edits (e.g., TimestampLogApp) rather than just the in-app message list.
 - Input submissions now append directly to `constraints.md` (read/append, no in-memory rewrite). The iteration reads constraints fresh from the file at start.
