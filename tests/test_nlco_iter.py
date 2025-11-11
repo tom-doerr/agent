@@ -55,7 +55,7 @@ async def test_iteration_loop_triggers_async_memory(monkeypatch, tmp_path):
         refined_artifact = "Refined artifact"
         structured_schedule: list[dict[str, str]] = []
 
-    def fake_refiner(*, constraints, context, artifact):
+    def fake_refiner(*, constraints, context, artifact, **kwargs):
         # Critic disabled; critique may be empty
         return RefinerResult()
 
