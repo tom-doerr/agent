@@ -169,7 +169,7 @@ Iteration counts
 - In the TUI, each press of `r` runs exactly 1 iteration.
 
 Layout tweak (2025-11-07)
-- Increased artifact editor area relative to constraints: `#constraints-pane` height 12, `#editor-row` height 30.
+- Increased artifact editor area relative to constraints: `#constraints-pane` height 8, `#editor-row` height 30.
 - Added `tests/test_nlco_textual_layout.py` to pin these values.
 
 Constraints pane behavior

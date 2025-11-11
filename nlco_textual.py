@@ -106,7 +106,7 @@ class NLCOTextualApp(App):
         border-bottom: solid $surface-lighten-2;
     }
     #constraints-pane {
-        height: 12;
+        height: 8;
         padding: 1;
         border-bottom: solid $surface-lighten-2;
     }
