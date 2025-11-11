@@ -17,6 +17,7 @@ from textual import events
 from textual.app import App, ComposeResult
 from textual.containers import Container, Vertical
 from textual.widgets import Footer, Header, Input, Log, Static, Markdown
+from timestamp_vim_input import VimInput
 from constraints_io import tail_lines as constraints_tail_lines
 
 ARTIFACT_FILE = Path("artifact.md")
@@ -24,7 +25,7 @@ CONSTRAINTS_FILE = Path("constraints.md")
 DATE_HEADING_RE = re.compile(r"^#\s*(\d{4}-\d{2}-\d{2})$")
 
 
-class VimInput(Input):
+class _OldVimInput(Input):
     """Input widget that supports a small subset of Vim normal-mode commands."""
 
     def __init__(self, *args, **kwargs) -> None:
@@ -410,6 +411,7 @@ class TimestampLogApp(App):
         with Vertical(id="constraints-container"):
             yield Static("Constraints", id="constraints-title")
             yield Markdown(id="constraints-view")
+        # Use external VimInput; keep old class around (unused) for clarity
         yield VimInput(placeholder="Type here and press Enter...", id="input")
         with Vertical(id="artifact-container"):
             yield Static("Artifact", id="artifact-title")

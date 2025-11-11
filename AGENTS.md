@@ -16,7 +16,7 @@ Things to keep in mind
 Models & budgets (NLCO iter)
 - Primary LM: `deepseek/deepseek-reasoner` with `max_tokens=40000` (see `nlco_iter.py`).
 - Support LM for subsystems: `deepseek/deepseek-chat` with `max_tokens=4000`, `temperature=0` (used in various support modules).
-- Memory now uses the primary LM (reasoner) in both headless and TUI paths.
+- Memory now uses the primary LM (reasoner) in headless.
 
 Memory module limits
 - `MemoryModule.max_iters` = 4 by default. Each ReAct step can call a tool (e.g., `replace_memory` or `append_memory`).
@@ -150,7 +150,7 @@ Nootropics log (read-only)
 Caching placement
 - To maximize DSPy cache reuse, nootropics data is appended to the `context` input (not `constraints`).
 - This keeps the `constraints` string stable across runs and pushes variable nootropics lines "behind" constraints in the prompt ordering.
-- Both `nlco_iter.py` and `nlco_textual.py` add a `Nootropics (last 72h)` section at the end of `context`.
+- `nlco_iter.py` appends a `Nootropics (last 72h)` section at the end of `context`.
 
 NLCO iter tests
 - Added tests covering headless iteration behavior without touching real LMs:
@@ -160,9 +160,8 @@ NLCO iter tests
 - Note: Running the entire repo test suite may fail due to duplicate test module names in `packages/deepseek-batch/tests/`. Run selective tests for NLCO iter.
 
 Quick usage
-- TUI: press `r` to run one iteration, `Ctrl+S` to save, `Ctrl+L` to clear logs.
-- Headless: scheduler decides when to run; finished-check is currently disabled.
- - Timestamp app: new `gi` shortcut focuses the input if focus is elsewhere.
+- Headless (nlco_iter): scheduler decides when to run; finished-check is currently disabled.
+- Timestamp app: `gi` focuses the input if focus is elsewhere; use Enter to append a timestamped line.
 
 Iteration counts
 - After a constraints.md change (headless), the loop runs up to `MAX_ITERATIONS` in one invocation. Override with `NLCO_MAX_ITERS` (default 3).
@@ -170,24 +169,24 @@ Iteration counts
 - In the TUI, each press of `r` runs exactly 1 iteration.
 
 Layout tweak (2025-11-07)
-- Increased artifact editor area relative to constraints: `#constraints-pane` height 8, `#editor-row` height 30.
-- Added `tests/test_nlco_textual_layout.py` to pin these values.
+- Removed NLCO TUI layout. Timestamp app has its own constraints height (8) documented below.
 
 Timestamp app constraints
 - TimestampLogApp now uses a fixed constraints height of 8 (`#constraints-container { height: 8; }`).
 - Uses the shared `constraints_io.tail_lines` for tailing and scrolls to bottom by default.
 - Test: `tests/test_timestamp_constraints_height.py` pins the height.
 
-Constraints pane behavior
-- The constraints pane now tails the last ~40 lines of `constraints.md`, so it reflects external edits (e.g., TimestampLogApp) rather than just the in-app message list.
-- Input submissions now append directly to `constraints.md` (read/append, no in-memory rewrite). The iteration reads constraints fresh from the file at start.
-- Test: `tests/test_nlco_textual_constraints_tail.py` ensures the pane shows only the tail.
-- The pane scrolls to the end after refresh, so the bottom of the file is always visible.
+Refactor: Timestamp app split
+- `timestamp_vim_input.py` contains the minimal `VimInput` widget.
+- `timestamp_app_core.py` holds the app class and helper functions.
+- `timestamp_textual_app.py` is a thin wrapper that re-exports the app, helpers, and main().
+
+Constraints pane behavior (Timestamp app)
+- Tails the last ~N lines of `constraints.md` (default 200 via `TIMESTAMP_CONSTRAINTS_TAIL`).
+- Scrolls to the end after refresh so the bottom is visible by default.
 
 File-first constraints behavior
-- Run uses the live file contents, not an internal buffer.
-- Test: `tests/test_constraints_append_live_read.py` appends twice and verifies the worker receives both lines.
-- Helper: `constraints_io.tail_lines` and `constraints_io.append_line` centralize file tailing and appending.
+- Shared helpers `constraints_io.tail_lines` and `constraints_io.append_line` centralize file tailing and appending.
 
 Short‑term memory
 - File: `short_term_memory.md`.
