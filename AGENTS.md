@@ -176,6 +176,7 @@ Timestamp app constraints
 - Uses the shared `constraints_io.tail_lines` for tailing and scrolls to bottom by default.
 - Test: `tests/test_timestamp_constraints_height.py` pins the height.
 - Tests: `tests/test_timestamp_constraints_display.py` verifies the tail content and scroll-to-end behavior; `tests/test_timestamp_constraints_tail_default.py` ensures default tail (200) doesn't trim small files.
+ - Wrapper: `tests/test_timestamp_wrapper_exports.py` smoke tests that `timestamp_textual_app` exposes the app and helpers, and that `main()` wires parse/tty/lenient/run calls without launching a real UI.
 
 Refactor: Timestamp app split
 - `timestamp_vim_input.py` contains the minimal `VimInput` widget.
