@@ -93,11 +93,19 @@ Constraints pane behavior
 - Input submissions still append to the in-app list and rewrite `constraints.md` from that list when running an iteration; avoid concurrent writers to the same file.
 - Test: `tests/test_nlco_textual_constraints_tail.py` ensures the pane shows only the tail.
 
+Short‑term memory
+- File: `short_term_memory.md`.
+- Producers:
+  - `TimewarriorModule`: appends a one‑line event whenever it starts/stops or prints a notable status.
+  - `ExecutiveModule`: appends a one‑line trace per tool action when used (not currently wired in headless; TUI doesn’t invoke ExecutiveModule).
+- Consumers: none at runtime; we don’t read it back into model context today. It’s for lightweight, append‑only breadcrumbs.
+
 Potential rough edges observed
 - `nlco_iter.py` disables finished-check (`if False:`), so it may iterate indefinitely unless externally stopped.
 - `nlco_textual.py` writes files in place; concurrent runs could clobber state.
 - Timewarrior context: headless `nlco_iter.py` currently does not call `TimewarriorModule.run`, so no Timewarrior info is added to the model context. In the Textual UI, `TimewarriorModule.run` is invoked and its output is shown in the "Timewarrior" pane, but it is not injected into the `context` string passed to Critic/Refiner.
- - Critic stage disabled (2025-11-08): We skip the Critic call and pass an empty critique to Refiner. The TUI shows “Critic disabled” in the Critique panel.
+- Critic stage disabled (2025-11-08): We skip the Critic call and pass an empty critique to Refiner. The TUI shows “Critic disabled” in the Critique panel.
+- Planner stage: In the Textual UI we call `PlanningModule.run` and show its output; in headless `nlco_iter.py` the planner is instantiated but not called yet.
 
 Future test ideas
 - Add a Textual `App.run_test()` smoke test to ensure `NLCOTextualApp` composes and updates logs without launching a real UI.
