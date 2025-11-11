@@ -108,10 +108,12 @@ class TimestampLogApp(App):
             self._constraints_mtime = stat.st_mtime
             self._constraints_title.update(f"Constraints — {self._constraints_path}")
             self._constraints_view.update(content)
-            try:
-                self._constraints_view.scroll_end(animate=False)  # type: ignore[attr-defined]
-            except Exception:
-                pass
+            auto = os.environ.get("TIMESTAMP_AUTO_SCROLL", "1").lower() not in {"0", "false", "no"}
+            if auto:
+                try:
+                    self._constraints_view.scroll_end(animate=False)  # type: ignore[attr-defined]
+                except Exception:
+                    pass
         except FileNotFoundError:
             self._constraints_view.update("(constraints not found)")
 
@@ -182,4 +184,3 @@ def _parse_cli(argv: list[str]) -> None:
         os.environ["TIMESTAMP_AUTO_SCROLL"] = "0"
     if ns.constraints_tail is not None:
         os.environ["TIMESTAMP_CONSTRAINTS_TAIL"] = str(ns.constraints_tail)
-
