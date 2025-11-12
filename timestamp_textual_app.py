@@ -399,6 +399,12 @@ class TimestampLogApp(App):
                 existing = fh.read()
             except Exception:
                 existing = ""
+            # snapshot before write
+            try:
+                from backups import ensure_backups  # local import to avoid startup cost
+                ensure_backups(path, content=existing)
+            except Exception:
+                pass
             needs_heading = self._last_constraints_date != current_date and (f"# {date_str}" not in existing)
             pieces: list[str] = []
             if existing and not existing.endswith("\n"):

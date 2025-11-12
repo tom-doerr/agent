@@ -3,6 +3,7 @@ from typing import List
 import os
 
 from file_lock import locked_file
+from backups import ensure_backups
 
 
 def tail_lines(path: Path, n: int) -> List[str]:
@@ -21,6 +22,11 @@ def append_line(path: Path, text: str) -> None:
             existing = fh.read()
         except Exception:
             existing = ""
+        # Snapshot before applying changes
+        try:
+            ensure_backups(path, content=existing)
+        except Exception:
+            pass
         sep = "\n" if existing and not existing.endswith("\n") else ""
         fh.seek(0, os.SEEK_END)
         fh.write(f"{sep}{text}\n")

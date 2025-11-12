@@ -39,6 +39,12 @@ def write_constraints_entry(path: Path, message: str, *, now: datetime | None = 
     with locked_file(path, "a+") as handle:
         handle.seek(0)
         existing = handle.read()
+        # snapshot before write
+        try:
+            from backups import ensure_backups  # local import
+            ensure_backups(path, content=existing)
+        except Exception:
+            pass
         last_date = extract_last_constraints_date(existing)
         pieces: list[str] = []
         if existing and not existing.endswith("\n"):
