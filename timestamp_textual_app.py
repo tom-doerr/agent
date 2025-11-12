@@ -303,6 +303,16 @@ def main() -> None:
     
 
 def _parse_cli(argv: list[str]) -> None:  # wrapper to keep test import path stable
+    # Support wrapper-specific flag, then delegate to core.
+    try:
+        import argparse
+        p = argparse.ArgumentParser(add_help=False)
+        p.add_argument("--constraints-rows", type=int, dest="rows")
+        ns, _ = p.parse_known_args(argv)
+        if ns.rows is not None:
+            os.environ["TIMESTAMP_CONSTRAINTS_ROWS"] = str(max(1, ns.rows))
+    except Exception:
+        pass
     from timestamp_app_core import _parse_cli as _core_parse
     _core_parse(argv)
 
