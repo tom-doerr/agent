@@ -1,5 +1,8 @@
 from pathlib import Path
 from typing import List
+import os
+
+from file_lock import locked_file
 
 
 def tail_lines(path: Path, n: int) -> List[str]:
@@ -12,11 +15,12 @@ def append_line(path: Path, text: str) -> None:
     text = (text or "").rstrip("\n")
     if not text:
         return
-    try:
-        existing = path.read_text(encoding="utf-8") if path.exists() else ""
-    except Exception:
-        existing = ""
-    sep = "\n" if existing and not existing.endswith("\n") else ""
-    with path.open("a", encoding="utf-8") as fh:
+    with locked_file(path, "a+") as fh:
+        try:
+            fh.seek(0)
+            existing = fh.read()
+        except Exception:
+            existing = ""
+        sep = "\n" if existing and not existing.endswith("\n") else ""
+        fh.seek(0, os.SEEK_END)
         fh.write(f"{sep}{text}\n")
-

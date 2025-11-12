@@ -19,6 +19,7 @@ from textual.containers import Container, Vertical
 from textual.widgets import Footer, Header, Input, Log, Static, Markdown
 from timestamp_vim_input import VimInput
 from constraints_io import tail_lines as constraints_tail_lines
+from file_lock import locked_file
 
 ARTIFACT_FILE = Path("artifact.md")
 CONSTRAINTS_FILE = Path("constraints.md")
@@ -697,26 +698,24 @@ class TimestampLogApp(App):
     def _append_to_constraints(self, current_date: date, formatted_line: str) -> None:
         path = self._constraints_path
         path.parent.mkdir(parents=True, exist_ok=True)
-        try:
-            existing = path.read_text(encoding="utf-8")
-        except FileNotFoundError:
-            existing = ""
-
         date_str = current_date.strftime("%Y-%m-%d")
-        needs_heading = self._last_constraints_date != current_date
-
-        pieces: list[str] = []
-        if existing and not existing.endswith("\n"):
-            pieces.append("\n")
-        if needs_heading:
-            if existing and not existing.endswith("\n\n"):
+        with locked_file(path, "a+") as fh:
+            try:
+                fh.seek(0)
+                existing = fh.read()
+            except Exception:
+                existing = ""
+            needs_heading = self._last_constraints_date != current_date and (f"# {date_str}" not in existing)
+            pieces: list[str] = []
+            if existing and not existing.endswith("\n"):
                 pieces.append("\n")
-            pieces.append(f"# {date_str}\n")
-        pieces.append(f"{formatted_line}\n")
-
-        with path.open("a", encoding="utf-8") as fh:
+            if needs_heading:
+                if existing and not existing.endswith("\n\n"):
+                    pieces.append("\n")
+                pieces.append(f"# {date_str}\n")
+            pieces.append(f"{formatted_line}\n")
+            fh.seek(0, 2)
             fh.write("".join(pieces))
-
         self._last_constraints_date = current_date
 
 

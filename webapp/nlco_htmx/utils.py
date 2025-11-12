@@ -8,6 +8,8 @@ from pathlib import Path
 from typing import Iterable, Optional
 
 from refiner_signature import ScheduleBlock, normalize_schedule
+from file_lock import locked_file
+import os
 
 DATE_HEADING_RE = re.compile(r"^#\s*(\d{4}-\d{2}-\d{2})$")
 
@@ -34,19 +36,19 @@ def write_constraints_entry(path: Path, message: str, *, now: datetime | None = 
     entry_date = now.date()
 
     path.parent.mkdir(parents=True, exist_ok=True)
-    existing = read_text(path)
-    last_date = extract_last_constraints_date(existing)
-
-    pieces: list[str] = []
-    if existing and not existing.endswith("\n"):
-        pieces.append("\n")
-    if last_date != entry_date:
-        if existing and not existing.endswith("\n\n"):
+    with locked_file(path, "a+") as handle:
+        handle.seek(0)
+        existing = handle.read()
+        last_date = extract_last_constraints_date(existing)
+        pieces: list[str] = []
+        if existing and not existing.endswith("\n"):
             pieces.append("\n")
-        pieces.append(f"# {entry_date:%Y-%m-%d}\n")
-    pieces.append(f"{formatted_line}\n")
-
-    with path.open("a", encoding="utf-8") as handle:
+        if last_date != entry_date:
+            if existing and not existing.endswith("\n\n"):
+                pieces.append("\n")
+            pieces.append(f"# {entry_date:%Y-%m-%d}\n")
+        pieces.append(f"{formatted_line}\n")
+        handle.seek(0, os.SEEK_END)
         handle.write("".join(pieces))
 
     return formatted_line, entry_date
