@@ -1,0 +1,13 @@
+target-version = "py311"
+line-length = 100
+extend-exclude = ["dspy_programs/online_optimization.py"]
+
+[lint]
+select = ["E", "F"]
+ignore = ["E501"]
+
+[lint.per-file-ignores]
+"timestamp_textual_app.py" = ["E402", "E701", "E702"]
+"timestamp_vim_input.py" = ["E701", "E702"]
+"agent_manual_pkg/src/agent_manual_pkg/app.py" = ["E402"]
+"dspy_programs/memory_gan.py" = ["E402"]
