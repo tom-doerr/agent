@@ -99,10 +99,18 @@ class TimestampLogApp(App):
     def _load_constraints(self) -> None:
         try:
             stat = self._constraints_path.stat()
-            try:
-                tail = int(os.environ.get("TIMESTAMP_CONSTRAINTS_TAIL", "200"))
-            except ValueError:
-                tail = 200
+            env_tail = os.environ.get("TIMESTAMP_CONSTRAINTS_TAIL", "200")
+            if str(env_tail).lower() == "auto":
+                try:
+                    height = int(getattr(getattr(self._constraints_view, "size", None), "height", 0))
+                except Exception:
+                    height = 0
+                tail = max(height - 2, 1)
+            else:
+                try:
+                    tail = int(env_tail)
+                except ValueError:
+                    tail = 200
             lines = constraints_tail_lines(self._constraints_path, tail)
             content = "\n".join(lines).replace("\n", "  \n")
             self._constraints_mtime = stat.st_mtime
