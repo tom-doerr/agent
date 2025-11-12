@@ -16,21 +16,30 @@ async def test_constraints_tail_displayed(monkeypatch, tmp_path: Path):
         constraints_path=constraints,
     )
 
-    monkeypatch.setenv("TIMESTAMP_CONSTRAINTS_TAIL", "3")
+    # Stub a small pane height so tail=3 (height 5 -> 3)
+    captured = {"text": ""}
 
-    async with app.run_test() as pilot:
-        await pilot.pause()
-        view = app.query_one("#constraints-view", core.Markdown)
-        captured = {"text": ""}
+    class DummySize:
+        def __init__(self, h: int) -> None:
+            self.height = h
 
-        def _spy_update(text: str):
+    class DummyMd:
+        def __init__(self):
+            self.size = DummySize(5)
+        def update(self, text: str):
             captured["text"] = text
 
-        view.update = _spy_update  # type: ignore[assignment]
-        app._load_constraints()
-        rendered = captured["text"]
-        assert "L48" in rendered and "L49" in rendered and "L50" in rendered
-        assert "L1" not in rendered
+    class DummyTitle:
+        def update(self, text: str):
+            pass
+
+    app._constraints_view = DummyMd()
+    app._constraints_title = DummyTitle()
+
+    app._load_constraints()
+    rendered = captured["text"]
+    assert "L48" in rendered and "L49" in rendered and "L50" in rendered
+    assert "L1" not in rendered
 
 
 @pytest.mark.asyncio

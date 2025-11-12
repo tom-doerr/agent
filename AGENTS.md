@@ -13,7 +13,7 @@ Things to keep in mind
 - `timestamp_textual_app.py` appends to `constraints.md` and can be used alongside NLCO tools, but beware of concurrent writes to the same file.
  - Context now includes weekday explicitly: `Datetime: YYYY-MM-DD HH:MM:SS (Friday)` for better temporal grounding.
 - Auto-backups: Before any write to `constraints.md`, we snapshot the current file to `.nlco/backups/{hourly|daily|weekly}/constraints-*.md` if the period’s file doesn’t exist yet. Env override: `NLCO_BACKUP_DIR`.
-- Constraints tail sizing: In `timestamp_app_core`, set `TIMESTAMP_CONSTRAINTS_TAIL=auto` to compute tail from the constraints pane height (tail = max(height - 2, 1)). Default remains 200 to keep tests and behavior stable.
+- Constraints tail sizing: In `timestamp_app_core`, tail now always derives from pane height (tail = max(height - 2, 1)). The old `TIMESTAMP_CONSTRAINTS_TAIL` numeric env is ignored for rendering.
 
 Next Steps (2025-11-12)
 - 46a. Wire `TimewarriorModule.run()` into `nlco_iter.iteration_loop()` behind env `NLCO_TIMEW=1`; log a short status line and add 2 unit tests (timew present/absent). Recommended.
@@ -88,7 +88,7 @@ Release
  - v0.1.28 (2025-11-11): TimestampLogApp respects newlines in the constraints view by emitting Markdown line breaks. Test: `tests/test_timestamp_constraints_newlines.py`.
  - v0.1.29 (2025-11-12): Remove unused `_OldVimInput` from `timestamp_textual_app.py`; the TUI relies solely on `VimInput`.
 - v0.1.30 (2025-11-12): Add hourly/daily/weekly auto-backups for `constraints.md` (locked writes). New module `backups.py`; used by `constraints_io`, `timestamp_textual_app`, and HTMX utils. Tests: `tests/test_constraints_backups.py`.
- - v0.1.31 (2025-11-12): Add `TIMESTAMP_CONSTRAINTS_TAIL=auto` to size the constraints tail to the pane height in `timestamp_app_core`. Test: `tests/test_timestamp_constraints_tail_auto.py`.
+ - v0.1.31 (2025-11-12): Constraints tail now always tracks pane height in `timestamp_app_core`. Tests: `tests/test_timestamp_constraints_tail_auto.py` and updated display/tail default tests.
  - v0.1.32 (2025-11-12): Ran `ruff check .` across repo; 397 findings, 166 auto-fixable. Consider adding a minimal `pyproject.toml` Ruff config and staged fixes.
 
 Structured Memory — Options (2025-11-11)
