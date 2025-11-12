@@ -1,6 +1,5 @@
 from pathlib import Path
 from datetime import datetime, timedelta
-import os
 
 from nootropics_log import load_recent_nootropics_lines
 

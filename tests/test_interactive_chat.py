@@ -7,10 +7,8 @@ import sys
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 from interactive_chat import InteractiveChat
-from unittest.mock import patch, MagicMock
-from textual.widgets import Input, Button, Static
-from textual.containers import Container
-import asyncio
+from unittest.mock import patch
+from textual.widgets import Input, Static
 
 # Test app initialization
 def test_app_initialization():

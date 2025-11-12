@@ -4,7 +4,7 @@ import sys
 import os
 from unittest.mock import patch, MagicMock
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-from dspy_programs.memory_gan import main, get_firecrawl_content, gan_metric, optimize_memory_gan, MemoryGAN
+from dspy_programs.memory_gan import main, get_firecrawl_content, gan_metric, optimize_memory_gan
 
 @pytest.fixture
 def mock_firecrawl(monkeypatch):

@@ -1,6 +1,6 @@
 
 from __future__ import annotations
-from typing import Optional, List, Tuple
+from typing import List, Tuple
 import math
 
 def cursor_row_key(table) -> str | None:

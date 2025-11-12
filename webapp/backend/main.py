@@ -16,7 +16,6 @@ from audio_handler import transcribe_audio
 from gemini_handler import (
     MOCK_MODE as GEMINI_MOCK_MODE,
     DEFAULT_AUDIO_MODEL,
-    DEFAULT_MODEL,
     get_gemini_response,
     stream_gemini_response,
 )

@@ -1,6 +1,6 @@
 from textual.app import App, ComposeResult
-from textual.containers import Container, Vertical
-from textual.widgets import Header, Footer, Button, Static, Input, ListView, ListItem, Label
+from textual.containers import Container
+from textual.widgets import Header, Footer, Button, Input, ListView, ListItem, Label
 from textual.screen import ModalScreen
 from textual.reactive import reactive
 from textual import events

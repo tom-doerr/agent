@@ -1,7 +1,10 @@
 #!/usr/bin/env python3
 
 from __future__ import annotations
-import asyncio, json, random, functools
+import asyncio
+import json
+import random
+import functools
 from dataclasses import dataclass, asdict
 from typing import List, Optional
 
@@ -10,12 +13,11 @@ from textual.widgets import Header, Footer, Input, Button, DataTable, Select, La
 from textual.containers import Horizontal, Vertical, Grid
 from textual import on
 
-import dspy
 
 from .model import WorldModel, Theory, weighted_sample_without_replacement, multiplicative_update
 from .dspy_judge import WorldModelJudge, LocalHeuristicJudge
 from .llm_providers import configure_lm, LMConfigError
-from .utils import cursor_row_key, cursor_row_index, topk_sorted, kl_divergence, gini
+from .utils import cursor_row_index, topk_sorted, gini
 
 @dataclass
 class RunConfig:
@@ -255,7 +257,7 @@ class WorldModelTUI(App):
             try:
                 # Local heuristic is fast; but to keep flow uniform, still to_thread
                 return await asyncio.to_thread(func)
-            except Exception as e:
+            except Exception:
                 if attempt == 2:
                     raise
                 await asyncio.sleep(1.5 ** attempt)

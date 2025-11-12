@@ -7,7 +7,7 @@ import dspy
 from ..config import get_config, update_config
 from ..signatures import AgentSignature
 from .agent import ReadableReAct
-from .models import MODEL_PRESETS, MODULE_INFO, MODULE_ORDER
+from .models import MODEL_PRESETS
 from .tools import TOOLS
 
 # Defer all config I/O to the CLI entrypoint.

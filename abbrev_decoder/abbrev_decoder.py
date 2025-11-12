@@ -7,13 +7,10 @@ Uses LLMs with logprobs to decode abbreviated input into likely sentences.
 import argparse
 import os
 import sys
-from typing import List, Tuple, Optional
-import litellm
+from typing import List, Tuple
 from litellm import completion
-import heapq
 from dataclasses import dataclass
 import json
-import re
 
 @dataclass
 class Candidate:

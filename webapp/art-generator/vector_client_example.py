@@ -14,8 +14,7 @@ import numpy as np
 import base64
 from PIL import Image
 import io
-from typing import List, Dict, Any
-import json
+from typing import List, Dict
 
 
 class VectorImageClient:
@@ -227,7 +226,7 @@ def main():
     print("   ✓ Saved style variation matrix")
     
     print("\n✅ All examples completed successfully!")
-    print(f"   Generated images saved in current directory")
+    print("   Generated images saved in current directory")
 
 
 if __name__ == "__main__":

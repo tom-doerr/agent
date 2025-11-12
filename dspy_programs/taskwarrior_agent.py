@@ -188,7 +188,7 @@ def main():
             if success:
                 optimization_data.append(data_point)
                 save_optimization_data(data_point)
-                print(f"Saved optimization data point")
+                print("Saved optimization data point")
             else:
                 # Allow retry for failed commands
                 retry = input("Retry with new command? [Y/n]: ").strip().lower()
@@ -223,7 +223,7 @@ def main():
                     if success:
                         optimization_data.append(data_point)
                         save_optimization_data(data_point)
-                        print(f"Saved optimization data point")
+                        print("Saved optimization data point")
             
             print(f"\nExecution time: {execution_time:.2f}s")
             print(f"Command {'succeeded' if success else 'failed'}")

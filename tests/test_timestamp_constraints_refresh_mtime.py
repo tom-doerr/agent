@@ -1,5 +1,4 @@
 import os
-import time
 
 import timestamp_textual_app as mod
 

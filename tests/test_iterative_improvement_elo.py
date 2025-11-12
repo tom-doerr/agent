@@ -7,10 +7,7 @@ import sys
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 from iterative_improvement_elo import sample_version, get_random_opponent, update_elo_ratings, iterative_improvement_elo
-from unittest.mock import patch, MagicMock
-import numpy as np
-import random
-from simpledspy import predict, chain_of_thought
+from unittest.mock import patch
 
 # Test helper functions
 def test_sample_version():

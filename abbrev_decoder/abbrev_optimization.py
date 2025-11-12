@@ -4,12 +4,12 @@ DSPy optimization for abbreviation decoder
 """
 
 import dspy
-from dspy.teleprompt import BootstrapFewShot, BootstrapFewShotWithRandomSearch
+from dspy.teleprompt import BootstrapFewShot
 from dspy.evaluate import Evaluate
 import json
 import os
-from typing import List, Dict, Any
-from abbrev_dspy_program import AbbreviationExpander, AbbreviationValidator, AbbreviationExample
+from typing import List, Dict
+from abbrev_dspy_program import AbbreviationExpander
 
 def load_dataset(filename: str) -> List[Dict[str, str]]:
     """Load dataset from JSONL file"""

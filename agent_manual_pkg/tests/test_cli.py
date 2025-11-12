@@ -1,5 +1,4 @@
 import os
-import types
 
 
 def test_cli_configures_model_and_runs_tui(tmp_path, monkeypatch):

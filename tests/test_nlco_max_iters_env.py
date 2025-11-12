@@ -1,5 +1,4 @@
 import importlib
-import os
 
 
 def test_env_overrides_max_iters(monkeypatch):

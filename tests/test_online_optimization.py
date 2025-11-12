@@ -1,12 +1,11 @@
 import pytest
 pytestmark = pytest.mark.timeout(10, method='thread')
-import asyncio
 import time
 import os
 import sys
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-from online_optimization_system import OnlineOptimizationSystem, AsyncModelManager, OptimizationRequest, InferenceResult
+from online_optimization_system import OnlineOptimizationSystem, OptimizationRequest, InferenceResult
 import dspy
 
 class MockModule(dspy.Module):

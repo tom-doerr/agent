@@ -7,7 +7,7 @@ import subprocess
 from unittest.mock import patch, MagicMock
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from taskwarrior_dspy_agent import execute_taskwarrior_command, setup_dspy, main
+from taskwarrior_dspy_agent import execute_taskwarrior_command, main
 
 def test_execute_taskwarrior_command_success():
     with patch("subprocess.run") as mock_run:

@@ -26,7 +26,6 @@ from nootropics_log import append_nootropics_section
 from metrics_utils import run_with_metrics
 from timewarrior_module import TimewarriorModule
 from memory_module import MemoryModule
-from executive_module import ExecutiveModule
 from planning_module import PlanningModule
 from affect_module import AffectModule
 from nlco_scheduler import evaluate_run_decision

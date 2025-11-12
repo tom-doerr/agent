@@ -1,6 +1,4 @@
-import os
 import types
-import builtins
 import subprocess
 
 import pytest

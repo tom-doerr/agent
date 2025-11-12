@@ -1,4 +1,3 @@
-import json
 import pytest
 from textual_task_manager import TaskManager, TaskItem
 

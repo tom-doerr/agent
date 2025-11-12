@@ -1,4 +1,4 @@
-from datetime import datetime, date, timedelta
+from datetime import date
 from pathlib import Path
 
 import timestamp_textual_app as mod

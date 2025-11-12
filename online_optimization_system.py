@@ -2,12 +2,10 @@ import asyncio
 import threading
 import queue
 import time
-import json
 from typing import Dict, Any, List, Optional, Callable
 from dataclasses import dataclass
 from datetime import datetime
 import dspy
-from concurrent.futures import ThreadPoolExecutor
 import logging
 
 logging.basicConfig(level=logging.INFO)

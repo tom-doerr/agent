@@ -12,7 +12,6 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 import pytest
-from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from webapp.nlco_htmx.app import WebConfig, create_app

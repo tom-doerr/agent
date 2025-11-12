@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 import os
 from collections.abc import AsyncGenerator, Callable
-from typing import Optional, TYPE_CHECKING, Tuple
+from typing import Optional, TYPE_CHECKING
 
 from fastapi import APIRouter, Depends, FastAPI, HTTPException, Request, status
 from fastapi_users import BaseUserManager, FastAPIUsers, IntegerIDMixin, models
@@ -15,7 +15,6 @@ from fastapi_users.authentication import (
     JWTStrategy,
 )
 from fastapi_users.authentication.strategy import Strategy
-from fastapi_users.models import UP
 from httpx_oauth.clients.github import GitHubOAuth2
 from fastapi_users.schemas import BaseUser, BaseUserCreate, BaseUserUpdate
 from fastapi.security import OAuth2PasswordRequestForm

@@ -15,8 +15,8 @@ from typing import Optional
 
 from textual import events
 from textual.app import App, ComposeResult
-from textual.containers import Container, Vertical
-from textual.widgets import Footer, Header, Input, Log, Static, Markdown
+from textual.containers import Vertical
+from textual.widgets import Footer, Header, Input, Static, Markdown
 from timestamp_vim_input import VimInput
 from constraints_io import tail_lines as constraints_tail_lines
 from file_lock import locked_file

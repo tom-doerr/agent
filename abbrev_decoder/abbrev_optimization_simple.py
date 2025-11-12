@@ -7,7 +7,7 @@ import dspy
 from dspy.teleprompt import BootstrapFewShot
 import json
 import os
-from typing import List, Dict, Any
+from typing import List, Dict
 
 # Import the expander module
 from abbrev_dspy_program import AbbreviationExpander

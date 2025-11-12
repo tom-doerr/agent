@@ -1,9 +1,7 @@
 #!/usr/bin/env python3
 
 
-import os
-from subprocess import run, PIPE, STDOUT, Popen
-from typing import Literal
+from subprocess import PIPE, STDOUT, Popen
 import rich
 import dspy
 import sys
@@ -62,7 +60,7 @@ class Agent(dspy.Module):
                     rich.print(f'[bold red]Not done viewing output, need to view more:[/bold red] {done_viewing_output}, additional chars: {number_additional_chars}')
 
                 self.context += f'Process started with PID: {process.pid}\n'
-                self.context += f'Command output:\n'
+                self.context += 'Command output:\n'
 
             elif action == 'reply_to_user':
                 response = predict(self.context)

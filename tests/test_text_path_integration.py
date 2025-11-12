@@ -1,4 +1,3 @@
-import asyncio
 from tests.helpers import install_fake_dspy, fresh_pkg, import_pkg
 
 

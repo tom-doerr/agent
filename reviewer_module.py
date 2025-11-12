@@ -5,7 +5,6 @@ from __future__ import annotations
 from typing import Literal, Optional
 
 import dspy
-from pydantic import BaseModel, Field
 from rich.console import Console
 from rich.panel import Panel
 

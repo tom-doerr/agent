@@ -1,4 +1,3 @@
-import textwrap
 
 import timestamp_textual_app as mod
 

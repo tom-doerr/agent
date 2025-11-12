@@ -4,7 +4,7 @@ DSPy program for abbreviation decoding
 """
 
 import dspy
-from typing import List, Tuple
+from typing import List
 import json
 from dataclasses import dataclass
 

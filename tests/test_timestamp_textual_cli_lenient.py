@@ -3,7 +3,6 @@ import sys
 import types
 import subprocess
 
-import pytest
 
 
 def test_cli_lenient_enables_decode_fallback(monkeypatch):

@@ -1,5 +1,4 @@
 from tests.helpers import install_fake_dspy, fresh_pkg, import_pkg
-import types
 
 
 def test_signature_path_runs_n_times_and_returns_one_output():

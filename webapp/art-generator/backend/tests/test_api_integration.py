@@ -1,18 +1,16 @@
 import pytest
 import asyncio
 from httpx import AsyncClient
-from unittest.mock import patch, Mock, AsyncMock
+from unittest.mock import patch, AsyncMock
 import numpy as np
 from datetime import datetime
-import json
 import sys
 import os
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from main import app
-from database import init_db, get_session
-from models import ImageProvider, GenerationStatus
+from models import ImageProvider
 
 
 @pytest.fixture

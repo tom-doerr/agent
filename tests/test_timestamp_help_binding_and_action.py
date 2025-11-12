@@ -1,4 +1,3 @@
-import types
 
 import timestamp_textual_app as mod
 

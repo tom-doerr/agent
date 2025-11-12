@@ -1,6 +1,5 @@
 import dspy
 import random
-import numpy as np
 
 class GeneratorSignature(dspy.Signature):
     """Generate a diverse data point for evaluation."""

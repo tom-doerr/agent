@@ -1,12 +1,8 @@
 import dspy
-import mlflow
 import os
 import sys
 import firecrawl
 from dspy.teleprompt import SIMBA
-from mlflow.models.signature import ModelSignature
-from mlflow.types.schema import Schema, ColSpec
-import time
 
 def get_firecrawl_content(url):
     """Scrape a URL using Firecrawl and return the content."""

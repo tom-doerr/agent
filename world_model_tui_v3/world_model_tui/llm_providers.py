@@ -40,7 +40,7 @@ def configure_lm(provider: str, max_tokens: int = 1024, temperature: float = 0.0
     if provider in {"gemini-2.5-flash", "gemini-2.5-flash-lite"} or provider.startswith("gemini"):
         api_key = os.environ.get("GOOGLE_API_KEY") or os.environ.get("GEMINI_API_KEY") or ""
         if not api_key:
-            raise LMConfigError("Missing GOOGLE_API_KEY (or GEMINI_API_KEY).");
+            raise LMConfigError("Missing GOOGLE_API_KEY (or GEMINI_API_KEY).")
         lm = dspy.LM(
             model=f"gemini/{provider}",
             api_key=api_key,

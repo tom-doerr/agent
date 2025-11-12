@@ -1,5 +1,4 @@
 import dspy
-import random
 
 class GeneratorSignature(dspy.Signature):
     """Generate a data point for evaluation."""

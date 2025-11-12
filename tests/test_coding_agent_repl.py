@@ -1,5 +1,3 @@
-import os
-import re
 import pytest
 pytestmark = pytest.mark.timeout(10, method='thread')
 import dspy

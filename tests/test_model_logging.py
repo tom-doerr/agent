@@ -1,7 +1,5 @@
 import importlib
 import json
-import os
-from pathlib import Path
 
 
 def test_log_model_writes_jsonl(tmp_path, monkeypatch):

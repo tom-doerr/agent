@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import date, datetime
 import re
 from pathlib import Path
-from typing import Iterable, Optional
+from typing import Optional
 
 from refiner_signature import ScheduleBlock, normalize_schedule
 from file_lock import locked_file

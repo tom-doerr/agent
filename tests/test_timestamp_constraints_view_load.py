@@ -1,5 +1,3 @@
-from pathlib import Path
-import types
 
 import timestamp_textual_app as mod
 

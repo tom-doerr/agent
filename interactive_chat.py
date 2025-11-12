@@ -3,7 +3,6 @@
 from textual.app import App, ComposeResult
 from textual.containers import Container, ScrollableContainer
 from textual.widgets import Header, Footer, Input, Button, Static
-from textual.reactive import reactive
 from simpledspy import predict, configure
 from model_map import MODEL_MAP
 import asyncio

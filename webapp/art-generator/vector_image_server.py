@@ -9,23 +9,18 @@ bypassing the need for text prompts. It supports multiple generation methods:
 3. Guided diffusion from embeddings
 """
 
-import os
-import asyncio
 import numpy as np
-from typing import List, Optional, Dict, Any, Union
+from typing import List, Optional, Dict, Any
 from datetime import datetime
 import base64
 import io
-import json
-from pathlib import Path
 
 import torch
 import torch.nn as nn
 from PIL import Image
 import uvicorn
-from fastapi import FastAPI, HTTPException, UploadFile, File
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
 
