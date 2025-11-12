@@ -10,7 +10,14 @@ def test_constraints_tail_shows_bottom(monkeypatch, tmp_path):
     app = mod.TimestampLogApp(constraints_path=c)
     captured = {}
 
+    class DummySize:
+        def __init__(self, h: int) -> None:
+            self.height = h
+
     class DummyMd:
+        def __init__(self) -> None:
+            # Simulate a 10-row pane -> tail = 8
+            self.size = DummySize(10)
         def update(self, text: str):
             captured["text"] = text
 
@@ -21,9 +28,9 @@ def test_constraints_tail_shows_bottom(monkeypatch, tmp_path):
     app._constraints_view = DummyMd()
     app._constraints_title = DummyTitle()
 
-    # Default tail is 200; we expect to see L101..L300
+    # Tail derives from pane height (10 -> 8). Expect last 8 lines L293..L300.
     app._load_constraints()
     txt = captured.get("text", "")
-    assert "L101" in txt and "L100" not in txt
-    assert txt.splitlines()[0].startswith("L101")
+    assert "L293" in txt and "L292" not in txt
+    assert txt.splitlines()[0].startswith("L293")
     assert txt.splitlines()[-1].startswith("L300") or "L300" in txt

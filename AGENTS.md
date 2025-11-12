@@ -1,9 +1,14 @@
 Agent Notes (updated 2025-11-12)
 
-- NLCO Textual TUI is considered legacy. The file `nlco_textual.py` may still exist in the repo for historical reference but is not maintained. Prefer headless `nlco_iter.py` and `timestamp_textual_app.py` for constraints capture and artifact viewing.
+- TUIs at a glance:
+  - `timestamp_textual_app.py` (TimestampLogApp): capture constraints and view `artifact.md` (Markdown). It doesn’t run NLCO.
+  - `agent_manual_pkg/src/agent_manual_pkg/tui.py` (Agent Manual TUI): interactive agent runner (satisfaction, memory, DSPy logs).
+  - Legacy `nlco_textual.py` was removed; use the two TUIs above instead.
 - Headless alternative is `nlco_iter.py` (console loop). Run: `python nlco_iter.py`.
 - You do NOT need both at once; the TUI runs iterations itself. Avoid concurrent runs (shared files).
-- Another TUI exists: `timestamp_textual_app.py` (`TimestampLogApp`). This is a lightweight note pad that prefixes lines with the current time and appends them to `constraints.md` under daily headings. It does not run the NLCO iteration pipeline or any DSPy modules; it only shows `artifact.md` and its last-updated age.
+- Run commands:
+  - Timestamp: `python timestamp_textual_app.py`
+  - Agent Manual: `python -m agent_manual_pkg.cli` (supports `--model` and `--max-tokens`).
 - Files touched: none (informational change only).
 
 Things to keep in mind
@@ -25,6 +30,12 @@ Next Steps (2025-11-12)
   - New: `file_lock.locked_file(path, mode='a+')` (fcntl LOCK_EX; Linux only).
   - Used by: `constraints_io.append_line`, `timestamp_textual_app._append_to_constraints`, `webapp/nlco_htmx/utils.write_constraints_entry`.
   - Test: `tests/test_constraints_locking_utils.py` spawns two processes appending concurrently; asserts one heading and all lines present.
+
+Proposed Next Steps (79)
+- 79a. Split `TUI.apply_memory_updates` into `*_create/_update/_delete` helpers with one focused unit test. Minimal code; lowers CC hotspot. (Recommended.)
+- 79b. Style cleanup in `tui.py`: remove semicolons flagged by ruff (E702/E703); no behavior change; quick win + keep lint clean.
+- 79c. Wire `TimewarriorModule.run` into `nlco_iter` behind `NLCO_TIMEW=1` with 2 tests (timew present/absent). Small, controlled change toward earlier goals.
+- 79d. Add a tiny `/help` command that echoes HelpScreen text into `#log`; add one assertion in tests to lock UX.
 
 Models & budgets (NLCO iter)
 - Primary LM: `deepseek/deepseek-reasoner` with `max_tokens=40000` (see `nlco_iter.py`).
@@ -52,6 +63,14 @@ Textual Markdown
 - Textual provides a `Markdown` widget that parses Markdown with a GFM-like parser (tables, task lists, strikethrough, autolinks).
 - For interactive/spreadsheet-like tables, use `DataTable`; Markdown tables are static.
 - TimestampLogApp now renders `artifact.md` via `Markdown` (read-only) instead of a `TextArea`.
+
+Timestamp TUI complexity reductions (2025-11-12)
+- Merged CLI/TTY preflight across modules: `timestamp_textual_app.py` now delegates to `timestamp_app_core` for CLI parsing and UTF‑8 TTY checks, with a tiny wrapper that preserves the `stty iutf8` behavior required by tests.
+- Extracted `_build_append` to assemble constraint writes; keeps `_append_to_constraints` linear and short.
+- Kept richer lenient‑input helper in wrapper (prints one warning, patches `read`) since tests assert those messages; core retains a minimal variant.
+- Result: wrapper no longer has any CC ≥ C; worst offenders are B(10/8/6). Core remains B‑level for `_ensure_utf8_tty` and `_parse_cli`.
+- Constraints pane: factored wrapper’s constraints logic into helpers — `_md_preserve_lines`, `_maybe_scroll_constraints_end`. The old `_tail_env` helper was removed; the wrapper now derives the tail from the pane height (tail = max(height − 2, 1)), matching the core. `_load_constraints` stays straight‑line and ≤ B. Tests updated accordingly.
+  - Added tests: `tests/test_timestamp_constraints_helpers.py` covers `_tail_env` defaults/values/invalids, newline preservation, and autoscroll focus/no-focus behavior.
 
 Legacy: Old Vim Input
 - `_OldVimInput` (previously in `timestamp_textual_app.py`) has been removed. The app uses `VimInput` from `timestamp_vim_input.py`.
@@ -92,7 +111,17 @@ Release
 - v0.1.32 (2025-11-12): Ran `ruff check .` across repo; 397 findings, 166 auto-fixable. Consider adding a minimal `pyproject.toml` Ruff config and staged fixes.
 - v0.1.33 (2025-11-12): Applied safe Ruff auto-fixes (`ruff check . --fix`). Findings reduced to 221 from 397; remaining include E402/E70x/F841 and a few F821/E722. No code semantics changes intended.
 - v0.1.34 (2025-11-12): Added minimal Ruff config `.ruff.toml` (py311, line-length 100, ignore E501; per-file ignores for legacy/intentional patterns; excluded one experimental file). Current findings with config: 102.
- - v0.1.35 (2025-11-12): Fixed high-signal Ruff issues: F821 in `agent_manual_b.py`, `interactive_chat.py`, `textual_dspy/app.py`; E722 in `abbrev_decoder/...` and `online_optimization_system.py`; minor F841 cleanups. Added targeted per-file ignores for tests, world_model, and submodules. `ruff check` now passes clean with `.ruff.toml`.
+- v0.1.35 (2025-11-12): Fixed high-signal Ruff issues: F821 in `agent_manual_b.py`, `interactive_chat.py`, `textual_dspy/app.py`; E722 in `abbrev_decoder/...` and `online_optimization_system.py`; minor F841 cleanups. Added targeted per-file ignores for tests, world_model, and submodules. `ruff check` now passes clean with `.ruff.toml`.
+ - v0.1.36 (2025-11-12): Simplify Timestamp TUI constraints pane — wrapper tail derives from visible pane height; env `TIMESTAMP_CONSTRAINTS_TAIL` is ignored for rendering. Removed `_tail_env`. Tests updated: `tests/test_timestamp_constraints_tail_view.py`, `tests/test_timestamp_constraints_helpers.py`, and `tests/test_timestamp_constraints_newlines.py` adjusted to inject pane height.
+ - v0.1.37 (2025-11-12): Delegate wrapper helpers to core: added tiny shared helpers in `timestamp_app_core.py` (`md_preserve_lines`, `constraints_tail_from_height`, `scroll_end`) and made the wrapper call them. Added `tests/test_timestamp_constraints_equivalence.py` to assert wrapper/core render identical content for the same pane height.
+- v0.1.38 (2025-11-12): Wrapper now respects `TIMESTAMP_CONSTRAINTS_ROWS` like the core. On mount, it sets `#constraints-container` height and uses it to derive tail (`rows-2`). Added `tests/test_timestamp_constraints_rows_env_wrapper.py` to validate height + tail.
+ - v0.1.39 (2025-11-12): Unified TUI apps: `timestamp_textual_app.TimestampLogApp` now subclasses the core `timestamp_app_core.TimestampLogApp` to remove duplicate CSS/compose and reuse helpers. Wrapper overrides only: key bindings, timers/refresh, input submit formatting, help toggle, artifact scroll actions, and a focus‑aware `_scroll_constraints_end` (skips autoscroll when constraints pane focused). Tests added: `tests/test_timestamp_constraints_equivalence.py` (wrapper vs core rendering), `tests/test_timestamp_artifact_scroll_helpers_delegate.py` (wrapper delegates to core scroll helpers).
+
+Things learned / to keep in mind (2025-11-12)
+- Two `TimestampLogApp` classes exist (core and wrapper). Their behaviors can drift; we aligned tailing behavior to reduce divergence. Consider consolidating or delegating constraints logic from the wrapper to the core in a future change.
+- CLI still accepts `--constraints-tail` and sets `TIMESTAMP_CONSTRAINTS_TAIL` for backward compatibility, but the wrapper ignores it during rendering. Tests only assert env propagation.
+- Textual's `Markdown.update` may emit a benign "no running event loop" message when called on stubbed views in tests; currently harmless and can be ignored.
+ - Helper naming: the core calls `_scroll_constraints_end`. For backward‑compat with older tests, the wrapper keeps `_maybe_scroll_constraints_end()` and forwards it to `_scroll_constraints_end()`.
 
 Structured Memory — Options (2025-11-11)
 - Option A (light): add sectioned headings in `memory.md` (Policies/Procedures/Glossary) and constrain tools to edit within a selected section; add tests for section targeting.
@@ -269,7 +298,9 @@ Code Quality Snapshot (2025-11-12)
 Actionable Quick Wins
 - `timestamp_vim_input._handle_normal_mode_key` refactored into helpers — now below C and no longer listed.
 - `nlco_iter.iteration_loop` refactored internally (helpers for reading state, building context, logging, and refiner print) with no behavior change; CC dropped below C.
-- Agent TUI: split `on_input_submitted` flow into helpers (`_handle_blueberries`, `_route_awaiting_states`, etc.), then split the router into `_handle_module_model_choice`, `_handle_module_selection`, `_handle_max_tokens`, `_handle_model_choice`, and `_handle_inline_commands`. Extracted `_show_modules_list` to remove duplication. CC for input path now below hotspot list; remaining hotspot is `_process_job` (addressed next).
+- Agent TUI: unified command routing. Merged `_handle_inline_commands` into a single `_route_command`, and kept a tiny `_handle_command` wrapper for compatibility. Overlap eliminated for `/model`, `/modules`, `/max_tokens`, and `/layout`.
+- Tests for unified router: added `test_layout_command_via_on_input` and a full `/modules` flow test to assert state transitions and configuration calls. The suite now covers `/layout`, `/model`, `/modules`, and `/max_tokens` (prompted and inline). See `agent_manual_pkg/tests/test_tui_router_commands.py` and existing tests.
+- Split satisfaction update: `_process_job` now calls `_update_goals(prompt)` and `_update_score()` separately; added unit tests for each. Kept `_update_satisfaction` as a tiny wrapper for compatibility.
 - Radon artifact (58d): added `scripts/gen_radon_report.py` which writes JSON + minimal HTML to `.nlco/meta/`. Test: `tests/test_radon_report.py` monkeys patches subprocess to avoid external dependency.
 - `timestamp_app_core._load_constraints` split into small helpers (`_tail_count`, `_constraints_text`, `_scroll_constraints_end`) to simplify the constraints pane logic without behavior changes.
 - Extract subroutines from `nlco_iter.iteration_loop` (context build, model calls, writeback) to lower CC without changing behavior.

@@ -18,6 +18,52 @@ ARTIFACT_FILE = Path("artifact.md")
 CONSTRAINTS_FILE = Path("constraints.md")
 
 
+# --- tiny shared helpers (used by wrapper too) ---
+def md_preserve_lines(text: str) -> str:
+    return text.replace("\n", "  \n")
+
+
+def constraints_tail_from_height(height: int) -> int:
+    try:
+        h = int(height)
+    except Exception:
+        h = 0
+    return max(h - 2, 1)
+
+
+def scroll_end(view) -> None:  # pragma: no cover - thin convenience
+    try:
+        view.scroll_end(animate=False)  # type: ignore[attr-defined]
+    except Exception:
+        pass
+
+
+def scroll_page_down(view) -> None:
+    for name, args in (
+        ("scroll_page_down", {}),
+        ("scroll_relative", {"y": 10}),
+        ("scroll_end", {"animate": False}),
+    ):
+        try:
+            getattr(view, name)(**args)
+            return
+        except Exception:
+            continue
+
+
+def scroll_page_up(view) -> None:
+    for name, args in (
+        ("scroll_page_up", {}),
+        ("scroll_relative", {"y": -10}),
+        ("scroll_home", {"animate": False}),
+    ):
+        try:
+            getattr(view, name)(**args)
+            return
+        except Exception:
+            continue
+
+
 class TimestampLogApp(App):
     CSS = """
     Screen { layout: vertical; }
@@ -137,7 +183,7 @@ class TimestampLogApp(App):
 
     def _constraints_text(self, tail: int) -> str:
         lines = constraints_tail_lines(self._constraints_path, tail)
-        return "\n".join(lines).replace("\n", "  \n")
+        return md_preserve_lines("\n".join(lines))
 
     def _auto_scroll(self) -> bool:
         return os.environ.get("TIMESTAMP_AUTO_SCROLL", "1").lower() not in {"0", "false", "no"}
@@ -145,18 +191,12 @@ class TimestampLogApp(App):
     def _scroll_constraints_end(self) -> None:
         if not self._auto_scroll():
             return
-        try:
-            self._constraints_view.scroll_end(animate=False)  # type: ignore[attr-defined]
-        except Exception:
-            pass
+        scroll_end(self._constraints_view)
 
     def _scroll_artifact_end(self) -> None:
         if not self._auto_scroll():
             return
-        try:
-            self._artifact_view.scroll_end(animate=False)  # type: ignore[attr-defined]
-        except Exception:
-            pass
+        scroll_end(self._artifact_view)
 
     def _show_constraints_not_found(self) -> None:
         self._constraints_view.update("(constraints not found)")

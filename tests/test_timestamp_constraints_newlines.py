@@ -7,7 +7,13 @@ def test_constraints_newlines_respected(monkeypatch, tmp_path):
     app = mod.TimestampLogApp(constraints_path=c)
     captured = {}
 
+    class DummySize:
+        def __init__(self, h: int) -> None:
+            self.height = h
+
     class DummyMd:
+        def __init__(self) -> None:
+            self.size = DummySize(10)
         def update(self, text: str):
             captured["text"] = text
 
