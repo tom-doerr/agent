@@ -42,45 +42,94 @@ class VimInput(Input):
 
     def _handle_normal_mode_key(self, event: events.Key) -> bool:
         key = event.key
-        if self._pending_text_object is not None:
-            kind = self._pending_text_object + key
-            self._apply_text_object(kind)
-            event.stop(); event.prevent_default(); return True
-        if key.isdigit():
-            if not self._count_active and key == "0":
-                self._apply_motion("0", 1); event.stop(); event.prevent_default(); return True
+        if self._consume_text_object(key, event):
+            return True
+        if self._accumulate_count(key, event):
+            return True
+        if self._enter_insert_or_append(key, event):
+            return True
+        if self._init_change_all(key, event):
+            return True
+        if self._init_operator(key, event):
+            return True
+        if self._pending_operator:
+            return self._handle_operator_key(key, event)
+        return self._motion_or_edit(key, event)
+
+    # --- helpers to reduce branching ---
+    def _consume_text_object(self, key: str, event: events.Key) -> bool:
+        if self._pending_text_object is None:
+            return False
+        kind = self._pending_text_object + key
+        self._apply_text_object(kind)
+        event.stop(); event.prevent_default()
+        return True
+
+    def _accumulate_count(self, key: str, event: events.Key) -> bool:
+        if not key.isdigit():
+            return False
+        if not self._count_active and key == "0":
+            self._apply_motion("0", 1)
+        else:
             self._pending_count = self._pending_count * 10 + int(key)
             self._count_active = True
-            event.stop(); event.prevent_default(); return True
-        if key in {"i", "I"} and self._pending_operator is None:
+        event.stop(); event.prevent_default()
+        return True
+
+    def _enter_insert_or_append(self, key: str, event: events.Key) -> bool:
+        if self._pending_operator is not None:
+            return False
+        if key in {"i", "I"}:
             self._vim_normal = False
             if key == "I":
                 self.cursor_position = 0
-            event.stop(); event.prevent_default(); self._reset_pending(); return True
-        if key == "a" and self._pending_operator is None:
+            event.stop(); event.prevent_default(); self._reset_pending()
+            return True
+        if key == "a":
             self._move_cursor(1); self._vim_normal = False
-            event.stop(); event.prevent_default(); self._reset_pending(); return True
-        if key == "C" and self._pending_operator is None:
-            self._pending_operator = "c"; self._apply_operator_motion("$", self._get_count())
-            event.stop(); event.prevent_default(); return True
-        if key in {"d", "c"} and self._pending_operator is None:
-            self._pending_operator = key; event.stop(); event.prevent_default(); return True
-        if self._pending_operator:
-            if key in {"w", "b", "h", "l", "0", "$"}:
-                self._apply_operator_motion(key, self._get_count()); event.stop(); event.prevent_default(); return True
-            if key in {"i", "a"}:
-                self._pending_text_object = key; event.stop(); event.prevent_default(); return True
-            self._reset_pending(); return False
-        if key in {"h", "l", "0", "$", "w", "b", "x"}:
-            if key == "h": self._move_cursor(-1)
-            elif key == "l": self._move_cursor(1)
-            elif key == "0": self.cursor_position = 0
-            elif key == "$": self.cursor_position = len(self.value)
-            elif key == "w": self.cursor_position = self._motion_word_forward(self.cursor_position, self._get_count())
-            elif key == "b": self.cursor_position = self._motion_word_backward(self.cursor_position, self._get_count())
-            elif key == "x": self._delete_under_cursor()
-            event.stop(); event.prevent_default(); self._reset_pending(); return True
+            event.stop(); event.prevent_default(); self._reset_pending()
+            return True
         return False
+
+    def _init_change_all(self, key: str, event: events.Key) -> bool:
+        if self._pending_operator is None and key == "C":
+            self._pending_operator = "c"
+            self._apply_operator_motion("$", self._get_count())
+            event.stop(); event.prevent_default()
+            return True
+        return False
+
+    def _init_operator(self, key: str, event: events.Key) -> bool:
+        if self._pending_operator is None and key in {"d", "c"}:
+            self._pending_operator = key
+            event.stop(); event.prevent_default()
+            return True
+        return False
+
+    def _handle_operator_key(self, key: str, event: events.Key) -> bool:
+        if key in {"w", "b", "h", "l", "0", "$"}:
+            self._apply_operator_motion(key, self._get_count())
+            event.stop(); event.prevent_default()
+            return True
+        if key in {"i", "a"}:
+            self._pending_text_object = key
+            event.stop(); event.prevent_default()
+            return True
+        self._reset_pending()
+        return False
+
+    def _motion_or_edit(self, key: str, event: events.Key) -> bool:
+        if key not in {"h", "l", "0", "$", "w", "b", "x"}:
+            return False
+        if key == "h": self._move_cursor(-1)
+        elif key == "l": self._move_cursor(1)
+        elif key == "0": self.cursor_position = 0
+        elif key == "$": self.cursor_position = len(self.value)
+        elif key == "w": self.cursor_position = self._motion_word_forward(self.cursor_position, self._get_count())
+        elif key == "b": self.cursor_position = self._motion_word_backward(self.cursor_position, self._get_count())
+        elif key == "x": self._delete_under_cursor()
+        event.stop(); event.prevent_default(); self._reset_pending()
+        return True
 
     def _enter_normal_mode(self) -> None:
         self._vim_normal = True; self._reset_pending()
@@ -191,4 +240,3 @@ class VimInput(Input):
     @staticmethod
     def _is_word_char(ch: str) -> bool:
         return ch.isalnum() or ch == "_"
-

@@ -266,6 +266,6 @@ Code Quality Snapshot (2025-11-12)
 - Radon MI: no grade-C files outside legacy/tests; worst MI flagged `agent_manual_pkg/.../tui.py` (likely due to generated code/tests context). See `radon mi -s .`.
 
 Actionable Quick Wins
-- Reduce branching in `timestamp_vim_input._handle_normal_mode_key` by splitting operator handling and motion parsing into helpers.
+- Reduce branching in `timestamp_vim_input._handle_normal_mode_key` by splitting operator handling and motion parsing into helpers. (Done; CC fell below C.)
 - Extract subroutines from `nlco_iter.iteration_loop` (context build, model calls, writeback) to lower CC without changing behavior.
 - In `timewarrior_module._apply_decision`, early-return on NO-OP cases to flatten nesting.
