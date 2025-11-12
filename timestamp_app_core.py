@@ -67,6 +67,18 @@ class TimestampLogApp(App):
         self._constraints_view = self.query_one("#constraints-view", Markdown)
         self._artifact_title = self.query_one("#artifact-title", Static)
         self._constraints_title = self.query_one("#constraints-title", Static)
+        # Optional env-controlled constraints height (also drives tail lines)
+        try:
+            rows_env = os.environ.get("TIMESTAMP_CONSTRAINTS_ROWS")
+            if rows_env:
+                rows = max(int(rows_env), 1)
+                container = self.query_one("#constraints-container", Vertical)
+                container.styles.height = rows  # type: ignore[assignment]
+                self._constraints_rows = rows  # used by _tail_count
+            else:
+                self._constraints_rows = None
+        except Exception:
+            self._constraints_rows = None
         self._artifact_status = self.query_one("#artifact-status", Static)
         self._input = self.query_one("#input", Input)
         self._help_panel = self.query_one("#help-panel", Static)
@@ -117,8 +129,10 @@ class TimestampLogApp(App):
             return 0
 
     def _tail_count(self) -> int:
+        if getattr(self, "_constraints_rows", None):
+            return max(int(self._constraints_rows) - 2, 1)
         h = self._pane_height()
-        return max(h - 2, 1) if h > 0 else 200
+        return max(h - 2, 1)
 
     def _constraints_text(self, tail: int) -> str:
         lines = constraints_tail_lines(self._constraints_path, tail)

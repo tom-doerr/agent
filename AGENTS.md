@@ -207,8 +207,9 @@ Refactor: Timestamp app split
 - `timestamp_textual_app.py` is a thin wrapper that re-exports the app, helpers, and main().
 
 Constraints pane behavior (Timestamp app)
-- Tail count = max(pane height − 2, 1); if pane height is unavailable (e.g., offscreen/test), we fall back to 200 lines.
-- Scrolls to the end after refresh so the bottom is visible by default.
+ - Tail count = max(pane height − 2, 1). No implicit fallback.
+ - Env `TIMESTAMP_CONSTRAINTS_ROWS=N` sets the container height to `N` rows at mount time and drives tail count (`N-2`).
+ - Scrolls to the end after refresh so the bottom is visible by default.
 
 File-first constraints behavior
 - Shared helpers `constraints_io.tail_lines` and `constraints_io.append_line` centralize file tailing and appending.
