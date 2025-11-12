@@ -38,6 +38,13 @@ def scroll_end(view) -> None:  # pragma: no cover - thin convenience
         pass
 
 
+def scroll_home(view) -> None:  # pragma: no cover - thin convenience
+    try:
+        view.scroll_home(animate=False)  # type: ignore[attr-defined]
+    except Exception:
+        pass
+
+
 def scroll_page_down(view) -> None:
     for name, args in (
         ("scroll_page_down", {}),
@@ -151,7 +158,7 @@ class TimestampLogApp(App):
             self._artifact_view.update(text.replace("\n", "  \n"))
             self._artifact_status_message = "Artifact updated"
             self.query_one("#artifact-status", Static).update(self._artifact_status_message)
-            self._scroll_artifact_end()
+            self._scroll_artifact_home()
         except Exception:
             self._artifact_view.update("(artifact not found)")
 
@@ -193,10 +200,10 @@ class TimestampLogApp(App):
             return
         scroll_end(self._constraints_view)
 
-    def _scroll_artifact_end(self) -> None:
+    def _scroll_artifact_home(self) -> None:
         if not self._auto_scroll():
             return
-        scroll_end(self._artifact_view)
+        scroll_home(self._artifact_view)
 
     def _show_constraints_not_found(self) -> None:
         self._constraints_view.update("(constraints not found)")
