@@ -269,6 +269,7 @@ Code Quality Snapshot (2025-11-12)
 Actionable Quick Wins
 - `timestamp_vim_input._handle_normal_mode_key` refactored into helpers — now below C and no longer listed.
 - `nlco_iter.iteration_loop` refactored internally (helpers for reading state, building context, logging, and refiner print) with no behavior change; CC dropped below C.
+- Agent TUI: split `on_input_submitted` flow into helpers (`_handle_blueberries`, `_route_awaiting_states`, etc.), then split the router into `_handle_module_model_choice`, `_handle_module_selection`, `_handle_max_tokens`, `_handle_model_choice`, and `_handle_inline_commands`. Extracted `_show_modules_list` to remove duplication. CC for input path now below hotspot list; remaining hotspot is `_process_job` (addressed next).
 - Radon artifact (58d): added `scripts/gen_radon_report.py` which writes JSON + minimal HTML to `.nlco/meta/`. Test: `tests/test_radon_report.py` monkeys patches subprocess to avoid external dependency.
 - `timestamp_app_core._load_constraints` split into small helpers (`_tail_count`, `_constraints_text`, `_scroll_constraints_end`) to simplify the constraints pane logic without behavior changes.
 - Extract subroutines from `nlco_iter.iteration_loop` (context build, model calls, writeback) to lower CC without changing behavior.

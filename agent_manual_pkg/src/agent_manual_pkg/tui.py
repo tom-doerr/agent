@@ -278,85 +278,22 @@ class TUI(App):
 
     async def _process_job(self, job: Job, log: RichLog, loop: asyncio.AbstractEventLoop) -> None:
         _ = job.id[:8]
-        log.write(Text(f"▶ {job.prompt!r}", style="system-msg"))
         dspy_log = self.query_one("#dspy", RichLog)
-        dspy_log.write(Text(f"▶ {job.prompt!r}", style="system-msg"))
         raw_log = self.query_one("#raw", RichLog)
-        raw_log.write(f"▶ {job.prompt!r}")
+        self._log_prompt(job.prompt, log, dspy_log, raw_log)
 
-        def run_agent():
-            agent = runtime.get_agent()
-            return agent(prompt=job.prompt)
-
-        prediction = await loop.run_in_executor(None, run_agent)
+        prediction = await loop.run_in_executor(None, lambda: runtime.get_agent()(prompt=job.prompt))
         steps = getattr(prediction, "steps", [])
-        for step in steps:
-            thought = step.get("thought", "")
-            tool = step.get("tool", "")
-            args = step.get("args", {})
-            obs = step.get("observation", "")
-            if thought:
-                log.write(Text(f"🤔 {thought}", style="context-msg"))
-                dspy_log.write(Text(f"🤔 {thought}", style="context-msg"))
-            if tool and tool != "finish":
-                log.write(Text(f"🔧 {tool} {args}", style="context-msg"))
-                dspy_log.write(Text(f"🔧 {tool} {args}", style="context-msg"))
-            if tool == "run_shell" and isinstance(obs, dict):
-                cmd = obs.get("command", "")
-                log.write(Text(f"🖥️ command: {cmd}", style="context-msg"))
-                dspy_log.write(Text(f"🖥️ command: {cmd}", style="context-msg"))
-                safety = obs.get("safety")
-                if isinstance(safety, dict):
-                    summary = "passed" if safety.get("passed") else f"blocked ({safety.get('detail', '')})"
-                    log.write(Text(f"🛡️ safety: {summary}", style="context-msg"))
-                    dspy_log.write(Text(f"🛡️ safety: {summary}", style="context-msg"))
-                out = obs.get("output", "")
-                if out:
-                    log.write(Text(f"📥 output: {out}", style="context-msg"))
-                    dspy_log.write(Text(f"📥 output: {out}", style="context-msg"))
-                status = obs.get("status")
-                if status:
-                    icon = "⚠️" if status != "ok" else "✅"
-                    log.write(Text(f"{icon} status: {status}", style="context-msg"))
-                    dspy_log.write(Text(f"{icon} status: {status}", style="context-msg"))
-            elif obs:
-                log.write(Text(f"📥 {obs}", style="context-msg"))
-                dspy_log.write(Text(f"📥 {obs}", style="context-msg"))
-
-        raw_history = getattr(prediction, "raw_history", [])
-        for chunk in raw_history:
-            raw_log.write(chunk)
-        raw_log.write("")
+        self._emit_step_logs(log, dspy_log, raw_log, steps)
+        self._emit_raw_history(raw_log, getattr(prediction, "raw_history", []))
 
         updates = await loop.run_in_executor(None, lambda: MEMORY_MODULE(prompt=job.prompt, steps=steps))
-        if updates:
-            self._active_modules.add("memory")
-            self.apply_memory_updates(updates)
-            self._refresh_memory_view()
-            self.query_one("#memory", RichLog).scroll_end()
+        self._apply_updates_and_refresh(updates)
 
         answer = getattr(prediction, "answer", "")
-        log.write(Text(f"✅ {answer}\n", style="answer-msg"))
-        dspy_log.write(Text(f"✅ {answer}", style="answer-msg"))
-        if isinstance(answer, str) and answer.strip():
-            self._history.append({"role": "assistant", "content": answer.strip()})
+        self._emit_answer(log, dspy_log, answer)
 
-        goals, goal_error = await asyncio.to_thread(self._run_goal_planner, job.prompt)
-        if goals is not None:
-            self._latest_goals = goals
-            if goals.goals:
-                self._active_modules.add("satisfaction_goals")
-        else:
-            self._latest_goals = InstrumentalGoals(goals=[])
-        self._satisfaction_error = goal_error
-        self._refresh_satisfaction_view()
-
-        score_result, score_error = await asyncio.to_thread(self._run_satisfaction_scorer)
-        if score_result is not None:
-            self._latest_score = score_result
-            self._active_modules.add("satisfaction_score")
-        self._satisfaction_error = score_error
-        self._refresh_satisfaction_view()
+        await asyncio.to_thread(self._update_satisfaction, job.prompt)
 
     async def worker(self):
         log = self.query_one("#log", RichLog)
@@ -562,6 +499,70 @@ class TUI(App):
                 log.write(Text("enter a positive integer for max_tokens", style="system-msg"))
             return True
         return False
+
+    # ---- small helpers to reduce CC in _process_job ----
+    def _log_prompt(self, prompt: str, log: RichLog, dspy_log: RichLog, raw_log: RichLog) -> None:
+        log.write(Text(f"▶ {prompt!r}", style="system-msg"))
+        dspy_log.write(Text(f"▶ {prompt!r}", style="system-msg"))
+        raw_log.write(f"▶ {prompt!r}")
+
+    def _emit_step_logs(self, log: RichLog, dspy_log: RichLog, raw_log: RichLog, steps: List[Dict[str, Any]]) -> None:
+        for step in steps:
+            thought = step.get("thought", ""); tool = step.get("tool", ""); args = step.get("args", {}); obs = step.get("observation", "")
+            if thought:
+                log.write(Text(f"🤔 {thought}", style="context-msg")); dspy_log.write(Text(f"🤔 {thought}", style="context-msg"))
+            if tool and tool != "finish":
+                log.write(Text(f"🔧 {tool} {args}", style="context-msg")); dspy_log.write(Text(f"🔧 {tool} {args}", style="context-msg"))
+            if tool == "run_shell" and isinstance(obs, dict):
+                cmd = obs.get("command", ""); log.write(Text(f"🖥️ command: {cmd}", style="context-msg")); dspy_log.write(Text(f"🖥️ command: {cmd}", style="context-msg"))
+                safety = obs.get("safety");
+                if isinstance(safety, dict):
+                    summary = "passed" if safety.get("passed") else f"blocked ({safety.get('detail', '')})"
+                    log.write(Text(f"🛡️ safety: {summary}", style="context-msg")); dspy_log.write(Text(f"🛡️ safety: {summary}", style="context-msg"))
+                out = obs.get("output", "");
+                if out:
+                    log.write(Text(f"📥 output: {out}", style="context-msg")); dspy_log.write(Text(f"📥 output: {out}", style="context-msg"))
+                status = obs.get("status");
+                if status:
+                    icon = "⚠️" if status != "ok" else "✅"; log.write(Text(f"{icon} status: {status}", style="context-msg")); dspy_log.write(Text(f"{icon} status: {status}", style="context-msg"))
+            elif obs:
+                log.write(Text(f"📥 {obs}", style="context-msg")); dspy_log.write(Text(f"📥 {obs}", style="context-msg"))
+
+    def _emit_raw_history(self, raw_log: RichLog, raw_history: List[str]) -> None:
+        for chunk in raw_history:
+            raw_log.write(chunk)
+        raw_log.write("")
+
+    def _apply_updates_and_refresh(self, updates: List[MemorySlotUpdate] | None) -> None:
+        if not updates:
+            return
+        self._active_modules.add("memory")
+        self.apply_memory_updates(updates)
+        self._refresh_memory_view()
+        self.query_one("#memory", RichLog).scroll_end()
+
+    def _emit_answer(self, log: RichLog, dspy_log: RichLog, answer: str) -> None:
+        log.write(Text(f"✅ {answer}\n", style="answer-msg")); dspy_log.write(Text(f"✅ {answer}", style="answer-msg"))
+        if isinstance(answer, str) and answer.strip():
+            self._history.append({"role": "assistant", "content": answer.strip()})
+
+    def _update_satisfaction(self, prompt: str) -> None:
+        goals, goal_error = self._run_goal_planner(prompt)
+        if goals is not None:
+            self._latest_goals = goals
+            if goals.goals:
+                self._active_modules.add("satisfaction_goals")
+        else:
+            self._latest_goals = InstrumentalGoals(goals=[])
+        self._satisfaction_error = goal_error
+        self._refresh_satisfaction_view()
+
+        score_result, score_error = self._run_satisfaction_scorer()
+        if score_result is not None:
+            self._latest_score = score_result
+            self._active_modules.add("satisfaction_score")
+        self._satisfaction_error = score_error
+        self._refresh_satisfaction_view()
 
     def _set_layout(self, mode: str) -> None:
         content = self.query_one("#content", Horizontal)
