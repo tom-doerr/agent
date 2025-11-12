@@ -116,12 +116,14 @@ Release
  - v0.1.37 (2025-11-12): Delegate wrapper helpers to core: added tiny shared helpers in `timestamp_app_core.py` (`md_preserve_lines`, `constraints_tail_from_height`, `scroll_end`) and made the wrapper call them. Added `tests/test_timestamp_constraints_equivalence.py` to assert wrapper/core render identical content for the same pane height.
 - v0.1.38 (2025-11-12): Wrapper now respects `TIMESTAMP_CONSTRAINTS_ROWS` like the core. On mount, it sets `#constraints-container` height and uses it to derive tail (`rows-2`). Added `tests/test_timestamp_constraints_rows_env_wrapper.py` to validate height + tail.
  - v0.1.39 (2025-11-12): Unified TUI apps: `timestamp_textual_app.TimestampLogApp` now subclasses the core `timestamp_app_core.TimestampLogApp` to remove duplicate CSS/compose and reuse helpers. Wrapper overrides only: key bindings, timers/refresh, input submit formatting, help toggle, artifact scroll actions, and a focus‑aware `_scroll_constraints_end` (skips autoscroll when constraints pane focused). Tests added: `tests/test_timestamp_constraints_equivalence.py` (wrapper vs core rendering), `tests/test_timestamp_artifact_scroll_helpers_delegate.py` (wrapper delegates to core scroll helpers).
+ - v0.1.40 (2025-11-12): Extract constraints append formatting to shared helper `constraints_io.build_append_block(existing, needs_heading, date_str, line)`. Wrapper now uses it in `_append_to_constraints`. New tests: `tests/test_constraints_append_helper.py` covers first-entry, same-day, and next-day w/o trailing newline.
 
 Things learned / to keep in mind (2025-11-12)
 - Two `TimestampLogApp` classes exist (core and wrapper). Their behaviors can drift; we aligned tailing behavior to reduce divergence. Consider consolidating or delegating constraints logic from the wrapper to the core in a future change.
 - CLI still accepts `--constraints-tail` and sets `TIMESTAMP_CONSTRAINTS_TAIL` for backward compatibility, but the wrapper ignores it during rendering. Tests only assert env propagation.
 - Textual's `Markdown.update` may emit a benign "no running event loop" message when called on stubbed views in tests; currently harmless and can be ignored.
- - Helper naming: the core calls `_scroll_constraints_end`. For backward‑compat with older tests, the wrapper keeps `_maybe_scroll_constraints_end()` and forwards it to `_scroll_constraints_end()`.
+- Helper naming: the core calls `_scroll_constraints_end`. For backward‑compat with older tests, the wrapper keeps `_maybe_scroll_constraints_end()` and forwards it to `_scroll_constraints_end()`.
+ - Append logic centralization: both headless and TUI paths should use `constraints_io.build_append_block` for consistent spacing/heading behavior; today only the wrapper calls it. Consider adopting it in any other path that writes constraints to avoid drift.
 
 Structured Memory — Options (2025-11-11)
 - Option A (light): add sectioned headings in `memory.md` (Policies/Procedures/Glossary) and constrain tools to edit within a selected section; add tests for section targeting.

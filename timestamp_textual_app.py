@@ -279,21 +279,11 @@ class TimestampLogApp(_CoreTimestampLogApp):
             except Exception:
                 pass
             needs_heading = (self._last_constraints_date != current_date) and (f"# {date_str}" not in existing)
+            from constraints_io import build_append_block
             fh.seek(0, 2)
-            fh.write(self._build_append(existing, needs_heading, date_str, formatted_line))
+            fh.write(build_append_block(existing, needs_heading, date_str, formatted_line))
         self._last_constraints_date = current_date
-        
-    # keep append formatting logic small and testable
-    def _build_append(self, existing: str, needs_heading: bool, date_str: str, line: str) -> str:
-        parts: list[str] = []
-        if existing and not existing.endswith("\n"):
-            parts.append("\n")
-        if needs_heading:
-            if existing and not existing.endswith("\n\n"):
-                parts.append("\n")
-            parts.append(f"# {date_str}\n")
-        parts.append(f"{line}\n")
-        return "".join(parts)
+
 
 
 

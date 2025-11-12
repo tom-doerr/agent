@@ -30,3 +30,21 @@ def append_line(path: Path, text: str) -> None:
         sep = "\n" if existing and not existing.endswith("\n") else ""
         fh.seek(0, os.SEEK_END)
         fh.write(f"{sep}{text}\n")
+
+
+def build_append_block(existing: str, needs_heading: bool, date_str: str, line: str) -> str:
+    """Return the text to append to constraints.md.
+
+    - Adds a leading newline if the existing file doesn't end with one.
+    - Optionally inserts a "# YYYY-MM-DD" heading (with a separating blank line when needed).
+    - Always appends the provided line plus a trailing newline.
+    """
+    parts: list[str] = []
+    if existing and not existing.endswith("\n"):
+        parts.append("\n")
+    if needs_heading:
+        if existing and not existing.endswith("\n\n"):
+            parts.append("\n")
+        parts.append(f"# {date_str}\n")
+    parts.append(f"{line}\n")
+    return "".join(parts)
