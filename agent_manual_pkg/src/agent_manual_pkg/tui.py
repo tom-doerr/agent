@@ -486,10 +486,7 @@ class TUI(App):
             self.awaiting_model_choice = False
             self.awaiting_max_tokens = False
             self._reset_module_state(); self.awaiting_module_selection = True
-            for idx, module_name in enumerate(runtime.MODULE_ORDER, start=1):
-                label = runtime.MODULE_INFO[module_name]["label"]
-                current = runtime.get_module_model(module_name)
-                log.write(Text(f"{idx}. {module_name} ({label}) current={current}", style="system-msg"))
+            self._show_modules_list(log)
             event.input.value = ""
             return True
         if text == "/model":
@@ -515,6 +512,12 @@ class TUI(App):
             return True
         return False
 
+    def _show_modules_list(self, log: RichLog) -> None:
+        for idx, module_name in enumerate(runtime.MODULE_ORDER, start=1):
+            label = runtime.MODULE_INFO[module_name]["label"]
+            current = runtime.get_module_model(module_name)
+            log.write(Text(f"{idx}. {module_name} ({label}) current={current}", style="system-msg"))
+
     def _handle_command(self, text: str, log: RichLog) -> bool:
         """Return True if input was a command and consumed here."""
         if text.startswith("/layout"):
@@ -531,10 +534,7 @@ class TUI(App):
             self.awaiting_max_tokens = False
             self._reset_module_state()
             self.awaiting_module_selection = True
-            for idx, module_name in enumerate(runtime.MODULE_ORDER, start=1):
-                label = runtime.MODULE_INFO[module_name]["label"]
-                current = runtime.get_module_model(module_name)
-                log.write(Text(f"{idx}. {module_name} ({label}) current={current}", style="system-msg"))
+            self._show_modules_list(log)
             return True
 
         if text == "/model":
