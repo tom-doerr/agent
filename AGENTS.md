@@ -19,7 +19,10 @@ Next Steps (2025-11-12)
 - 46c. Apply `TIMESTAMP_RIGHT_MARGIN` padding in `timestamp_app_core.TimestampLogApp` (Constraints Markdown) and add one style assertion test.
 - 46d. Prune remaining legacy references to `nlco_textual.py` in docs and code comments; keep the file but mark clearly as deprecated.
 - 46e. Harden JSONL model logging for path errors (permission/dir missing) with a tiny try/except and one test; keep code minimal.
-- 46f. Optional: lightweight file lock to avoid simultaneous writes to `constraints.md` when headless + timestamp app run together; if added, keep it as a single advisory lock helper with a single test.
+- 46f. (Done) Lightweight advisory file lock to avoid simultaneous writes to `constraints.md` when headless + timestamp/web app run together.
+  - New: `file_lock.locked_file(path, mode='a+')` (fcntl LOCK_EX; Linux only).
+  - Used by: `constraints_io.append_line`, `timestamp_textual_app._append_to_constraints`, `webapp/nlco_htmx/utils.write_constraints_entry`.
+  - Test: `tests/test_constraints_locking_utils.py` spawns two processes appending concurrently; asserts one heading and all lines present.
 
 Models & budgets (NLCO iter)
 - Primary LM: `deepseek/deepseek-reasoner` with `max_tokens=40000` (see `nlco_iter.py`).
