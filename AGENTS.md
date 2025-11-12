@@ -253,6 +253,7 @@ Memory handling (summary, 2025-11-11)
 - Headless and Textual flows both use the primary LM for memory updates; a short result string is printed to the Memory pane when changes happen.
 - We don’t inject `memory.md` back into the model context yet (display-only except for edits). Short-term breadcrumbs go to `short_term_memory.md` separately.
 Code Quality Snapshot (2025-11-12)
+- Refreshed Radon (post-constraints refactor): repo avg CC C ≈ 14.89. Top hotspots unchanged; constraints pane no longer contributes.
 - Radon CC (C–F) hotspots (function · score) — latest:
   - `dspy_programs/memory_gan.main` · D (24)
   - `dspy_programs/taskwarrior_agent.main` · D (21)
