@@ -48,6 +48,11 @@ Textual Markdown
 - For interactive/spreadsheet-like tables, use `DataTable`; Markdown tables are static.
 - TimestampLogApp now renders `artifact.md` via `Markdown` (read-only) instead of a `TextArea`.
 
+Legacy: Old Vim Input
+- `_OldVimInput` (in `timestamp_textual_app.py`) is a legacy, unused Input subclass that implemented a broader set of Vim-like motions/operators.
+- The active widget is `VimInput` (in `timestamp_vim_input.py`), which is slimmer and currently used by both Textual apps.
+- We can safely remove `_OldVimInput` once no tests reference it to reduce confusion.
+
 Release
 - v0.1.1 (2025-11-06): reasoning trace panels in `nlco_iter`, JSONL model logging, TimestampLogApp Markdown view + `gi` input focus, tests updated.
 - v0.1.2 (2025-11-10): TimestampLogApp adds a minimal UTF-8 TTY preflight to avoid Textual `UnicodeDecodeError` on misconfigured terminals; new tests in `tests/test_timestamp_textual_preflight.py`.
