@@ -95,7 +95,7 @@ Structured Memory — Options (2025-11-11)
 
 Quick Run — Textual Apps (cheat sheet)
 - Install deps once: `source .venv/bin/activate || true; pip install -r requirements.txt`
-- Legacy NLCO TUI (deprecated): `python nlco_textual.py` (not maintained; avoid for new work)
+- Legacy NLCO TUI: deprecated and not maintained; examples removed. Use headless `nlco_iter.py` or `timestamp_textual_app.py`.
 - Timestamp TUI (notes/constraints): `./timestamp_tui.sh` (recommended)
   - Alt: `./timestamp_textual_app.py --lenient-input --fallback-encoding cp1252`
   - Phone/SSH hardening: `stty iutf8 && export LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8`
