@@ -132,6 +132,59 @@ def _log_model(stage: str, *, output: str | None, reasoning: str | None) -> None
         fh.write(json.dumps(rec, ensure_ascii=False) + "\n")
 
 
+def _read_artifact_and_state() -> tuple[str, SystemState]:
+    artifact = ARTIFACT_FILE.read_text()
+    try:
+        prev_mtime = ARTIFACT_FILE.stat().st_mtime
+    except FileNotFoundError:
+        prev_mtime = datetime.datetime.now().timestamp()
+    state = SystemState(
+        last_artifact_update=datetime.datetime.fromtimestamp(prev_mtime).isoformat(timespec="seconds")
+    )
+    return artifact, state
+
+
+def _read_constraints_and_context() -> tuple[str, str]:
+    constraints = CONSTRAINTS_FILE.read_text().strip()
+    context = create_context_string()
+    context = append_nootropics_section(context)
+    return constraints, context
+
+
+def _log_affect(affect_report, *, iteration_index: int) -> None:
+    try:
+        summary = (
+            f"emotions={affect_report.emotions}, urgency={affect_report.urgency}, "
+            f"confidence={affect_report.confidence}"
+        ) if affect_report else None
+        _log_model("Affect", output=summary, reasoning=_extract_last_reasoning_text())
+    except Exception:
+        pass
+    log_iteration_to_mlflow(iteration_index, affect_report, executive_summary=None)
+
+
+def _run_refiner_and_print(*, constraints: str, system_state: SystemState, context: str, artifact: str) -> str:
+    pred = run_with_metrics(
+        'Refiner',
+        refiner,
+        constraints=constraints,
+        system_state=system_state,
+        context=context,
+        artifact=artifact,
+    )
+    refined = pred.refined_artifact
+    try:
+        _log_model("Refiner", output=refined, reasoning=_extract_last_reasoning_text())
+    except Exception:
+        pass
+    reasoning = _extract_last_reasoning_text()
+    if reasoning:
+        console.print(Panel(reasoning, title="Model Reasoning · Refiner", border_style="blue"))
+    console.rule(f"{_now_str()} · Updated Artifact", style="white")
+    console.print(refined)
+    return refined
+
+
 async def iteration_loop(*, max_iterations: Optional[int] = None):
     start_mtime = CONSTRAINTS_FILE.stat().st_mtime
     history = []
@@ -144,17 +197,8 @@ async def iteration_loop(*, max_iterations: Optional[int] = None):
             mlflow_run = mlflow.start_run(run_name=f"iteration-{i + 1}")
 
         try:
-            artifact = ARTIFACT_FILE.read_text()
-            try:
-                prev_mtime = ARTIFACT_FILE.stat().st_mtime
-            except FileNotFoundError:
-                prev_mtime = datetime.datetime.now().timestamp()
-            system_state = SystemState(
-                last_artifact_update=datetime.datetime.fromtimestamp(prev_mtime).isoformat(timespec="seconds")
-            )
-            constraints = CONSTRAINTS_FILE.read_text().strip()
-            context = create_context_string()
-            context = append_nootropics_section(context)
+            artifact, system_state = _read_artifact_and_state()
+            constraints, context = _read_constraints_and_context()
             console.print(Panel(context, title=f"Context @ {_now_str()}", border_style="cyan"))
 
             affect_report = affect_module.run(
@@ -162,16 +206,7 @@ async def iteration_loop(*, max_iterations: Optional[int] = None):
                 context=context,
                 artifact=artifact,
             )
-            try:
-                summary = (
-                    f"emotions={affect_report.emotions}, urgency={affect_report.urgency}, "
-                    f"confidence={affect_report.confidence}"
-                ) if affect_report else None
-                _log_model("Affect", output=summary, reasoning=_extract_last_reasoning_text())
-            except Exception:
-                pass
-
-            log_iteration_to_mlflow(i + 1, affect_report, executive_summary=None)
+            _log_affect(affect_report, iteration_index=i + 1)
 
             memory_task = asyncio.create_task(
                 memory_manager_async(
@@ -181,29 +216,12 @@ async def iteration_loop(*, max_iterations: Optional[int] = None):
                 )
             )
 
-            refined_prediction = run_with_metrics(
-                'Refiner',
-                refiner,
+            refined = _run_refiner_and_print(
                 constraints=constraints,
                 system_state=system_state,
                 context=context,
                 artifact=artifact,
             )
-            refined = refined_prediction.refined_artifact
-            try:
-                _log_model("Refiner", output=refined, reasoning=_extract_last_reasoning_text())
-            except Exception:
-                pass
-            reasoning = _extract_last_reasoning_text()
-            if reasoning:
-                console.print(Panel(reasoning, title="Model Reasoning · Refiner", border_style="blue"))
-            # Structured schedule output removed from refiner; no JSON is produced.
-            # prediction = refiner(artifact=artifact, constraints=constraints, critique=critique, search_replace_errors=search_replace_errors, context=context)
-            # print('edits: ', prediction)
-            # edits = prediction.edits  # Extract the edits list from the Prediction object
-            # refined, search_replace_errors = editing_utils.apply_edits(artifact, edits)
-            console.rule(f"{_now_str()} · Updated Artifact", style="white")
-            console.print(refined)
 
             ARTIFACT_FILE.write_text(refined)
             history += [f'Iteration {i + 1}', artifact, constraints, refined]
