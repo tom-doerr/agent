@@ -382,37 +382,55 @@ class TUI(App):
         if not text:
             event.input.value = ""
             return
-
-        if text.lower() == "blueberries":
-            log.write(Text("✅ seirrebeulb\n", style="answer-msg"))
-            self._history.append({"role": "assistant", "content": "seirrebeulb"})
-            event.input.value = ""
+        if self._handle_blueberries(text, log, event):
             return
-
         log.write(Text(text, style="user-msg"))
         log.scroll_end()
-
-        # Route slash-commands and awaiting states through a tiny handler.
         if self._handle_command(text, log):
             event.input.value = ""
             return
+        if self._route_awaiting_states(text, log, event):
+            return
+        self._history.append({"role": "user", "content": text})
+        await self.q.put(Job(id=str(uuid.uuid4()), prompt=text))
+        event.input.value = ""
 
+    def _handle_blueberries(self, text: str, log: RichLog, event: Input.Submitted) -> bool:
+        if text.lower() != "blueberries":
+            return False
+        log.write(Text("✅ seirrebeulb\n", style="answer-msg"))
+        self._history.append({"role": "assistant", "content": "seirrebeulb"})
+        event.input.value = ""
+        return True
+
+    def _route_awaiting_states(self, text: str, log: RichLog, event: Input.Submitted) -> bool:
+        if self._handle_module_model_choice(text, log, event):
+            return True
+        if self._handle_module_selection(text, log, event):
+            return True
+        if self._handle_max_tokens(text, log, event):
+            return True
+        if self._handle_model_choice(text, log, event):
+            return True
+        return self._handle_inline_commands(text, log, event)
+
+    def _handle_module_model_choice(self, text: str, log: RichLog, event: Input.Submitted) -> bool:
         if self.awaiting_module_model_choice and self.selected_module:
             choice = text.lower()
             if choice in runtime.MODEL_PRESETS:
                 configure_name = runtime.MODULE_INFO[self.selected_module]["configure"]
-                configure_fn = getattr(runtime, configure_name)
-                configure_fn(choice)
+                getattr(runtime, configure_name)(choice)
                 log.write(Text(f"{self.selected_module} model set to {choice}", style="system-msg"))
                 self._reset_module_state()
             else:
                 log.write(Text(f"unknown model '{text}'. choose from: {', '.join(runtime.MODEL_PRESETS)}", style="system-msg"))
             event.input.value = ""
-            return
+            return True
+        return False
 
+    def _handle_module_selection(self, text: str, log: RichLog, event: Input.Submitted) -> bool:
         if self.awaiting_module_selection:
-            choice = text.lower()
-            module_name: Optional[str] = None
+            choice = text.lower(); module_name: Optional[str] = None
             if choice.isdigit():
                 index = int(choice) - 1
                 if 0 <= index < len(runtime.MODULE_ORDER):
@@ -422,7 +440,7 @@ class TUI(App):
             if module_name is None:
                 log.write(Text(f"unknown module '{text}'. choose from: {', '.join(runtime.MODULE_ORDER)}", style="system-msg"))
                 event.input.value = ""
-                return
+                return True
             self.awaiting_module_selection = False
             self.awaiting_module_model_choice = True
             self.selected_module = module_name
@@ -432,22 +450,24 @@ class TUI(App):
                 style="system-msg",
             )
             event.input.value = ""
-            return
+            return True
+        return False
 
+    def _handle_max_tokens(self, text: str, log: RichLog, event: Input.Submitted) -> bool:
         if self.awaiting_max_tokens:
             try:
-                value = int(text)
-                if value <= 0:
-                    raise ValueError
-            except ValueError:
+                value = int(text); assert value > 0
+            except Exception:
                 log.write(Text("enter a positive integer for max_tokens", style="system-msg"))
             else:
                 runtime.configure_model(get_config().model, max_tokens=value)
                 self.awaiting_max_tokens = False
                 log.write(Text(f"max_tokens set to {value}", style="system-msg"))
             event.input.value = ""
-            return
+            return True
+        return False
 
+    def _handle_model_choice(self, text: str, log: RichLog, event: Input.Submitted) -> bool:
         if self.awaiting_model_choice:
             choice = text.lower()
             if choice in runtime.MODEL_PRESETS:
@@ -458,50 +478,42 @@ class TUI(App):
                 options = ", ".join(runtime.MODEL_PRESETS)
                 log.write(Text(f"unknown model '{text}'. choose from: {options}", style="system-msg"))
             event.input.value = ""
-            return
+            return True
+        return False
 
+    def _handle_inline_commands(self, text: str, log: RichLog, event: Input.Submitted) -> bool:
         if text == "/modules":
             self.awaiting_model_choice = False
             self.awaiting_max_tokens = False
-            self._reset_module_state()
-            self.awaiting_module_selection = True
+            self._reset_module_state(); self.awaiting_module_selection = True
             for idx, module_name in enumerate(runtime.MODULE_ORDER, start=1):
                 label = runtime.MODULE_INFO[module_name]["label"]
                 current = runtime.get_module_model(module_name)
                 log.write(Text(f"{idx}. {module_name} ({label}) current={current}", style="system-msg"))
             event.input.value = ""
-            return
-
+            return True
         if text == "/model":
             options = ", ".join(runtime.MODEL_PRESETS)
             log.write(Text(f"choose model ({options}). current={get_config().model}", style="system-msg"))
-            self.awaiting_model_choice = True
-            self._reset_module_state()
+            self.awaiting_model_choice = True; self._reset_module_state()
             event.input.value = ""
-            return
-
+            return True
         if text.startswith("/max_tokens"):
             parts = text.split()
             if len(parts) == 2:
                 try:
-                    value = int(parts[1])
-                    if value <= 0:
-                        raise ValueError
-                except ValueError:
+                    value = int(parts[1]); assert value > 0
+                except Exception:
                     log.write(Text("usage: /max_tokens <positive integer>", style="system-msg"))
                 else:
                     runtime.configure_model(get_config().model, max_tokens=value)
                     log.write(Text(f"max_tokens set to {value}", style="system-msg"))
             else:
-                self.awaiting_max_tokens = True
-                self._reset_module_state()
+                self.awaiting_max_tokens = True; self._reset_module_state()
                 log.write(Text("enter a positive integer for max_tokens", style="system-msg"))
             event.input.value = ""
-            return
-
-        self._history.append({"role": "user", "content": text})
-        await self.q.put(Job(id=str(uuid.uuid4()), prompt=text))
-        event.input.value = ""
+            return True
+        return False
 
     def _handle_command(self, text: str, log: RichLog) -> bool:
         """Return True if input was a command and consumed here."""

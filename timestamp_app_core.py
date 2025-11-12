@@ -24,7 +24,7 @@ class TimestampLogApp(App):
     #artifact-container { padding: 1; border-bottom: solid $surface-lighten-2; height: 2fr; }
     #artifact-title { text-style: bold; padding-bottom: 1; }
     #artifact-status { color: $text-muted; padding-top: 0; padding-bottom: 0; text-align: right; }
-    #artifact-view { height: 1fr; border: solid $surface-lighten-2; margin-bottom: 1; overflow: auto; }
+    #artifact-view { height: 1fr; border: solid $surface-lighten-2; margin-bottom: 1; overflow: auto; padding: 1 2; }
     #constraints-container { height: 8; padding: 1; }
     #input { margin: 0 1 1 1; }
     #constraints-view { border: solid $surface-lighten-2; padding: 1 2; overflow: auto; }
@@ -105,6 +105,7 @@ class TimestampLogApp(App):
             self._artifact_view.update(text.replace("\n", "  \n"))
             self._artifact_status_message = "Artifact updated"
             self.query_one("#artifact-status", Static).update(self._artifact_status_message)
+            self._scroll_artifact_end()
         except Exception:
             self._artifact_view.update("(artifact not found)")
 
@@ -146,6 +147,14 @@ class TimestampLogApp(App):
             return
         try:
             self._constraints_view.scroll_end(animate=False)  # type: ignore[attr-defined]
+        except Exception:
+            pass
+
+    def _scroll_artifact_end(self) -> None:
+        if not self._auto_scroll():
+            return
+        try:
+            self._artifact_view.scroll_end(animate=False)  # type: ignore[attr-defined]
         except Exception:
             pass
 
