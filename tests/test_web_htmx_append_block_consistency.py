@@ -13,7 +13,6 @@ def test_write_constraints_entry_uses_shared_append_block(tmp_path: Path) -> Non
         c, "new day", now=datetime(2025, 11, 12, 8, 1, 0)
     )
     out = c.read_text(encoding="utf-8")
-    assert formatted == "0801 new day"
+    assert formatted == "08:01:00 new day"
     # Expect a separating blank line, a new heading, then the line
-    assert "existing\n\n# 2025-11-12\n0801 new day\n" in out
-
+    assert "existing\n\n# 2025-11-12\n08:01:00 new day\n" in out

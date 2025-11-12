@@ -39,7 +39,7 @@ async def test_timestamp_app_formats_entries(monkeypatch, tmp_path):
 
         constraints_text = app._constraints_path.read_text()
         assert "# 2025-10-05" in constraints_text
-        assert "0930 Check autoposter" in constraints_text
+        assert "09:30:00 Check autoposter" in constraints_text
 
 
 @pytest.mark.asyncio
@@ -69,8 +69,8 @@ async def test_multiple_entries_same_day_add_single_heading(monkeypatch, tmp_pat
 
         constraints_lines = app._constraints_path.read_text().splitlines()
         assert constraints_lines.count("# 2025-10-05") == 1
-        assert "0930 Morning check" in constraints_lines
-        assert "1015 Mid-morning update" in constraints_lines
+        assert "09:30:00 Morning check" in constraints_lines
+        assert "10:15:00 Mid-morning update" in constraints_lines
 
 
 @pytest.mark.asyncio
@@ -116,8 +116,8 @@ async def test_new_day_inserts_date_heading(monkeypatch, tmp_path):
         constraints_text = app._constraints_path.read_text()
         assert constraints_text.count("# 2025-10-05") == 1
         assert constraints_text.count("# 2025-10-06") == 1
-        assert "2355 Wrap up day" in constraints_text
-        assert "0005 Start new day" in constraints_text
+        assert "23:55:00 Wrap up day" in constraints_text
+        assert "00:05:00 Start new day" in constraints_text
 
 
 @pytest.mark.asyncio

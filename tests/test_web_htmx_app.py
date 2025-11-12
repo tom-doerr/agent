@@ -168,8 +168,8 @@ def test_post_message_appends_with_timestamp(client: TestClient, temp_paths: dic
     assert response.status_code == 200
     updated = temp_paths["constraints"].read_text(encoding="utf-8")
     assert "# 2025-10-05" in updated
-    assert "2115 new constraint" in updated
-    assert "2115 new constraint" in response.text
+    assert "21:15:00 new constraint" in updated
+    assert "21:15:00 new constraint" in response.text
 
 
 def test_history_limit_applied(temp_paths: dict[str, Path]) -> None:
@@ -291,9 +291,9 @@ def test_api_post_message_updates_history(
     assert resp.status_code == 200
     data = resp.json()
     history = data["history"]
-    assert history[-1]["entries"][-1] == "2130 android app test"
+    assert history[-1]["entries"][-1] == "21:30:00 android app test"
     updated = temp_paths["constraints"].read_text(encoding="utf-8")
-    assert "2130 android app test" in updated
+    assert "21:30:00 android app test" in updated
     assert data["schedule"]["blocks"][0]["description"] == "Dinner"
 
 def test_default_user_created_from_env(temp_paths: dict[str, Path]) -> None:

@@ -99,7 +99,7 @@ class TimestampLogApp(_CoreTimestampLogApp):
         return datetime.now()
 
     def _format_line(self, message: str, current_time: datetime) -> str:
-        timestamp = current_time.strftime("%H%M")
+        timestamp = current_time.strftime("%H:%M:%S")
         return f"{timestamp} {message}"
 
     def on_input_submitted(self, event: Input.Submitted) -> None:

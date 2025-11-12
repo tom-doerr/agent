@@ -33,7 +33,7 @@ def write_constraints_entry(path: Path, message: str, *, now: datetime | None = 
     if not message:
         raise ValueError("message must not be empty")
 
-    formatted_line = f"{now.strftime('%H%M')} {message}"
+    formatted_line = f"{now.strftime('%H:%M:%S')} {message}"
     entry_date = now.date()
 
     path.parent.mkdir(parents=True, exist_ok=True)
