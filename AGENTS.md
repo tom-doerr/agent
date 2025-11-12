@@ -268,6 +268,7 @@ Code Quality Snapshot (2025-11-12)
 Actionable Quick Wins
 - `timestamp_vim_input._handle_normal_mode_key` refactored into helpers — now below C and no longer listed.
 - `nlco_iter.iteration_loop` refactored internally (helpers for reading state, building context, logging, and refiner print) with no behavior change; CC dropped below C.
+- Radon artifact (58d): added `scripts/gen_radon_report.py` which writes JSON + minimal HTML to `.nlco/meta/`. Test: `tests/test_radon_report.py` monkeys patches subprocess to avoid external dependency.
 - `timestamp_app_core._load_constraints` split into small helpers (`_tail_count`, `_constraints_text`, `_scroll_constraints_end`) to simplify the constraints pane logic without behavior changes.
 - Extract subroutines from `nlco_iter.iteration_loop` (context build, model calls, writeback) to lower CC without changing behavior.
 - In `timewarrior_module._apply_decision`, add early returns for NONE/denied cases to flatten nesting.
