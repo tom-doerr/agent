@@ -91,7 +91,8 @@ Release
  - v0.1.31 (2025-11-12): Constraints tail now always tracks pane height in `timestamp_app_core`. Tests: `tests/test_timestamp_constraints_tail_auto.py` and updated display/tail default tests.
 - v0.1.32 (2025-11-12): Ran `ruff check .` across repo; 397 findings, 166 auto-fixable. Consider adding a minimal `pyproject.toml` Ruff config and staged fixes.
 - v0.1.33 (2025-11-12): Applied safe Ruff auto-fixes (`ruff check . --fix`). Findings reduced to 221 from 397; remaining include E402/E70x/F841 and a few F821/E722. No code semantics changes intended.
- - v0.1.34 (2025-11-12): Added minimal Ruff config `.ruff.toml` (py311, line-length 100, ignore E501; per-file ignores for legacy/intentional patterns; excluded one experimental file). Current findings with config: 102.
+- v0.1.34 (2025-11-12): Added minimal Ruff config `.ruff.toml` (py311, line-length 100, ignore E501; per-file ignores for legacy/intentional patterns; excluded one experimental file). Current findings with config: 102.
+ - v0.1.35 (2025-11-12): Fixed high-signal Ruff issues: F821 in `agent_manual_b.py`, `interactive_chat.py`, `textual_dspy/app.py`; E722 in `abbrev_decoder/...` and `online_optimization_system.py`; minor F841 cleanups. Added targeted per-file ignores for tests, world_model, and submodules. `ruff check` now passes clean with `.ruff.toml`.
 
 Structured Memory — Options (2025-11-11)
 - Option A (light): add sectioned headings in `memory.md` (Policies/Procedures/Glossary) and constrain tools to edit within a selected section; add tests for section targeting.
