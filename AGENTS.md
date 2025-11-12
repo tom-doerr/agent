@@ -1,6 +1,6 @@
-Agent Notes (updated 2025-11-11)
+Agent Notes (updated 2025-11-12)
 
-- NLCO Textual TUI has been removed (nlco_textual.py deleted). Use headless `nlco_iter.py` or `timestamp_textual_app.py` for constraints capture and artifact viewing.
+- NLCO Textual TUI is considered legacy. The file `nlco_textual.py` may still exist in the repo for historical reference but is not maintained. Prefer headless `nlco_iter.py` and `timestamp_textual_app.py` for constraints capture and artifact viewing.
 - Headless alternative is `nlco_iter.py` (console loop). Run: `python nlco_iter.py`.
 - You do NOT need both at once; the TUI runs iterations itself. Avoid concurrent runs (shared files).
 - Another TUI exists: `timestamp_textual_app.py` (`TimestampLogApp`). This is a lightweight note pad that prefixes lines with the current time and appends them to `constraints.md` under daily headings. It does not run the NLCO iteration pipeline or any DSPy modules; it only shows `artifact.md` and its last-updated age.
@@ -12,6 +12,14 @@ Things to keep in mind
 - Constraints and artifact paths are fixed: `constraints.md`, `artifact.md`, `memory.md`, `short_term_memory.md`.
 - `timestamp_textual_app.py` appends to `constraints.md` and can be used alongside NLCO tools, but beware of concurrent writes to the same file.
  - Context now includes weekday explicitly: `Datetime: YYYY-MM-DD HH:MM:SS (Friday)` for better temporal grounding.
+
+Next Steps (2025-11-12)
+- 46a. Wire `TimewarriorModule.run()` into `nlco_iter.iteration_loop()` behind env `NLCO_TIMEW=1`; log a short status line and add 2 unit tests (timew present/absent). Recommended.
+- 46b. Add a minimal “unchanged twice” stop rule to headless iterations to prevent endless runs; 2 tests (no-change stops, change resets counter).
+- 46c. Apply `TIMESTAMP_RIGHT_MARGIN` padding in `timestamp_app_core.TimestampLogApp` (Constraints Markdown) and add one style assertion test.
+- 46d. Prune remaining legacy references to `nlco_textual.py` in docs and code comments; keep the file but mark clearly as deprecated.
+- 46e. Harden JSONL model logging for path errors (permission/dir missing) with a tiny try/except and one test; keep code minimal.
+- 46f. Optional: lightweight file lock to avoid simultaneous writes to `constraints.md` when headless + timestamp app run together; if added, keep it as a single advisory lock helper with a single test.
 
 Models & budgets (NLCO iter)
 - Primary LM: `deepseek/deepseek-reasoner` with `max_tokens=40000` (see `nlco_iter.py`).
@@ -64,9 +72,9 @@ Release
 - v0.1.20 (2025-11-11): Remove structured schedule output from the Refiner. `RefineSignature` now returns only `refined_artifact`; headless and TUI paths no longer write or parse `structured_schedule.json`. Tests updated accordingly.
 - v0.1.21 (2025-11-11): Remove Critic module and input from Refiner. `RefineSignature` drops the `critique` field; headless and Textual flows no longer call or display Critic. TUI “Critique” panel removed. Tests updated.
 - v0.1.22 (2025-11-11): Add `SystemState` Pydantic model with `last_artifact_update` (ISO). Passed to the Refiner right after `constraints` in both headless and Textual flows. Tests: `tests/test_system_state_refiner_input_headless.py`, `tests/test_system_state_refiner_input_textual.py`.
-- v0.1.23 (2025-11-11): Make `nlco_textual.py` executable. You can now run it directly with `./nlco_textual.py`.
+- v0.1.23 (2025-11-11): (historical) `nlco_textual.py` was made executable. This TUI is now legacy and not maintained.
 - v0.1.24 (2025-11-11): Repo housekeeping — commit and push TUI + pipeline changes (mobile SSH fixes, scrollable panes, constraints view overhaul, removal of Critic/structured schedule, new SystemState input) and tests.
-- v0.1.25 (2025-11-11): Temporarily removed `nlco_textual.py` via `git rm`. The NLCO Textual app is disabled until restored; use the headless loop (`python nlco_iter.py`) or `timestamp_textual_app.py` for notes.
+- v0.1.25 (2025-11-11): (historical) `nlco_textual.py` removal was planned. The file may still be present but should be treated as deprecated; use headless loop (`python nlco_iter.py`) or `timestamp_textual_app.py`.
 - v0.1.26 (2025-11-11): TimestampLogApp now tails `constraints.md` by default (last 200 lines) and scrolls to bottom. Flags/env: `--constraints-tail N` (env `TIMESTAMP_CONSTRAINTS_TAIL`) to adjust; `--no-auto-scroll` to stop snapping to end.
 - v0.1.27 (2025-11-11): Tests for artifact scroll actions and fallbacks (`tests/test_timestamp_artifact_scroll_actions.py`).
  - v0.1.28 (2025-11-11): TimestampLogApp respects newlines in the constraints view by emitting Markdown line breaks. Test: `tests/test_timestamp_constraints_newlines.py`.
@@ -82,8 +90,7 @@ Structured Memory — Options (2025-11-11)
 
 Quick Run — Textual Apps (cheat sheet)
 - Install deps once: `source .venv/bin/activate || true; pip install -r requirements.txt`
-- NLCO TUI (iterations UI): `python nlco_textual.py`
-  - Keys: `r` run, `Ctrl+S` save, `Ctrl+L` clear, `q` quit
+- Legacy NLCO TUI (deprecated): `python nlco_textual.py` (not maintained; avoid for new work)
 - Timestamp TUI (notes/constraints): `./timestamp_tui.sh` (recommended)
   - Alt: `./timestamp_textual_app.py --lenient-input --fallback-encoding cp1252`
   - Phone/SSH hardening: `stty iutf8 && export LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8`
@@ -200,7 +207,7 @@ Short‑term memory
 
 Potential rough edges observed
 - `nlco_iter.py` disables finished-check (`if False:`), so it may iterate indefinitely unless externally stopped.
-- `nlco_textual.py` writes files in place; concurrent runs could clobber state.
+- Legacy `nlco_textual.py` also writes files in place; avoid running it alongside headless to prevent clobbering.
 - Timewarrior context: headless `nlco_iter.py` currently does not call `TimewarriorModule.run`, so no Timewarrior info is added to the model context. In the Textual UI, `TimewarriorModule.run` is invoked and its output is shown in the "Timewarrior" pane, but it is not injected into the `context` string passed to Critic/Refiner.
 - Critic stage disabled (2025-11-08): We skip the Critic call and pass an empty critique to Refiner. The TUI shows “Critic disabled” in the Critique panel.
 - Planner stage: In the Textual UI we call `PlanningModule.run` and show its output; in headless `nlco_iter.py` the planner is instantiated but not called yet.
@@ -211,7 +218,7 @@ Future test ideas
 - Model lineage update (2025-09-29)
   - DeepSeek docs state both `deepseek-chat` and `deepseek-reasoner` were upgraded to `DeepSeek-V3.2-Exp`; `chat` = non-thinking mode, `reasoner` = thinking mode. Over OpenRouter, reasoning appears in the `reasoning` field; via DeepSeek API it appears as `message.reasoning_content`.
 Timewarrior Control — Conceptual Plan
-- Current state: `TimewarriorModule` exists and works in the Textual UI (`nlco_textual.py` calls `TimewarriorModule.run`, around the stage pipeline). In the headless loop, `nlco_iter.py` instantiates `TimewarriorModule` but never calls it, so no tracking occurs.
+- Current state: `TimewarriorModule` is wired for use but not yet invoked in the headless loop (`nlco_iter.py`). We plan to gate it behind `NLCO_TIMEW=1` and log a concise status line each iteration.
 - Likely failure cause: headless flow never invokes Timewarrior; summary parsing is brittle (looks for a "Tags" line and the phrase "there is currently no active time tracking").
 - Minimal enablement: call `timewarrior_tracker.run(...)` early in `iteration_loop` (before memory/planning) and log the result. Add two tests that monkeypatch the tool to simulate `summary` and `start/stop` success.
 - Robust detection: prefer `timew export` JSON (or `timew get dom.active*`) to detect active state + tags instead of scraping `summary`. Keep it simple—no fallbacks unless asked.
