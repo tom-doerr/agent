@@ -99,24 +99,44 @@ class TimestampLogApp(App):
     def _load_constraints(self) -> None:
         try:
             stat = self._constraints_path.stat()
-            try:
-                height = int(getattr(getattr(self._constraints_view, "size", None), "height", 0))
-            except Exception:
-                height = 0
-            tail = max(height - 2, 1) if height > 0 else 200
-            lines = constraints_tail_lines(self._constraints_path, tail)
-            content = "\n".join(lines).replace("\n", "  \n")
-            self._constraints_mtime = stat.st_mtime
-            self._constraints_title.update(f"Constraints — {self._constraints_path}")
-            self._constraints_view.update(content)
-            auto = os.environ.get("TIMESTAMP_AUTO_SCROLL", "1").lower() not in {"0", "false", "no"}
-            if auto:
-                try:
-                    self._constraints_view.scroll_end(animate=False)  # type: ignore[attr-defined]
-                except Exception:
-                    pass
         except FileNotFoundError:
-            self._constraints_view.update("(constraints not found)")
+            self._show_constraints_not_found()
+            return
+
+        self._constraints_mtime = stat.st_mtime
+        self._constraints_title.update(f"Constraints — {self._constraints_path}")
+        content = self._constraints_text(self._tail_count())
+        self._constraints_view.update(content)
+        self._scroll_constraints_end()
+
+    # ---- small helpers to keep logic flat ----
+    def _pane_height(self) -> int:
+        try:
+            return int(getattr(getattr(self._constraints_view, "size", None), "height", 0))
+        except Exception:
+            return 0
+
+    def _tail_count(self) -> int:
+        h = self._pane_height()
+        return max(h - 2, 1) if h > 0 else 200
+
+    def _constraints_text(self, tail: int) -> str:
+        lines = constraints_tail_lines(self._constraints_path, tail)
+        return "\n".join(lines).replace("\n", "  \n")
+
+    def _auto_scroll(self) -> bool:
+        return os.environ.get("TIMESTAMP_AUTO_SCROLL", "1").lower() not in {"0", "false", "no"}
+
+    def _scroll_constraints_end(self) -> None:
+        if not self._auto_scroll():
+            return
+        try:
+            self._constraints_view.scroll_end(animate=False)  # type: ignore[attr-defined]
+        except Exception:
+            pass
+
+    def _show_constraints_not_found(self) -> None:
+        self._constraints_view.update("(constraints not found)")
 
 
 def _ensure_utf8_tty() -> None:
