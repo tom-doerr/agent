@@ -52,9 +52,7 @@ Textual Markdown
 - TimestampLogApp now renders `artifact.md` via `Markdown` (read-only) instead of a `TextArea`.
 
 Legacy: Old Vim Input
-- `_OldVimInput` (in `timestamp_textual_app.py`) is a legacy, unused Input subclass that implemented a broader set of Vim-like motions/operators.
-- The active widget is `VimInput` (in `timestamp_vim_input.py`), which is slimmer and currently used by both Textual apps.
-- We can safely remove `_OldVimInput` once no tests reference it to reduce confusion.
+- `_OldVimInput` (previously in `timestamp_textual_app.py`) has been removed. The app uses `VimInput` from `timestamp_vim_input.py`.
 
 Release
 - v0.1.1 (2025-11-06): reasoning trace panels in `nlco_iter`, JSONL model logging, TimestampLogApp Markdown view + `gi` input focus, tests updated.
@@ -86,6 +84,7 @@ Release
 - v0.1.26 (2025-11-11): TimestampLogApp now tails `constraints.md` by default (last 200 lines) and scrolls to bottom. Flags/env: `--constraints-tail N` (env `TIMESTAMP_CONSTRAINTS_TAIL`) to adjust; `--no-auto-scroll` to stop snapping to end.
 - v0.1.27 (2025-11-11): Tests for artifact scroll actions and fallbacks (`tests/test_timestamp_artifact_scroll_actions.py`).
  - v0.1.28 (2025-11-11): TimestampLogApp respects newlines in the constraints view by emitting Markdown line breaks. Test: `tests/test_timestamp_constraints_newlines.py`.
+ - v0.1.29 (2025-11-12): Remove unused `_OldVimInput` from `timestamp_textual_app.py`; the TUI relies solely on `VimInput`.
 
 Structured Memory — Options (2025-11-11)
 - Option A (light): add sectioned headings in `memory.md` (Policies/Procedures/Glossary) and constrain tools to edit within a selected section; add tests for section targeting.
