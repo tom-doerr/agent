@@ -147,7 +147,7 @@ def iterative_improvement_elo(task, iterations=1000, parallel=10, model_name="un
     console.print(f"[green]Initial version created:[/green] {initial_version_str}")
 
     # Create dataset manager for optimization data
-    dataset_manager = DatasetManager("optimization_dataset.json")
+    _dataset_manager = DatasetManager("optimization_dataset.json")
 
     NUM_COMPARISONS_PER_GENERATION = 3  # Number of comparisons per new version
 
@@ -180,9 +180,9 @@ def iterative_improvement_elo(task, iterations=1000, parallel=10, model_name="un
             # Sample current version
             current_version_obj = sample_version(elo_versions_list)
             if current_version_obj is None:
-                current_version = ""
+                _current_version = ""
             else:
-                current_version = current_version_obj["version"]
+                _current_version = current_version_obj["version"]
             console.print(
                 f"  [cyan]Iteration {i+1}: Sampling a version to improve...[/cyan]"
             )

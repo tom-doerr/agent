@@ -277,7 +277,7 @@ class TUI(App):
         self._worker_tasks.clear()
 
     async def _process_job(self, job: Job, log: RichLog, loop: asyncio.AbstractEventLoop) -> None:
-        jid = job.id[:8]
+        _ = job.id[:8]
         log.write(Text(f"▶ {job.prompt!r}", style="system-msg"))
         dspy_log = self.query_one("#dspy", RichLog)
         dspy_log.write(Text(f"▶ {job.prompt!r}", style="system-msg"))
@@ -369,7 +369,7 @@ class TUI(App):
                 await self._process_job(job, log, loop)
                 self._finish_request(success=True)
             except Exception as exc:  # pragma: no cover - defensive logging
-                jid = job.id[:8]
+                _ = job.id[:8]
                 self._finish_request(success=False, message=str(exc))
                 log.write(Text(f"❌ {exc!r}\n", style="system-msg"))
             finally:

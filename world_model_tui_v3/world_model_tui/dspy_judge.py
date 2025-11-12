@@ -58,7 +58,8 @@ class WorldModelJudge(dspy.Module):
 class LocalHeuristicJudge:
     def __call__(self, model_a: str, model_b: str, observation: str):
         obs = observation.lower()
-        score = lambda s: sum(tok in obs for tok in s.lower().replace('-', ' ').split())
+        def score(s: str) -> int:
+            return sum(tok in obs for tok in s.lower().replace('-', ' ').split())
         sa, sb = score(model_a), score(model_b)
         winner = "A" if sa >= sb else "B"
         return type("Pred", (), {"winner": winner, "justification": f"token overlap A={sa} B={sb}"})()

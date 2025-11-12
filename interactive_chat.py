@@ -144,6 +144,7 @@ class InteractiveChat(App):
         
         loop = asyncio.get_event_loop()
         try:
+            import speech_recognition as sr  # local import to satisfy F821 and avoid global dependency
             with sr.Microphone() as source:
                 audio = await loop.run_in_executor(None, self.recognizer.listen, source, 5)
                 text = await loop.run_in_executor(None, self.recognizer.recognize_google, audio)

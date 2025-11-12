@@ -26,7 +26,8 @@ def kl_divergence(p: List[float], q: List[float], eps: float = 1e-12) -> float:
     # KL(p||q) = sum p_i log(p_i/q_i)
     s = 0.0
     for pi, qi in zip(p, q):
-        pi = max(pi, eps); qi = max(qi, eps)
+        pi = max(pi, eps)
+        qi = max(qi, eps)
         s += pi * math.log(pi/qi)
     return s
 

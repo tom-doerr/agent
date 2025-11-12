@@ -362,7 +362,8 @@ class WorldModelTUI(App):
         wb = [(t.text, t.weight) for t in self.model_b.theories]
         top_a = topk_sorted(wa, 5)
         top_b = topk_sorted(wb, 5)
-        g_a = gini([w for _, w in wa]); g_b = gini([w for _, w in wb])
+        g_a = gini([w for _, w in wa])
+        g_b = gini([w for _, w in wb])
         self.log.write("[bold]Top A:[/bold] " + "; ".join(f"{txt} ({w:.3f})" for txt, w in top_a))
         self.log.write("[bold]Top B:[/bold] " + "; ".join(f"{txt} ({w:.3f})" for txt, w in top_b))
         self.log.write(f"[dim]Gini A={g_a:.3f}  Gini B={g_b:.3f}[/dim]")

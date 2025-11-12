@@ -67,7 +67,7 @@ class MultiAttemptExpander(dspy.Module):
                 expansion = self.expander(abbreviation=abbreviation).expanded
                 if self.validator(abbreviation=abbreviation, expansion=expansion):
                     valid_expansions.append(expansion)
-            except:
+            except Exception:
                 continue
                 
         return valid_expansions

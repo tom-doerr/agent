@@ -203,7 +203,7 @@ def main():
         bsize=2
     )
 
-    with mlflow.start_run(run_name="SIMBA_MemoryGAN_Run") as run:
+    with mlflow.start_run(run_name="SIMBA_MemoryGAN_Run") as _run:
         mlflow.log_params({
             "llm_model_name": LLM_MODEL_NAME,
             "simba_max_steps": max_steps,

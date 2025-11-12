@@ -122,7 +122,7 @@ def get_home_status():
     try:
         from home_automation import get_home_status as get_status
         return get_status()
-    except:
+    except Exception:
         return ""
 
 

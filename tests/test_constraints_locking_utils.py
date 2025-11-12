@@ -19,7 +19,10 @@ def test_constraints_locking_prevents_race(tmp_path: Path) -> None:
     n = 50
     p1 = Process(target=_worker, args=(str(path), "p1", n))
     p2 = Process(target=_worker, args=(str(path), "p2", n))
-    p1.start(); p2.start(); p1.join(); p2.join()
+    p1.start()
+    p2.start()
+    p1.join()
+    p2.join()
 
     text = path.read_text(encoding="utf-8")
     # One heading for the fixed date
@@ -28,4 +31,3 @@ def test_constraints_locking_prevents_race(tmp_path: Path) -> None:
     for i in range(n):
         assert f"p1-{i}" in text
         assert f"p2-{i}" in text
-

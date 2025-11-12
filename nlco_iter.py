@@ -135,7 +135,6 @@ def _log_model(stage: str, *, output: str | None, reasoning: str | None) -> None
 async def iteration_loop(*, max_iterations: Optional[int] = None):
     start_mtime = CONSTRAINTS_FILE.stat().st_mtime
     history = []
-    search_replace_errors = []
     iteration_cap = max_iterations if max_iterations is not None else MAX_ITERATIONS
     for i in range(iteration_cap):
         console.rule(f"{_now_str()} · Iteration {i + 1}")

@@ -48,9 +48,9 @@ class KnowledgeUpdater(dspy.Module):
             challenge = self.problem_generator(knowledge=self.knowledge, observation=observation)
             # print(f"[bold yellow]Generated question:[/bold yellow] {question}; [bold yellow]Proposed solution:[/bold yellow] {solution}")
             print(f"[bold yellow]Generated question:[/bold yellow] {challenge.question}; [bold yellow]Proposed solution:[/bold yellow] {challenge.solution}")
-            reasoning, solution = self.knowledge_observation_solver(question=question, knowledge=self.knowledge)
+            reasoning, solution = self.knowledge_observation_solver(question=challenge.question, knowledge=self.knowledge)
             if solution.strip().lower() == "unknown":
-                reasoning, solution = self.knowledge_solver(question=question, knowledge=self.knowledge)
+                reasoning, solution = self.knowledge_solver(question=challenge.question, knowledge=self.knowledge)
             index, search, replace = self.knowledge_observation_updater(observation=observation, reasoning=reasoning, solution=solution)
             if index.strip().lower() == "none":
                 break
@@ -84,4 +84,3 @@ while True:
 
 
     user_message = input(">  ")
-

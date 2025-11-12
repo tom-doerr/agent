@@ -45,7 +45,6 @@ class AsyncModelManager:
                 new_model = self.current_model.__class__.load(model_path)
                 
                 # Atomic swap
-                old_model = self.current_model
                 old_version = self.current_version
                 
                 self.current_model = new_model
@@ -390,7 +389,7 @@ if __name__ == "__main__":
             model_answer = numbers_in_answer[-1]
             
             return 1.0 if model_answer == correct_answer else 0.0
-        except:
+        except Exception:
             return 0.0
     
     # Initialize with micro-batches for true online optimization
@@ -410,7 +409,7 @@ if __name__ == "__main__":
         print(f"\n⤵️ Input: {question}")
         
         # Run inference
-        start_time = time.time()
+        # start_time = time.time()  # not used; rely on result.latency_ms
         result = await system.inference(question)
         latency_ms = result.latency_ms
         
@@ -461,7 +460,7 @@ if __name__ == "__main__":
                     try:
                         num_str = question.split()[1] if len(question.split()) > 1 else "3"
                         num_replays = int(num_str)
-                    except:
+                    except Exception:
                         num_replays = 3
                     
                     print(f"🔄 Replaying {num_replays} queries...")
