@@ -119,6 +119,7 @@ Release
  - v0.1.40 (2025-11-12): Extract constraints append formatting to shared helper `constraints_io.build_append_block(existing, needs_heading, date_str, line)`. Wrapper now uses it in `_append_to_constraints`. New tests: `tests/test_constraints_append_helper.py` covers first-entry, same-day, and next-day w/o trailing newline.
  - v0.1.41 (2025-11-12): Add smoke tests using Textual `run_test()` for both core and wrapper TimestampLogApp to ensure they compose and render without launching a real UI (`tests/test_timestamp_smoke_run_test.py`).
  - v0.1.42 (2025-11-12): Wrapper CLI adds `--constraints-rows N` to set `TIMESTAMP_CONSTRAINTS_ROWS` (mirrors core env). Test: `tests/test_timestamp_cli_constraints_rows.py`.
+ - v0.1.43 (2025-11-12): HTMX writer now uses shared `build_append_block` for consistent constraints formatting. Updated `webapp/nlco_htmx/utils.write_constraints_entry`. New test `tests/test_web_htmx_append_block_consistency.py` covers next-day insert with missing trailing newline.
 
 Things learned / to keep in mind (2025-11-12)
 - Two `TimestampLogApp` classes exist (core and wrapper). Their behaviors can drift; we aligned tailing behavior to reduce divergence. Consider consolidating or delegating constraints logic from the wrapper to the core in a future change.

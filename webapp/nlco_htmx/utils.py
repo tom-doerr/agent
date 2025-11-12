@@ -9,6 +9,7 @@ from typing import Optional
 
 from refiner_signature import ScheduleBlock, normalize_schedule
 from file_lock import locked_file
+from constraints_io import build_append_block
 import os
 
 DATE_HEADING_RE = re.compile(r"^#\s*(\d{4}-\d{2}-\d{2})$")
@@ -46,16 +47,10 @@ def write_constraints_entry(path: Path, message: str, *, now: datetime | None = 
         except Exception:
             pass
         last_date = extract_last_constraints_date(existing)
-        pieces: list[str] = []
-        if existing and not existing.endswith("\n"):
-            pieces.append("\n")
-        if last_date != entry_date:
-            if existing and not existing.endswith("\n\n"):
-                pieces.append("\n")
-            pieces.append(f"# {entry_date:%Y-%m-%d}\n")
-        pieces.append(f"{formatted_line}\n")
+        needs_heading = last_date != entry_date
+        block = build_append_block(existing, needs_heading, f"{entry_date:%Y-%m-%d}", formatted_line)
         handle.seek(0, os.SEEK_END)
-        handle.write("".join(pieces))
+        handle.write(block)
 
     return formatted_line, entry_date
 
