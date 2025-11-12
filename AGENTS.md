@@ -252,3 +252,20 @@ Memory handling (summary, 2025-11-11)
 - Module `MemoryModule` runs a small ReAct loop with tools `show_memory`, `replace_memory`, `append_memory`, `reset_memory` and writes back only if changes occurred.
 - Headless and Textual flows both use the primary LM for memory updates; a short result string is printed to the Memory pane when changes happen.
 - We don’t inject `memory.md` back into the model context yet (display-only except for edits). Short-term breadcrumbs go to `short_term_memory.md` separately.
+Code Quality Snapshot (2025-11-12)
+- Radon CC (C–F) hotspots (function · score):
+  - `timestamp_vim_input.VimInput._handle_normal_mode_key` · D (25)
+  - `dspy_programs/memory_gan.main` · D (24)
+  - `dspy_programs/taskwarrior_agent.main` · D (21)
+  - `refiner_signature.render_schedule_timeline` · C (20)
+  - `agent_manual_pkg.tui.TUI._process_job` · C (20)
+  - `nlco_iter.iteration_loop` · C (15)
+  - `timewarrior_module.TimewarriorModule._apply_decision` · C (15)
+  - `executive_module._execute_step` · C (16)
+  - Full listing captured via `radon cc -s -n C -a .`.
+- Radon MI: no grade-C files outside legacy/tests; worst MI flagged `agent_manual_pkg/.../tui.py` (likely due to generated code/tests context). See `radon mi -s .`.
+
+Actionable Quick Wins
+- Reduce branching in `timestamp_vim_input._handle_normal_mode_key` by splitting operator handling and motion parsing into helpers.
+- Extract subroutines from `nlco_iter.iteration_loop` (context build, model calls, writeback) to lower CC without changing behavior.
+- In `timewarrior_module._apply_decision`, early-return on NO-OP cases to flatten nesting.
