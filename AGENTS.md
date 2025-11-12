@@ -207,7 +207,7 @@ Refactor: Timestamp app split
 - `timestamp_textual_app.py` is a thin wrapper that re-exports the app, helpers, and main().
 
 Constraints pane behavior (Timestamp app)
-- Tails the last ~N lines of `constraints.md` (default 200 via `TIMESTAMP_CONSTRAINTS_TAIL`).
+- Tail count = max(pane height − 2, 1); if pane height is unavailable (e.g., offscreen/test), we fall back to 200 lines.
 - Scrolls to the end after refresh so the bottom is visible by default.
 
 File-first constraints behavior
@@ -272,3 +272,7 @@ Actionable Quick Wins
 - `timestamp_app_core._load_constraints` split into small helpers (`_tail_count`, `_constraints_text`, `_scroll_constraints_end`) to simplify the constraints pane logic without behavior changes.
 - Extract subroutines from `nlco_iter.iteration_loop` (context build, model calls, writeback) to lower CC without changing behavior.
 - In `timewarrior_module._apply_decision`, add early returns for NONE/denied cases to flatten nesting.
+Radon Snapshot (2025-11-12, 01:35)
+- Repo average CC: C ≈ 14.89 (46 C–F blocks).
+- Top hotspots unchanged: `agent_manual_pkg.tui.TUI.on_input_submitted` D(26), `dspy_programs/memory_gan.main` D(24), `dspy_programs/taskwarrior_agent.main` D(21), plus several C(20–16) functions.
+- MI: no grade‑C production files; `agent_manual_pkg/.../tui.py` MI “C” (legacy/test heavy).
