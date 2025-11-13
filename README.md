@@ -1,63 +1,52 @@
-# deepseek-batch (+ local TUIs)
+# NLCO Iteration Loop and Timestamp TUI
 
-This repo also contains a minimal Timestamp Log TUI for quick notes to `constraints.md` and a headless NLCO loop. See `AGENTS.md` for full details.
+Short, focused tools for iterating on an artifact with constraints and for fast note‑taking into `constraints.md`.
 
-- Uses OpenRouter `chat/completions`
-- Sends N identical requests in parallel
-- Feeds original prompt + candidates to a small dspy `Predict` to pick one
-- CLI: `deepseek-batch "your prompt" -n 5`
-- TUI: `deepseek-batch-tui` (Textual)
- - Tree CLI: `deepseek-tree "your prompt" --init-n 4 --expand-k 2 --iters 2`
+What’s here
+- Headless NLCO loop: `nlco_iter.py` refines `artifact.md` from `constraints.md` + context. Critic and structured schedule output are removed. The refiner receives a minimal `SystemState` containing the last artifact update time.
+- Timestamp Log TUI: `timestamp_textual_app.py` shows the bottom of `constraints.md`, lets you append timestamped lines, and renders `artifact.md` (scrollable Markdown).
 
-Env vars:
-- `OPENROUTER_API_KEY` (required)
-- `OPENROUTER_MODEL` (default: `deepseek/deepseek-v3.2`; set to your preferred DeepSeek model on OpenRouter)
+Quick start
+- Timestamp TUI (recommended wrapper):
+  - `./timestamp_tui.sh`
+- Timestamp TUI (one‑liner, hardened):
+  - `stty iutf8; LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8 ./timestamp_textual_app.py --lenient-input --fallback-encoding cp1252`
+- Headless NLCO:
+  - `python nlco_iter.py`
 
-Examples:
+Key bindings (TUI)
+- `gi` focus input • `ga` focus artifact • `F1` help (use this instead of Ctrl+H on some SSH clients) • `Ctrl+C` exit • `PageUp/PageDown` scroll artifact.
 
-```
-export OPENROUTER_API_KEY=...  # required
-export OPENROUTER_MODEL=deepseek/deepseek-v3.2
+Files and behavior
+- `constraints.md` — Timestamp TUI appends lines under `# YYYY‑MM‑DD` headings and shows the bottom by default; the pane is scrollable and preserves newlines.
+- `artifact.md` — headless loop prints model reasoning (when supported) and writes updates; TUI renders it read‑only and scrollable.
+- `memory.md`, `short_term_memory.md` — persistent and short‑term notes; not injected into prompts by default.
 
-# CLI
-deepseek-batch "Outline a README structure" -n 4
+Configuration
+- NLCO loop:
+  - `NLCO_MAX_ITERS` (default 3) caps iterations per run.
+  - Optional MLflow (local): set tracking URI if you use it; otherwise it’s ignored.
+- Timestamp TUI:
+  - `TIMESTAMP_CONSTRAINTS_ROWS` sets the constraints pane height; the tail count derives from it.
+  - `--no-auto-scroll` or `TIMESTAMP_AUTO_SCROLL=0` disables snapping to end.
+  - Mobile SSH aids: `--right-margin N` (env `TIMESTAMP_RIGHT_MARGIN`) and `--pad-eol` (env `TIMESTAMP_PAD_EOL=1`) help avoid right‑edge clipping.
+  - Lenient input for non‑UTF‑8 bytes: `--lenient-input [--fallback-encoding cp1252]` or env `TIMESTAMP_LENIENT_INPUT=1`.
 
-# TUI (optional)
-# pip install .[tui]
-deepseek-batch-tui
+Mobile SSH / Termux notes
+- Enable UTF‑8 input on the TTY: `stty iutf8`.
+- Prefer `F1` for help (some clients map `Ctrl+H` to backspace).
+- If you see right‑edge clipping of the last character, try `--pad-eol` or `--right-margin 2`.
 
-# Tree search CLI
-deepseek-tree "Summarize this text" --init-n 4 --expand-k 2 --iters 2
+Testing
+- Timestamp TUI focused tests: `pytest -q tests/test_timestamp_textual_app.py`
+- Headless loop smoke tests: `pytest -q tests/test_nlco_iter.py`
 
-# Python
-from deepseek_batch import batch_best, BestOfBatch
-print(batch_best("Outline a README structure", n=4))
+Subpackages
+- The `deepseek-batch` package remains available for batch selection experiments; see its CLI docs in that folder. It’s not the focus of this README.
 
-# As a dspy module on raw text
-bo = BestOfBatch(n=4)
-print(bo("Give me 3 bullet points"))
-
-# With a dspy Signature
-import dspy
-
-class Summarize(dspy.Signature):
-    """One-sentence summary"""
-    passage: str
-    summary: str
-
-print(BestOfBatch(n=3)(Summarize, passage="DSPy is a framework ..."))
-```
-
-Note: Special test hook — if input is exactly `blueberries`, it returns the reversed string `seirrebeulb`.
-
-Timestamp TUI quick start
-- Recommended: `./timestamp_tui.sh` (sets UTF‑8 and runs with lenient input).
-- One‑liner (hardened): `stty iutf8; LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8 ./timestamp_textual_app.py --lenient-input --fallback-encoding cp1252`
-- Keys: `gi` focus input • `ga` focus artifact • `F1` help • `Ctrl+C` exit.
-
-Quick dev:
-
+Dev setup
 ```
 python -m pip install -e .
-pytest -q tests  # runs offline tests only
+pytest -q tests  # offline‑friendly tests
 ```
+
