@@ -14,8 +14,18 @@ from textual.widgets import Footer, Header, Input, Static, Markdown
 from constraints_io import tail_lines as constraints_tail_lines
 from timestamp_vim_input import VimInput
 
-ARTIFACT_FILE = Path("artifact.md")
-CONSTRAINTS_FILE = Path("constraints.md")
+def _base_private_dir() -> Path:
+    return Path(os.environ.get("NLCO_PRIVATE_DIR", "~/.nlco/private")).expanduser()
+
+
+def resolve_constraints_path() -> Path:
+    p = os.environ.get("TIMESTAMP_CONSTRAINTS_PATH") or os.environ.get("NLCO_CONSTRAINTS_PATH")
+    return Path(os.path.expanduser(p)) if p else _base_private_dir() / "constraints.md"
+
+
+def resolve_artifact_path() -> Path:
+    p = os.environ.get("TIMESTAMP_ARTIFACT_PATH") or os.environ.get("NLCO_ARTIFACT_PATH")
+    return Path(os.path.expanduser(p)) if p else _base_private_dir() / "artifact.md"
 
 
 # --- tiny shared helpers (used by wrapper too) ---
@@ -92,8 +102,8 @@ class TimestampLogApp(App):
         constraints_refresh_seconds: float = 2.0,
     ) -> None:
         super().__init__()
-        self._artifact_path = artifact_path or ARTIFACT_FILE
-        self._constraints_path = constraints_path or CONSTRAINTS_FILE
+        self._artifact_path = artifact_path or resolve_artifact_path()
+        self._constraints_path = constraints_path or resolve_constraints_path()
         self._artifact_refresh_seconds = max(artifact_refresh_seconds, 0.1)
         self._constraints_refresh_seconds = max(constraints_refresh_seconds, 0.1)
         self._artifact_mtime: Optional[float] = None
@@ -261,6 +271,8 @@ def _parse_cli(argv: list[str]) -> None:
     parser.add_argument("--right-margin", dest="right_margin", type=int, default=None)
     parser.add_argument("--no-auto-scroll", action="store_true")
     parser.add_argument("--constraints-tail", dest="constraints_tail", type=int, default=None)
+    parser.add_argument("--constraints-path", dest="constraints_path", default=None)
+    parser.add_argument("--artifact-path", dest="artifact_path", default=None)
     parser.add_argument("--pad-eol", action="store_true")
     ns, _ = parser.parse_known_args(argv)
     if ns.lenient_input:
@@ -275,3 +287,7 @@ def _parse_cli(argv: list[str]) -> None:
         os.environ["TIMESTAMP_AUTO_SCROLL"] = "0"
     if ns.constraints_tail is not None:
         os.environ["TIMESTAMP_CONSTRAINTS_TAIL"] = str(ns.constraints_tail)
+    if ns.constraints_path:
+        os.environ["TIMESTAMP_CONSTRAINTS_PATH"] = ns.constraints_path
+    if ns.artifact_path:
+        os.environ["TIMESTAMP_ARTIFACT_PATH"] = ns.artifact_path

@@ -15,8 +15,11 @@ Agent Notes (updated 2025-11-13)
 Things to keep in mind
 - Textual and Rich must be installed to run the Timestamp TUI.
 - MLflow is optional for headless; structured schedule JSON is no longer produced by the refiner.
-- Constraints and artifact paths are fixed: `constraints.md`, `artifact.md`, `memory.md`, `short_term_memory.md`.
-- `timestamp_textual_app.py` appends to `constraints.md` and can be used alongside NLCO tools, but beware of concurrent writes to the same file.
+- Timestamp TUI default paths now live under the user’s private directory:
+  - Default base: `~/.nlco/private` (override with `NLCO_PRIVATE_DIR`).
+  - Resolved files: `constraints.md`, `artifact.md` in that directory.
+  - Override per-file via env: `TIMESTAMP_CONSTRAINTS_PATH`, `TIMESTAMP_ARTIFACT_PATH` or CLI flags `--constraints-path` / `--artifact-path`.
+- `timestamp_textual_app.py` appends to the resolved constraints file and can be used alongside NLCO tools, but beware of concurrent writes to the same file.
  - Context now includes weekday explicitly: `Datetime: YYYY-MM-DD HH:MM:SS (Friday)` for better temporal grounding.
 - Auto-backups: Before any write to `constraints.md`, we snapshot the current file to `.nlco/backups/{hourly|daily|weekly}/constraints-*.md` if the period’s file doesn’t exist yet. Env override: `NLCO_BACKUP_DIR`.
 - Constraints tail sizing: In `timestamp_app_core`, tail now always derives from pane height (tail = max(height - 2, 1)). The old `TIMESTAMP_CONSTRAINTS_TAIL` numeric env is ignored for rendering.

@@ -41,6 +41,10 @@ Configuration
   - `NLCO_MAX_ITERS` (default 3) caps iterations per run.
   - MLflow optional; if not configured, it’s silently ignored.
 - Timestamp TUI
+  - Paths: defaults to `~/.nlco/private/{constraints.md, artifact.md}`.
+    - Override via env: `TIMESTAMP_CONSTRAINTS_PATH`, `TIMESTAMP_ARTIFACT_PATH`.
+    - Override base dir: `NLCO_PRIVATE_DIR` (e.g., `~/nlco-private`).
+    - CLI flags: `--constraints-path /path/to/constraints.md`, `--artifact-path /path/to/artifact.md`.
   - `TIMESTAMP_CONSTRAINTS_ROWS` sets constraints pane height; tail count derives from it.
   - `--no-auto-scroll` or `TIMESTAMP_AUTO_SCROLL=0` disables snapping to end.
   - Mobile SSH aids: `--right-margin N` (env `TIMESTAMP_RIGHT_MARGIN`) and `--pad-eol` (env `TIMESTAMP_PAD_EOL=1`) avoid right‑edge clipping.

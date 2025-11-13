@@ -32,8 +32,6 @@ from timestamp_app_core import (
 )
 from timestamp_app_core import TimestampLogApp as _CoreTimestampLogApp
 
-ARTIFACT_FILE = Path("artifact.md")
-CONSTRAINTS_FILE = Path("constraints.md")
 DATE_HEADING_RE = re.compile(r"^#\s*(\d{4}-\d{2}-\d{2})$")
 
 # Legacy _OldVimInput removed; app uses VimInput from timestamp_vim_input.py
@@ -57,9 +55,12 @@ class TimestampLogApp(_CoreTimestampLogApp):
         artifact_refresh_seconds: float = 2.0,
         constraints_refresh_seconds: float = 2.0,
     ) -> None:
-        super().__init__()
-        self._artifact_path = artifact_path or ARTIFACT_FILE
-        self._constraints_path = constraints_path or CONSTRAINTS_FILE
+        super().__init__(
+            artifact_path=artifact_path,
+            constraints_path=constraints_path,
+            artifact_refresh_seconds=artifact_refresh_seconds,
+            constraints_refresh_seconds=constraints_refresh_seconds,
+        )
         self._artifact_refresh_seconds = max(artifact_refresh_seconds, 0.1)
         self._constraints_refresh_seconds = max(constraints_refresh_seconds, 0.1)
         self._artifact_mtime: Optional[float] = None
