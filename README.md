@@ -1,4 +1,13 @@
-# NLCO Iteration Loop · Timestamp TUI
+<div align="center">
+  <h1>NLCO Iteration Loop · Timestamp TUI</h1>
+  <p>
+    <a href="https://www.python.org/"><img alt="Python" src="https://img.shields.io/badge/Python-3.11%2B-3776AB?logo=python&logoColor=white&style=for-the-badge"></a>
+    <a href="https://textual.textualize.io/"><img alt="Textual" src="https://img.shields.io/badge/Textual-TUI-7B46BE?style=for-the-badge"></a>
+    <a href="https://github.com/stanfordnlp/dspy"><img alt="DSPy" src="https://img.shields.io/badge/DSPy-Enabled-0F7C0F?style=for-the-badge"></a>
+    <a href="#mobile-ssh--termux"><img alt="Termux Friendly" src="https://img.shields.io/badge/Termux-Friendly-00AA00?logo=android&logoColor=white&style=for-the-badge"></a>
+    <a href="#testing"><img alt="Tests" src="https://img.shields.io/badge/Tests-pytest-0A9EDC?logo=pytest&logoColor=white&style=for-the-badge"></a>
+  </p>
+</div>
 
 Refine an artifact from constraints, and capture new constraints quickly.
 
