@@ -13,6 +13,7 @@ from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel, Field
+import timestamp_app_core as core
 from starlette.concurrency import run_in_threadpool
 
 from . import utils
@@ -61,9 +62,9 @@ class WebConfig(BaseModel):
     """Runtime configuration for the web frontend."""
 
     artifact_path: Path = Field(default=Path("artifact.md"))
-    memory_path: Path = Field(default=Path("memory.md"))
+    memory_path: Path = Field(default_factory=core.resolve_memory_path)
     constraints_path: Path = Field(default=Path("constraints.md"))
-    short_term_memory_path: Path | None = Field(default=Path("short_term_memory.md"))
+    short_term_memory_path: Path | None = Field(default_factory=core.resolve_short_term_path)
     schedule_path: Path = Field(default=Path("structured_schedule.json"))
     history_limit: int = Field(default=200, ge=1, le=2000)
     auth_database_url: str = Field(

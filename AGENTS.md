@@ -401,6 +401,7 @@ Release (continued)
 - v0.1.48 (2025-11-13): Align headless constraints path with TUI — `CONSTRAINTS_FILE` now uses `timestamp_app_core.resolve_constraints_path()` (defaults to `~/.nlco/private/constraints.md`). Updated test `tests/test_nlco_iter_paths_env.py` to assert both artifact and constraints use shared resolvers.
 - v0.1.49 (2025-11-13): Add shared resolvers for memory files — `resolve_memory_path()` and `resolve_short_term_path()` default to `~/.nlco/private/{memory.md, short_term_memory.md}` with env overrides. Headless now passes these to `MemoryModule` and `TimewarriorModule`. Tests updated: extended `tests/test_timestamp_paths_env.py` and `tests/test_nlco_iter_paths_env.py`.
 - v0.1.50 (2025-11-13): Add tests asserting artifact does not auto-scroll when `TIMESTAMP_AUTO_SCROLL=0`: `tests/test_timestamp_artifact_no_autoscroll.py` (core + wrapper). Complements default-top tests.
+- v0.1.51 (2025-11-13): Web app uses shared defaults for memory files — `WebConfig.memory_path` and `WebConfig.short_term_memory_path` now default via `timestamp_app_core.resolve_memory_path/_short_term_path`. Test: `tests/test_web_paths_resolvers.py`.
 
 Next Steps (2025-11-13)
 - 90a. Add a test verifying artifact does not auto‑scroll when `TIMESTAMP_AUTO_SCROLL=0` (symmetry with constraints). Recommended.
