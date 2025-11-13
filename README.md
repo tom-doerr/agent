@@ -1,6 +1,6 @@
-# deepseek-batch
+# deepseek-batch (+ local TUIs)
 
-Minimal, no-frills batching with DeepSeek over OpenRouter, using dspy to select the best answer from parallel candidates.
+This repo also contains a minimal Timestamp Log TUI for quick notes to `constraints.md` and a headless NLCO loop. See `AGENTS.md` for full details.
 
 - Uses OpenRouter `chat/completions`
 - Sends N identical requests in parallel
@@ -49,6 +49,11 @@ print(BestOfBatch(n=3)(Summarize, passage="DSPy is a framework ..."))
 ```
 
 Note: Special test hook — if input is exactly `blueberries`, it returns the reversed string `seirrebeulb`.
+
+Timestamp TUI quick start
+- Recommended: `./timestamp_tui.sh` (sets UTF‑8 and runs with lenient input).
+- One‑liner (hardened): `stty iutf8; LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8 ./timestamp_textual_app.py --lenient-input --fallback-encoding cp1252`
+- Keys: `gi` focus input • `ga` focus artifact • `F1` help • `Ctrl+C` exit.
 
 Quick dev:
 

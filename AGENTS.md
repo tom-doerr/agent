@@ -1,4 +1,4 @@
-Agent Notes (updated 2025-11-12)
+Agent Notes (updated 2025-11-13)
 
 - TUIs at a glance:
   - `timestamp_textual_app.py` (TimestampLogApp): capture constraints and view `artifact.md` (Markdown). It doesn’t run NLCO.
@@ -7,7 +7,8 @@ Agent Notes (updated 2025-11-12)
 - Headless alternative is `nlco_iter.py` (console loop). Run: `python nlco_iter.py`.
 - You do NOT need both at once; the TUI runs iterations itself. Avoid concurrent runs (shared files).
 - Run commands:
-  - Timestamp: `python timestamp_textual_app.py`
+  - Timestamp (wrapper, recommended): `./timestamp_tui.sh`
+  - Timestamp (one-liner, hardened): `stty iutf8; LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8 ./timestamp_textual_app.py --lenient-input --fallback-encoding cp1252`
   - Agent Manual: `python -m agent_manual_pkg.cli` (supports `--model` and `--max-tokens`).
 - Files touched: none (informational change only).
 
@@ -19,11 +20,15 @@ Things to keep in mind
  - Context now includes weekday explicitly: `Datetime: YYYY-MM-DD HH:MM:SS (Friday)` for better temporal grounding.
 - Auto-backups: Before any write to `constraints.md`, we snapshot the current file to `.nlco/backups/{hourly|daily|weekly}/constraints-*.md` if the period’s file doesn’t exist yet. Env override: `NLCO_BACKUP_DIR`.
 - Constraints tail sizing: In `timestamp_app_core`, tail now always derives from pane height (tail = max(height - 2, 1)). The old `TIMESTAMP_CONSTRAINTS_TAIL` numeric env is ignored for rendering.
+- Mobile SSH tip: some clients clip the last column. Use either `--right-margin N` (env `TIMESTAMP_RIGHT_MARGIN`) or `--pad-eol` (env `TIMESTAMP_PAD_EOL=1`) to add space at the right; both affect rendering only (no file changes).
 
-Next Steps (2025-11-12)
+Key bindings (Timestamp TUI)
+- `gi` focus input • `ga` focus artifact • `F1` toggle help (more reliable than `Ctrl+H` on some phones/SSH) • `Ctrl+C` exit • `PageUp/PageDown` scroll artifact.
+
+Next Steps (2025-11-13)
 - 46a. Wire `TimewarriorModule.run()` into `nlco_iter.iteration_loop()` behind env `NLCO_TIMEW=1`; log a short status line and add 2 unit tests (timew present/absent). Recommended.
 - 46b. Add a minimal “unchanged twice” stop rule to headless iterations to prevent endless runs; 2 tests (no-change stops, change resets counter).
-- 46c. Apply `TIMESTAMP_RIGHT_MARGIN` padding in `timestamp_app_core.TimestampLogApp` (Constraints Markdown) and add one style assertion test.
+- 46c. Apply `TIMESTAMP_RIGHT_MARGIN` padding in `timestamp_app_core.TimestampLogApp` (Constraints Markdown) and add one style assertion test. (Tracking.)
 - 46d. Prune remaining legacy references to `nlco_textual.py` in docs and code comments; keep the file but mark clearly as deprecated.
 - 46e. Harden JSONL model logging for path errors (permission/dir missing) with a tiny try/except and one test; keep code minimal.
 - 46f. (Done) Lightweight advisory file lock to avoid simultaneous writes to `constraints.md` when headless + timestamp/web app run together.
@@ -31,11 +36,15 @@ Next Steps (2025-11-12)
   - Used by: `constraints_io.append_line`, `timestamp_textual_app._append_to_constraints`, `webapp/nlco_htmx/utils.write_constraints_entry`.
   - Test: `tests/test_constraints_locking_utils.py` spawns two processes appending concurrently; asserts one heading and all lines present.
 
-Proposed Next Steps (79)
-- 79a. Split `TUI.apply_memory_updates` into `*_create/_update/_delete` helpers with one focused unit test. Minimal code; lowers CC hotspot. (Recommended.)
-- 79b. Style cleanup in `tui.py`: remove semicolons flagged by ruff (E702/E703); no behavior change; quick win + keep lint clean.
-- 79c. Wire `TimewarriorModule.run` into `nlco_iter` behind `NLCO_TIMEW=1` with 2 tests (timew present/absent). Small, controlled change toward earlier goals.
-- 79d. Add a tiny `/help` command that echoes HelpScreen text into `#log`; add one assertion in tests to lock UX.
+Proposed Next Steps (80)
+- 80a. Split `TUI.apply_memory_updates` into `*_create/_update/_delete` helpers with one focused unit test. Minimal code; lowers CC hotspot. (Recommended.)
+- 80b. Style cleanup in `tui.py`: remove semicolons flagged by ruff (E702/E703); no behavior change; quick win + keep lint clean.
+- 80c. Wire `TimewarriorModule.run` into `nlco_iter` behind `NLCO_TIMEW=1` with 2 tests (timew present/absent). Small, controlled change toward earlier goals.
+- 80d. Add a tiny `/help` command that echoes HelpScreen text into `#log`; add one assertion in tests to lock UX.
+
+Shell hardening cheats
+- One-liner (ad‑hoc): `stty iutf8; LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8 ./timestamp_textual_app.py --lenient-input --fallback-encoding cp1252`
+- Persistent (bash/zsh): add `[ -t 0 ] && stty iutf8 || true` to your shell rc.
 
 Models & budgets (NLCO iter)
 - Primary LM: `deepseek/deepseek-reasoner` with `max_tokens=40000` (see `nlco_iter.py`).
