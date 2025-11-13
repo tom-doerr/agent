@@ -28,6 +28,16 @@ def resolve_artifact_path() -> Path:
     return Path(os.path.expanduser(p)) if p else _base_private_dir() / "artifact.md"
 
 
+def resolve_memory_path() -> Path:
+    p = os.environ.get("TIMESTAMP_MEMORY_PATH") or os.environ.get("NLCO_MEMORY_PATH")
+    return Path(os.path.expanduser(p)) if p else _base_private_dir() / "memory.md"
+
+
+def resolve_short_term_path() -> Path:
+    p = os.environ.get("TIMESTAMP_SHORT_TERM_PATH") or os.environ.get("NLCO_SHORT_TERM_PATH")
+    return Path(os.path.expanduser(p)) if p else _base_private_dir() / "short_term_memory.md"
+
+
 # --- tiny shared helpers (used by wrapper too) ---
 def md_preserve_lines(text: str) -> str:
     return text.replace("\n", "  \n")
