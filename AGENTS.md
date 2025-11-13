@@ -207,6 +207,9 @@ Copy‑paste one‑liner (only harden shell)
 Repo housekeeping (2025-11-10)
 - Committed and pushed v0.1.2 changes: UTF-8 TTY preflight in `timestamp_textual_app.py`, error hint in `main()`, and tests `test_timestamp_textual_preflight.py`+`test_timestamp_textual_main.py`.
 
+Repo housekeeping (2025-11-13)
+- README refocused on NLCO headless loop and Timestamp TUI. DeepSeek batch docs moved to a short subpackages note. Added hardened one‑liner and wrapper as primary run paths.
+
 Nootropics log (read-only)
 - NLCO Textual UI now shows the last 72h of entries from `~/.nootropics_log.jsonl` in a side panel.
 - Strictly read-only: the loader never writes or truncates the file.
