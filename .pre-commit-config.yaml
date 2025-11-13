@@ -1,0 +1,11 @@
+repos:
+  - repo: local
+    hooks:
+      - id: secrets-scan
+        name: secrets-scan
+        entry: bash scripts/secrets_scan.sh
+        language: system
+        pass_filenames: true
+        types: [text]
+        stages: [commit]
+

@@ -348,3 +348,17 @@ Recommended hardening
 - Add a `pre-commit` hook with `gitleaks` or `trufflehog` (kept minimal; fail on verified secrets only).
 - Enable GitHub secret scanning & push protection on the repo (if using GitHub).
 - Convert `telegram-mcp-repo` to a proper submodule or add packaging excludes so its local `.git/` never ships.
+
+PII scrub (2025-11-13)
+- Removed from Git history and remote: `constraints.md`, `memory.md`, `short_term_memory.md`, `notes.md`, `info.md`.
+- Local copies preserved (untracked) and added to `.gitignore`.
+- Safety: mirror backup at `/tmp/agent-pre-scrub-mirror-YYYYmmdd-HHMMSS`, tag `pre-scrub-20251113-060334`, branch `backup/pre-scrub-20251113-060334`.
+- Force-pushed rewritten history to `origin` (all branches + tags).
+- If collaborators exist: they must `git fetch --all --prune` and hard reset their branches (history was rewritten).
+
+Pre-commit secrets scan (2025-11-13)
+- Hook: `.pre-commit-config.yaml` with a local `secrets-scan` that runs `scripts/secrets_scan.sh` over staged files.
+- Patterns are high-confidence only (no entropy): private keys, GitHub tokens, GitHub PATs, AWS AKIA/ASIA, Slack webhooks, Bearer tokens.
+- Setup once: `python -m pip install --user pre-commit && pre-commit install`
+- Run ad-hoc: `bash scripts/secrets_scan.sh $(git diff --cached --name-only)`
+- Tests: `tests/test_secrets_scan.py` covers clean and leaked cases.
