@@ -293,7 +293,8 @@ class TUI(App):
         answer = getattr(prediction, "answer", "")
         self._emit_answer(log, dspy_log, answer)
 
-        await asyncio.to_thread(self._update_satisfaction, job.prompt)
+        await asyncio.to_thread(self._update_goals, job.prompt)
+        await asyncio.to_thread(self._update_score)
 
     async def worker(self):
         log = self.query_one("#log", RichLog)
@@ -349,7 +350,7 @@ class TUI(App):
             return True
         if self._handle_model_choice(text, log, event):
             return True
-        return self._handle_inline_commands(text, log, event)
+        return False
 
     def _handle_module_model_choice(self, text: str, log: RichLog, event: Input.Submitted) -> bool:
         if self.awaiting_module_model_choice and self.selected_module:
@@ -418,35 +419,53 @@ class TUI(App):
             return True
         return False
 
-    def _handle_inline_commands(self, text: str, log: RichLog, event: Input.Submitted) -> bool:
+    def _route_command(self, text: str, log: RichLog, event: Input.Submitted) -> bool:
+        if text.startswith("/layout"):
+            parts = text.split()
+            mode = parts[1].lower() if len(parts) > 1 else "stacked"
+            if mode not in {"stacked", "wide"}:
+                log.write(Text("usage: /layout stacked|wide", style="system-msg"))
+                return True
+            self._set_layout(mode)
+            log.write(Text(f"layout set to {mode}", style="system-msg"))
+            event.input.value = ""
+            return True
+
         if text == "/modules":
             self.awaiting_model_choice = False
             self.awaiting_max_tokens = False
-            self._reset_module_state(); self.awaiting_module_selection = True
+            self._reset_module_state()
+            self.awaiting_module_selection = True
             self._show_modules_list(log)
             event.input.value = ""
             return True
+
         if text == "/model":
             options = ", ".join(runtime.MODEL_PRESETS)
             log.write(Text(f"choose model ({options}). current={get_config().model}", style="system-msg"))
-            self.awaiting_model_choice = True; self._reset_module_state()
+            self.awaiting_model_choice = True
+            self._reset_module_state()
             event.input.value = ""
             return True
+
         if text.startswith("/max_tokens"):
             parts = text.split()
             if len(parts) == 2:
                 try:
-                    value = int(parts[1]); assert value > 0
+                    value = int(parts[1])
+                    assert value > 0
                 except Exception:
                     log.write(Text("usage: /max_tokens <positive integer>", style="system-msg"))
                 else:
                     runtime.configure_model(get_config().model, max_tokens=value)
                     log.write(Text(f"max_tokens set to {value}", style="system-msg"))
             else:
-                self.awaiting_max_tokens = True; self._reset_module_state()
+                self.awaiting_max_tokens = True
+                self._reset_module_state()
                 log.write(Text("enter a positive integer for max_tokens", style="system-msg"))
             event.input.value = ""
             return True
+
         return False
 
     def _show_modules_list(self, log: RichLog) -> None:
@@ -456,49 +475,9 @@ class TUI(App):
             log.write(Text(f"{idx}. {module_name} ({label}) current={current}", style="system-msg"))
 
     def _handle_command(self, text: str, log: RichLog) -> bool:
-        """Return True if input was a command and consumed here."""
-        if text.startswith("/layout"):
-            parts = text.split()
-            mode = parts[1].lower() if len(parts) > 1 else "stacked"
-            if mode not in {"stacked", "wide"}:
-                log.write(Text("usage: /layout stacked|wide", style="system-msg"))
-                return True
-            self._set_layout(mode)
-            log.write(Text(f"layout set to {mode}", style="system-msg"))
-            return True
-        if text == "/modules":
-            self.awaiting_model_choice = False
-            self.awaiting_max_tokens = False
-            self._reset_module_state()
-            self.awaiting_module_selection = True
-            self._show_modules_list(log)
-            return True
-
-        if text == "/model":
-            options = ", ".join(runtime.MODEL_PRESETS)
-            log.write(Text(f"choose model ({options}). current={get_config().model}", style="system-msg"))
-            self.awaiting_model_choice = True
-            self._reset_module_state()
-            return True
-
-        if text.startswith("/max_tokens"):
-            parts = text.split()
-            if len(parts) == 2:
-                try:
-                    value = int(parts[1])
-                    if value <= 0:
-                        raise ValueError
-                except ValueError:
-                    log.write(Text("usage: /max_tokens <positive integer>", style="system-msg"))
-                else:
-                    runtime.configure_model(get_config().model, max_tokens=value)
-                    log.write(Text(f"max_tokens set to {value}", style="system-msg"))
-            else:
-                self.awaiting_max_tokens = True
-                self._reset_module_state()
-                log.write(Text("enter a positive integer for max_tokens", style="system-msg"))
-            return True
-        return False
+        """Compat wrapper: route commands through a single handler."""
+        from types import SimpleNamespace
+        return self._route_command(text, log, SimpleNamespace(input=SimpleNamespace(value="")))
 
     # ---- small helpers to reduce CC in _process_job ----
     def _log_prompt(self, prompt: str, log: RichLog, dspy_log: RichLog, raw_log: RichLog) -> None:
@@ -508,25 +487,40 @@ class TUI(App):
 
     def _emit_step_logs(self, log: RichLog, dspy_log: RichLog, raw_log: RichLog, steps: List[Dict[str, Any]]) -> None:
         for step in steps:
-            thought = step.get("thought", ""); tool = step.get("tool", ""); args = step.get("args", {}); obs = step.get("observation", "")
+            thought = step.get("thought", "")
+            tool = step.get("tool", "")
+            args = step.get("args", {})
+            obs = step.get("observation", "")
             if thought:
-                log.write(Text(f"🤔 {thought}", style="context-msg")); dspy_log.write(Text(f"🤔 {thought}", style="context-msg"))
+                log.write(Text(f"🤔 {thought}", style="context-msg"))
+                dspy_log.write(Text(f"🤔 {thought}", style="context-msg"))
             if tool and tool != "finish":
-                log.write(Text(f"🔧 {tool} {args}", style="context-msg")); dspy_log.write(Text(f"🔧 {tool} {args}", style="context-msg"))
+                log.write(Text(f"🔧 {tool} {args}", style="context-msg"))
+                dspy_log.write(Text(f"🔧 {tool} {args}", style="context-msg"))
             if tool == "run_shell" and isinstance(obs, dict):
-                cmd = obs.get("command", ""); log.write(Text(f"🖥️ command: {cmd}", style="context-msg")); dspy_log.write(Text(f"🖥️ command: {cmd}", style="context-msg"))
-                safety = obs.get("safety");
-                if isinstance(safety, dict):
-                    summary = "passed" if safety.get("passed") else f"blocked ({safety.get('detail', '')})"
-                    log.write(Text(f"🛡️ safety: {summary}", style="context-msg")); dspy_log.write(Text(f"🛡️ safety: {summary}", style="context-msg"))
-                out = obs.get("output", "");
-                if out:
-                    log.write(Text(f"📥 output: {out}", style="context-msg")); dspy_log.write(Text(f"📥 output: {out}", style="context-msg"))
-                status = obs.get("status");
-                if status:
-                    icon = "⚠️" if status != "ok" else "✅"; log.write(Text(f"{icon} status: {status}", style="context-msg")); dspy_log.write(Text(f"{icon} status: {status}", style="context-msg"))
+                self._emit_shell_step(log, dspy_log, obs)
             elif obs:
-                log.write(Text(f"📥 {obs}", style="context-msg")); dspy_log.write(Text(f"📥 {obs}", style="context-msg"))
+                log.write(Text(f"📥 {obs}", style="context-msg"))
+                dspy_log.write(Text(f"📥 {obs}", style="context-msg"))
+
+    def _emit_shell_step(self, log: RichLog, dspy_log: RichLog, obs: Dict[str, Any]) -> None:
+        cmd = obs.get("command", "")
+        log.write(Text(f"🖥️ command: {cmd}", style="context-msg"))
+        dspy_log.write(Text(f"🖥️ command: {cmd}", style="context-msg"))
+        safety = obs.get("safety")
+        if isinstance(safety, dict):
+            summary = "passed" if safety.get("passed") else f"blocked ({safety.get('detail', '')})"
+            log.write(Text(f"🛡️ safety: {summary}", style="context-msg"))
+            dspy_log.write(Text(f"🛡️ safety: {summary}", style="context-msg"))
+        out = obs.get("output", "")
+        if out:
+            log.write(Text(f"📥 output: {out}", style="context-msg"))
+            dspy_log.write(Text(f"📥 output: {out}", style="context-msg"))
+        status = obs.get("status")
+        if status:
+            icon = "⚠️" if status != "ok" else "✅"
+            log.write(Text(f"{icon} status: {status}", style="context-msg"))
+            dspy_log.write(Text(f"{icon} status: {status}", style="context-msg"))
 
     def _emit_raw_history(self, raw_log: RichLog, raw_history: List[str]) -> None:
         for chunk in raw_history:
@@ -546,7 +540,7 @@ class TUI(App):
         if isinstance(answer, str) and answer.strip():
             self._history.append({"role": "assistant", "content": answer.strip()})
 
-    def _update_satisfaction(self, prompt: str) -> None:
+    def _update_goals(self, prompt: str) -> None:
         goals, goal_error = self._run_goal_planner(prompt)
         if goals is not None:
             self._latest_goals = goals
@@ -557,12 +551,18 @@ class TUI(App):
         self._satisfaction_error = goal_error
         self._refresh_satisfaction_view()
 
+    def _update_score(self) -> None:
         score_result, score_error = self._run_satisfaction_scorer()
         if score_result is not None:
             self._latest_score = score_result
             self._active_modules.add("satisfaction_score")
         self._satisfaction_error = score_error
         self._refresh_satisfaction_view()
+
+    # Back-compat: keep the old combined helper as a thin wrapper
+    def _update_satisfaction(self, prompt: str) -> None:  # pragma: no cover
+        self._update_goals(prompt)
+        self._update_score()
 
     def _set_layout(self, mode: str) -> None:
         content = self.query_one("#content", Horizontal)

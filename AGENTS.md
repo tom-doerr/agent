@@ -331,3 +331,20 @@ Radon Snapshot (2025-11-12, 01:35)
 - Repo average CC: C ≈ 14.89 (46 C–F blocks).
 - Top hotspots unchanged: `agent_manual_pkg.tui.TUI.on_input_submitted` D(26), `dspy_programs/memory_gan.main` D(24), `dspy_programs/taskwarrior_agent.main` D(21), plus several C(20–16) functions.
 - MI: no grade‑C production files; `agent_manual_pkg/.../tui.py` MI “C” (legacy/test heavy).
+Security scan (2025-11-13)
+- Scope: working tree, full Git history (patterns), and TruffleHog v2 entropy/regex pass.
+- High‑risk secrets: none found (no private keys, AWS/GitHub/Slack tokens, Bearer tokens).
+- .env files: only `.env.example` is tracked (placeholders). Any `.env*` in the tree are untracked.
+- Emails: only test/example emails in content; commit metadata naturally contains author emails (not part of file contents).
+- Nested repo note: `telegram-mcp-repo/.git/` exists locally but is not tracked; avoid bundling this folder when archiving.
+- Largest blobs in history are code/log artifacts; no credential patterns detected in those blobs.
+
+How to re‑run locally
+- Quick grep (HEAD): `rg -n --hidden -P -g '!/.git' -g '!**/.git/**' -e '-----BEGIN (RSA |DSA |EC |OPENSSH )?PRIVATE KEY-----' -e 'ghp_[A-Za-z0-9]{36,}' -e 'github_pat_[A-Za-z0-9_]{80,}' -e 'AKIA[0-9A-Z]{16}' -e 'ASIA[0-9A-Z]{16}' -e 'xox[bap]-' -e 'hooks\.slack\.com/services/' -e 'Authorization: Bearer [A-Za-z0-9_\-\.]+'
+- Full history (patterns): `git rev-list --all | while read c; do git grep -I -n --full-name -E '(AKIA[0-9A-Z]{16}|ASIA[0-9A-Z]{16}|ghp_[A-Za-z0-9]{36,}|github_pat_[A-Za-z0-9_]{80,}|xox[bap]-|hooks\\.slack\\.com/services/|BEGIN [A-Z ]+PRIVATE KEY|Authorization: Bearer )' "$c" || true; done`
+- TruffleHog v2 (optional): `python -m pip install --user trufflehog==2.2.1 && trufflehog --regex --entropy=True --json --since_commit $(git rev-list --max-parents=0 HEAD | tail -n1) --branch $(git rev-parse --abbrev-ref HEAD) file://$PWD`
+
+Recommended hardening
+- Add a `pre-commit` hook with `gitleaks` or `trufflehog` (kept minimal; fail on verified secrets only).
+- Enable GitHub secret scanning & push protection on the repo (if using GitHub).
+- Convert `telegram-mcp-repo` to a proper submodule or add packaging excludes so its local `.git/` never ships.
