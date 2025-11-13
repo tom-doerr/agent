@@ -81,8 +81,8 @@ refiner = dspy.Predict(
 # Critic module removed; refiner operates without an explicit critique input.
 is_finished_checker = dspy.Predict('history -> is_finished: bool, reasoning')
 
-CONSTRAINTS_FILE = Path('constraints.md')
-# Use the same resolver as the TUI for the artifact path (keeps it out of the repo)
+# Use shared resolvers so headless matches the TUI defaults
+CONSTRAINTS_FILE = core.resolve_constraints_path()
 ARTIFACT_FILE = core.resolve_artifact_path()
 STRUCTURED_SCHEDULE_FILE = Path('structured_schedule.json')
 

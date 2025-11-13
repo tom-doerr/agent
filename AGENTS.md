@@ -398,6 +398,7 @@ Forbid-paths hook (2025-11-13)
 Release (continued)
 - v0.1.46 (2025-11-13): Temporary headless hotfix — added a local `artifact.md` to avoid a first-run crash while investigating path alignment. The file remained ignored by Git.
 - v0.1.47 (2025-11-13): Proper fix — headless now uses the shared resolver (`timestamp_app_core.resolve_artifact_path`) so `artifact.md` lives under `~/.nlco/private` (or env override). Removed the temporary repo file and added a tiny `FileNotFoundError` guard in `_read_artifact_and_state()` so first-run works without creating files up front. Tests: `tests/test_nlco_iter_paths_env.py`, `tests/test_nlco_iter_missing_artifact.py`.
+- v0.1.48 (2025-11-13): Align headless constraints path with TUI — `CONSTRAINTS_FILE` now uses `timestamp_app_core.resolve_constraints_path()` (defaults to `~/.nlco/private/constraints.md`). Updated test `tests/test_nlco_iter_paths_env.py` to assert both artifact and constraints use shared resolvers.
 
 Next Steps (2025-11-13)
 - 90a. Add a test verifying artifact does not auto‑scroll when `TIMESTAMP_AUTO_SCROLL=0` (symmetry with constraints). Recommended.
