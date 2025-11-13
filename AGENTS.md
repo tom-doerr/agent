@@ -20,6 +20,16 @@ Things to keep in mind
   - Resolved files: `constraints.md`, `artifact.md` in that directory.
   - Override per-file via env: `TIMESTAMP_CONSTRAINTS_PATH`, `TIMESTAMP_ARTIFACT_PATH` or CLI flags `--constraints-path` / `--artifact-path`.
 - `timestamp_textual_app.py` appends to the resolved constraints file and can be used alongside NLCO tools, but beware of concurrent writes to the same file.
+
+Path migration note (2025-11-13)
+- We did NOT move any existing `constraints.md`/`artifact.md`. They remain at repo root, untracked.
+- To keep using them without moving: `TIMESTAMP_CONSTRAINTS_PATH="$PWD/constraints.md" TIMESTAMP_ARTIFACT_PATH="$PWD/artifact.md" ./timestamp_textual_app.py`.
+- To migrate to the new defaults (`~/.nlco/private`):
+  - One‑liner (hardened): `IFS=$'\n\t'; set -euo pipefail; umask 077; base="${NLCO_PRIVATE_DIR:-$HOME/.nlco/private}"; install -d -m 700 "$base"; for f in constraints.md artifact.md; do src="$PWD/$f"; dst="$base/$f"; if [ -f "$src" ] && [ ! -e "$dst" ]; then mv -- "$src" "$dst" && echo "moved $f -> $dst"; else echo "skipped $f"; fi; done`
+
+Path migration executed (2025-11-13)
+- On this machine, we moved `artifact.md` → `~/.nlco/private/artifact.md` and found `~/.nlco/private/constraints.md` already present; repo‑root `constraints.md` was untouched.
+- TUI now reads/writes from the private paths by default; override via `TIMESTAMP_CONSTRAINTS_PATH` / `TIMESTAMP_ARTIFACT_PATH` if needed.
  - Context now includes weekday explicitly: `Datetime: YYYY-MM-DD HH:MM:SS (Friday)` for better temporal grounding.
 - Auto-backups: Before any write to `constraints.md`, we snapshot the current file to `.nlco/backups/{hourly|daily|weekly}/constraints-*.md` if the period’s file doesn’t exist yet. Env override: `NLCO_BACKUP_DIR`.
 - Constraints tail sizing: In `timestamp_app_core`, tail now always derives from pane height (tail = max(height - 2, 1)). The old `TIMESTAMP_CONSTRAINTS_TAIL` numeric env is ignored for rendering.
@@ -384,3 +394,15 @@ Forbid-paths hook (2025-11-13)
 - Hook: `.pre-commit-config.yaml` `forbid-paths` runs `scripts/forbid_paths.sh`.
 - Deny-list: `constraints.md`, `memory.md`, `short_term_memory.md`, `notes.md`, `info.md` (basename match).
 - Tests: `tests/test_forbid_paths.py` ensures safe files pass and forbidden names fail.
+
+Release (continued)
+- v0.1.46 (2025-11-13): Headless hotfix — add a tracked repo‑root `artifact.md` so `nlco_iter.py` doesn’t crash when the artifact is missing. We intentionally avoid adding code fallbacks; the minimal fix is to check in the file. TUI continues to resolve paths via `~/.nlco/private` unless overridden.
+
+Next Steps (2025-11-13)
+- 90a. Add a test verifying artifact does not auto‑scroll when `TIMESTAMP_AUTO_SCROLL=0` (symmetry with constraints). Recommended.
+- 90b. Optional: CLI/env toggle to select artifact top/bottom; add 1–2 tests.
+- 90c. Consider `constraints_io.append_daily_line(now, message)` helper to encapsulate last‑date detection; 1 unit test.
+
+Things learned (2025-11-13)
+- Headless path expects `artifact.md` at repo root; missing file causes `FileNotFoundError` in `_read_artifact_and_state()`. Adding the file is the smallest, clearest fix.
+- Keep it simple: prefer explicit files over implicit creation logic or fallbacks.
