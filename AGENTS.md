@@ -362,3 +362,22 @@ Pre-commit secrets scan (2025-11-13)
 - Setup once: `python -m pip install --user pre-commit && pre-commit install`
 - Run ad-hoc: `bash scripts/secrets_scan.sh $(git diff --cached --name-only)`
 - Tests: `tests/test_secrets_scan.py` covers clean and leaked cases.
+
+PII double‑check (2025-11-13)
+- Local repo: no occurrences of `constraints.md`, `memory.md`, `short_term_memory.md`, `notes.md`, `info.md` in any commit; high‑risk patterns only appear in documentation and the scan script (not secrets).
+- Remote `main`: clean (no target files present).
+- Remote PR refs: `refs/pull/{1..17}/head` still contain the removed files (GitHub stores PR heads separately). Action: close these PRs and recreate from the new `main`. GitHub will GC unreachable objects over time; to accelerate removal, contact GitHub Support.
+- Re‑run locally: see “How to re‑run” in Security scan; remote check: `git clone --mirror $REPO_URL /tmp/repo.git && cd /tmp/repo.git && <same scans>`.
+
+PII prevention policy (2025-11-13)
+- Separation: personal logs/notes live outside the repo (default paths remain `constraints.md`, `memory.md`, `short_term_memory.md`, `notes.md`, `info.md` but are .gitignored and treated as local state).
+- Blocking hooks: pre-commit `secrets-scan` is mandatory for contributors (`pre-commit install`). A second hook `forbid-paths` blocks staging any of the five Markdown files (matched by basename).
+- CI gate (planned): GitHub Actions job runs the same scans on PRs and fails if secrets or forbidden paths are touched.
+- Repo settings: enable GitHub “Secret scanning” and “Push protection” in Settings → Code security and analysis.
+- Packaging: add `.gitattributes` `export-ignore` entries for those files to keep them out of `git archive` and release tarballs (planned).
+- Incident playbook: if a leak occurs, run the scrub script (filter-repo), force-push with backups/tags, close PR refs, notify collaborators to hard reset.
+
+Forbid-paths hook (2025-11-13)
+- Hook: `.pre-commit-config.yaml` `forbid-paths` runs `scripts/forbid_paths.sh`.
+- Deny-list: `constraints.md`, `memory.md`, `short_term_memory.md`, `notes.md`, `info.md` (basename match).
+- Tests: `tests/test_forbid_paths.py` ensures safe files pass and forbidden names fail.

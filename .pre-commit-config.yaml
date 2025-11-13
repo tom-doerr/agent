@@ -8,4 +8,10 @@ repos:
         pass_filenames: true
         types: [text]
         stages: [commit]
-
+      - id: forbid-paths
+        name: forbid-paths
+        entry: bash scripts/forbid_paths.sh
+        language: system
+        pass_filenames: true
+        types: [text]
+        stages: [commit]
