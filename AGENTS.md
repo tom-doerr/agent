@@ -211,6 +211,7 @@ Repo housekeeping (2025-11-13)
 - README refocused on NLCO headless loop and Timestamp TUI. DeepSeek batch docs moved to a short subpackages note. Added hardened one‑liner and wrapper as primary run paths.
  - README polished for readability: compact contents list, consistent section headers, and concise quick‑start. No behavior changes.
  - README now features centered heading and Material‑style badges (shields.io); purely visual.
+ - Pushed documentation commits to origin/main.
 
 Nootropics log (read-only)
 - NLCO Textual UI now shows the last 72h of entries from `~/.nootropics_log.jsonl` in a side panel.
