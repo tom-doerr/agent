@@ -30,6 +30,7 @@ from planning_module import PlanningModule
 from affect_module import AffectModule
 from nlco_scheduler import evaluate_run_decision
 from refiner_signature import RefineSignature, SystemState
+import timestamp_app_core as core
 
 # Print DSPy version at startup
 print(f"DSPy version: {dspy.__version__}")
@@ -81,7 +82,8 @@ refiner = dspy.Predict(
 is_finished_checker = dspy.Predict('history -> is_finished: bool, reasoning')
 
 CONSTRAINTS_FILE = Path('constraints.md')
-ARTIFACT_FILE = Path('artifact.md')
+# Use the same resolver as the TUI for the artifact path (keeps it out of the repo)
+ARTIFACT_FILE = core.resolve_artifact_path()
 STRUCTURED_SCHEDULE_FILE = Path('structured_schedule.json')
 
 MAX_ITERATIONS = int(os.getenv("NLCO_MAX_ITERS", "3"))
@@ -133,7 +135,10 @@ def _log_model(stage: str, *, output: str | None, reasoning: str | None) -> None
 
 
 def _read_artifact_and_state() -> tuple[str, SystemState]:
-    artifact = ARTIFACT_FILE.read_text()
+    try:
+        artifact = ARTIFACT_FILE.read_text()
+    except FileNotFoundError:
+        artifact = ""
     try:
         prev_mtime = ARTIFACT_FILE.stat().st_mtime
     except FileNotFoundError:

@@ -396,7 +396,8 @@ Forbid-paths hook (2025-11-13)
 - Tests: `tests/test_forbid_paths.py` ensures safe files pass and forbidden names fail.
 
 Release (continued)
-- v0.1.46 (2025-11-13): Headless hotfix — add a tracked repo‑root `artifact.md` so `nlco_iter.py` doesn’t crash when the artifact is missing. We intentionally avoid adding code fallbacks; the minimal fix is to check in the file. TUI continues to resolve paths via `~/.nlco/private` unless overridden.
+- v0.1.46 (2025-11-13): Temporary headless hotfix — added a local `artifact.md` to avoid a first-run crash while investigating path alignment. The file remained ignored by Git.
+- v0.1.47 (2025-11-13): Proper fix — headless now uses the shared resolver (`timestamp_app_core.resolve_artifact_path`) so `artifact.md` lives under `~/.nlco/private` (or env override). Removed the temporary repo file and added a tiny `FileNotFoundError` guard in `_read_artifact_and_state()` so first-run works without creating files up front. Tests: `tests/test_nlco_iter_paths_env.py`, `tests/test_nlco_iter_missing_artifact.py`.
 
 Next Steps (2025-11-13)
 - 90a. Add a test verifying artifact does not auto‑scroll when `TIMESTAMP_AUTO_SCROLL=0` (symmetry with constraints). Recommended.
@@ -404,5 +405,5 @@ Next Steps (2025-11-13)
 - 90c. Consider `constraints_io.append_daily_line(now, message)` helper to encapsulate last‑date detection; 1 unit test.
 
 Things learned (2025-11-13)
-- Headless path expects `artifact.md` at repo root; missing file causes `FileNotFoundError` in `_read_artifact_and_state()`. Adding the file is the smallest, clearest fix.
-- Keep it simple: prefer explicit files over implicit creation logic or fallbacks.
+- Align paths across headless + TUI to avoid surprises; using the shared resolver eliminates the repo-root dependency.
+- Minimal guard (not a broad fallback): treating missing artifact as empty input allows first-run without creating files ahead of time.
