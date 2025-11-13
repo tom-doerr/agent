@@ -200,3 +200,7 @@ artifact.md
 *.pkl
 *.db
 node_modules/
+memory.md
+short_term_memory.md
+notes.md
+info.md
