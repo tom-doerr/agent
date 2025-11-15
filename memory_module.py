@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import textwrap
 from pathlib import Path
+import difflib
 from typing import Any, Callable, Dict, List, Literal, Optional
 
 import dspy
@@ -128,11 +129,16 @@ class MemoryModule(dspy.Module):
                 console.print(Panel(message, title="replace_memory", border_style="red", expand=False))
                 return message
 
+            before = state.working_text
             state.working_text = state.working_text.replace(search, replace)
             state.edits_applied += 1
             state.notes.append(f"Replaced `{search}` -> `{replace}`")
             message = "Replacement applied successfully."
             console.print(Panel(message, title="replace_memory", border_style="green", expand=False))
+            # show a minimal unified diff for visibility
+            diff = self._render_diff(before, state.working_text)
+            if diff.strip():
+                console.print(diff)
             return message
 
         def append_block(content: str) -> str:
@@ -203,3 +209,12 @@ class MemoryModule(dspy.Module):
                 obs_text = observation if isinstance(observation, str) else repr(observation)
                 self.console.print(f"   📥 {obs_text}\n")
             idx += 1
+
+    # ------------------------------------------------------------------
+    # Small helper: render unified diff between texts
+    # ------------------------------------------------------------------
+    def _render_diff(self, before: str, after: str) -> str:
+        a = before.splitlines()
+        b = after.splitlines()
+        lines = difflib.unified_diff(a, b, fromfile="before", tofile="after", lineterm="")
+        return "\n".join(lines)
