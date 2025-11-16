@@ -34,6 +34,7 @@ File is self-contained: run it as
 to simulate, learn, and then run a greedy-actor demo.
 """
 
+import argparse
 import random
 from enum import Enum
 from typing import Dict, List, Optional, Tuple
@@ -1037,12 +1038,43 @@ class Experiment:
 # =========================
 
 
-def main():
+def main(argv: Optional[List[str]] = None):
+    parser = argparse.ArgumentParser(
+        description="Concept-world RL experiment with DSPy-tagged concepts."
+    )
+    parser.add_argument(
+        "--episodes",
+        "--epochs",
+        type=int,
+        default=5,
+        help="Number of episodes to simulate under the random behavior policy (default: 5).",
+    )
+    parser.add_argument(
+        "--max-steps",
+        type=int,
+        default=12,
+        help="Maximum steps per episode (default: 12).",
+    )
+    parser.add_argument(
+        "--gamma",
+        type=float,
+        default=0.9,
+        help="Discount factor for returns G_t (default: 0.9).",
+    )
+    parser.add_argument(
+        "--max-new-concepts",
+        type=int,
+        default=2,
+        help="Maximum number of new STATE concepts to create from high-value pairs (default: 2).",
+    )
+
+    args = parser.parse_args(argv)
+
     exp = Experiment(
-        num_episodes=5,
-        max_steps=12,
-        gamma=0.9,
-        max_new_concepts=2,
+        num_episodes=args.episodes,
+        max_steps=args.max_steps,
+        gamma=args.gamma,
+        max_new_concepts=args.max_new_concepts,
     )
     exp.run()
 
