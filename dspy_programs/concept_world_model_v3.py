@@ -895,6 +895,7 @@ class Experiment:
         max_steps: int = 15,
         gamma: float = 0.9,
         max_new_concepts: int = 2,
+        eps_greedy: float = 0.0,
     ):
         self.num_episodes = num_episodes
         self.env = ReactorEnv(max_steps=max_steps)
@@ -906,6 +907,7 @@ class Experiment:
             max_new=max_new_concepts,
             min_support=0.05,
         )
+        self.eps_greedy = eps_greedy
 
     def run(self):
         random.seed(42)
@@ -1051,6 +1053,11 @@ class Experiment:
             while not done:
                 state_vec = self.tagger.tag_state(obs, self.universe)
                 a, preds = self._greedy_action(state_vec)
+                # Epsilon-greedy exploration: with probability eps_greedy, override
+                # the greedy choice with a random action.
+                explore = random.random() < getattr(self, "eps_greedy", 0.0)
+                if explore:
+                    a = random.choice([0, 1, 2])
                 a_name = action_names.get(a, f"unknown({a})")
                 obs, done, meltdown = self.env.step(a)
                 reward = 0.0 if meltdown else 1.0
@@ -1119,6 +1126,12 @@ def main(argv: Optional[List[str]] = None):
         default=2,
         help="Maximum number of new STATE concepts to create from high-value pairs (default: 2).",
     )
+    parser.add_argument(
+        "--epsilon",
+        type=float,
+        default=0.0,
+        help="Epsilon for epsilon-greedy exploration during greedy actor runs (default: 0.0).",
+    )
 
     args = parser.parse_args(argv)
 
@@ -1127,6 +1140,7 @@ def main(argv: Optional[List[str]] = None):
         max_steps=args.max_steps,
         gamma=args.gamma,
         max_new_concepts=args.max_new_concepts,
+        eps_greedy=args.epsilon,
     )
     exp.run()
 
