@@ -227,6 +227,7 @@ class ReactorEnv:
         self.margin = random.uniform(35, 80)
         self.glitches = 0
         self.mood = "calm"
+        self.demand = random.choice(["low", "high"])
         self.step_idx = 0
         self.meltdown = False
         return self._make_observation(last_action=None)
@@ -285,6 +286,13 @@ class ReactorEnv:
         else:
             glitch_phrase = f"{self.glitches} shard glitches clustered in the last cycle"
 
+        if self.demand == "low":
+            demand_phrase = "grid demand is modest"
+        else:
+            demand_phrase = (
+                "grid demand is elevated; operators are asked to keep output up"
+            )
+
         if self.mood == "calm":
             operator_msg = random.choice(
                 [
@@ -321,6 +329,7 @@ class ReactorEnv:
 
         obs_lines = [
             f"Reactor log step {self.step_idx}: {stress_phrase}, {margin_phrase}, {glitch_phrase}.",
+            demand_phrase,
             f"{action_phrase}",
             f"Operator note: \"{operator_msg}\"",
         ]
@@ -356,6 +365,10 @@ class ReactorEnv:
 
         self.stress = max(0.0, min(100.0, self.stress))
         self.margin = max(0.0, min(100.0, self.margin))
+
+        # Occasionally flip demand to simulate changing grid needs.
+        if random.random() < 0.2:
+            self.demand = "high" if self.demand == "low" else "low"
 
         self._maybe_glitch()
         self._update_mood()
@@ -934,109 +947,15 @@ class Experiment:
         random.seed(42)
         np.random.seed(42)
 
-        console.rule("[bold cyan]Warmup: Random Policy[/bold cyan]")
-
-        # Collect random-policy episodes until we have enough train steps
-        # for an initial RewardModel fit.
-        warmup_episodes = 1
-        min_train_steps = 10
-        while True:
-            console.print(
-                f"[cyan]Simulating {warmup_episodes} warmup episode(s) with up to[/cyan] "
-                f"{self.env.max_steps} [cyan]steps each (RANDOM actions)...[/cyan]"
-            )
-            self.dataset.simulate_random(self.env, num_episodes=warmup_episodes)
-            n_steps_total = len(self.dataset.observations)
-            console.print(f"[cyan]Total decision steps collected:[/cyan] {n_steps_total}")
-
-            console.rule("[bold cyan]Pass 1: Tag STATE Concepts[/bold cyan]")
-            console.print("[cyan]Tagging STATE concepts (one LLM call per step)...[/cyan]")
-            self.dataset.tag_all_state(self.tagger, self.universe)
-
-            console.rule("[bold cyan]Monte-Carlo Returns[/bold cyan]")
-            console.print("[cyan]Building discounted cumulative reward labels (G_t)...[/cyan]")
-            G = self.dataset.build_discounted_reward()
-
-            # Baseline: random policy discounted return stats
-            num_eps = len(self.dataset.meltdown_flags)
-            num_meltdowns = sum(1 for f in self.dataset.meltdown_flags if f)
-            meltdown_rate = num_meltdowns / num_eps if num_eps > 0 else 0.0
-            console.rule("[bold magenta]Baseline: Random Policy (Behavior)[/bold magenta]")
-            console.print(
-                f"[magenta]Episodes:[/magenta] {num_eps}  |  "
-                f"[magenta]Meltdowns:[/magenta] {num_meltdowns}  |  "
-                f"[magenta]Meltdown rate:[/magenta] {meltdown_rate:.3f}"
-            )
-
-            self.baseline_overall_mean = float(G.mean()) if len(G) > 0 else 0.0
-            self.baseline_action_means: Dict[int, float] = {}
-            action_names = {0: "steady", 1: "cool", 2: "push"}
-            table = Table(title="Baseline action returns (random policy)")
-            table.add_column("Action", justify="left")
-            table.add_column("Mean G_t", justify="right")
-            table.add_column("# Steps", justify="right")
-            for a in (0, 1, 2):
-                idxs = [i for i, act in enumerate(self.dataset.actions) if act == a]
-                if not idxs:
-                    table.add_row(action_names[a], "—", "0")
-                    continue
-                mean_g = float(G[idxs].mean())
-                self.baseline_action_means[a] = mean_g
-                table.add_row(action_names[a], f"{mean_g:.3f}", str(len(idxs)))
-            console.print(table)
-
-            train_idx, test_idx = self.dataset.train_test_split_by_episode(test_frac=0.2)
-            console.rule("[bold cyan]Train / Test Split[/bold cyan]")
-            console.print(
-                f"[cyan]Train steps:[/cyan] {len(train_idx)}  |  "
-                f"[cyan]Test steps:[/cyan] {len(test_idx)}"
-            )
-
-            if len(train_idx) >= min_train_steps:
-                break
-
-            console.print(
-                "[yellow]Not enough train steps yet; "
-                "increasing warmup random episodes...[/yellow]"
-            )
-            warmup_episodes += 1
-
-        new_concepts_with_parents = self.discovery.discover(
-            self.universe,
-            self.dataset,
-            G,
+        console.rule("[bold cyan]No Warmup: ε-greedy Learning Episodes[/bold cyan]")
+        console.print(
+            f"[cyan]Episodes:[/cyan] {self.num_episodes}  |  "
+            f"[cyan]Max steps per episode:[/cyan] {self.env.max_steps}  |  "
+            f"[cyan]epsilon:[/cyan] {self.eps_greedy}"
         )
 
-        if new_concepts_with_parents:
-            new_state_concepts = [nc for (nc, _) in new_concepts_with_parents]
-            extended_concepts = (
-                self.universe.state_concepts
-                + new_state_concepts
-                + [c for c in self.universe.concepts if c.source != ConceptSource.LLM]
-            )
-            self.universe = ConceptUniverse(extended_concepts)
-
-            print(
-                f"\nExtended STATE space: {len(BASE_STATE_CONCEPTS)} base "
-                f"+ {len(new_state_concepts)} learned = "
-                f"{len(self.universe.state_concepts)} STATE concepts total"
-            )
-
-            print("\n[Pass 2] Re-tagging STATE concepts (one LLM call per step)...")
-            self.dataset.tag_all_state(self.tagger, self.universe)
-        else:
-            print("\nNo new STATE concepts created; staying with base STATE concepts.")
-
-        print("\n=== Reward model (concept vector -> discounted return) ===")
-        X_all = self.dataset.build_action_features(self.universe)
-        self.reward_model.fit(X_all, G, train_idx)
-        self.reward_model.evaluate(X_all, G, train_idx, "Train")
-        self.reward_model.evaluate(X_all, G, test_idx, "Test")
-        # Initial concept importance from warmup-trained RewardModel
-        self._update_concept_importance()
-
-        print("\nDone. Concept-learning + reward modeling complete.")
-        print("Now running a greedy-actor demo using predicted cumulative reward per action...")
+        # No separate random warmup: start directly with ε-greedy episodes.
+        # RewardModel is updated after each episode from that episode's returns.
         self.run_greedy_actor_demo(num_episodes=self.num_episodes)
 
     def _greedy_action(self, state_vec_state_only: np.ndarray) -> Tuple[int, np.ndarray]:
@@ -1050,6 +969,12 @@ class Experiment:
             raise ValueError("STATE vector length does not match universe STATE count.")
 
         K = self.universe.K
+
+        # Ensure the RewardModel has coefficients before first predict.
+        # If not, start from a simple zero model.
+        if not hasattr(self.reward_model.model, "coef_"):
+            self.reward_model.model.coef_ = np.zeros(K, dtype=float)
+            self.reward_model.model.intercept_ = 0.0
         full_state = np.zeros(K, dtype=float)
         state_indices = self.universe.state_index_map()
         full_state[state_indices] = state_vec_state_only
@@ -1114,7 +1039,29 @@ class Experiment:
                 full_state[j_act] = 1.0
 
                 obs, done, meltdown = self.env.step(a)
-                reward = 0.0 if meltdown else 1.0
+                if meltdown:
+                    # Large penalty for meltdown regardless of demand.
+                    reward = -5.0
+                else:
+                    # Base survival reward
+                    reward = 1.0
+
+                    # Output proxy: push > steady > cool
+                    if a == 2:  # push
+                        output = 1.0
+                    elif a == 0:  # steady
+                        output = 0.6
+                    else:  # cool
+                        output = 0.2
+
+                    # Demand-sensitive bonus:
+                    if self.env.demand == "high":
+                        # When demand is high, reward higher output directly.
+                        reward += output
+                    else:
+                        # When demand is low, staying moderate is preferred.
+                        # Penalize over/under-shooting a moderate output (≈0.4).
+                        reward += 0.2 - abs(output - 0.4)
                 ep_reward += reward
                 ep_steps += 1
                 total_reward += reward
