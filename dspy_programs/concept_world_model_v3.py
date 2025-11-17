@@ -914,11 +914,15 @@ class Experiment:
         np.random.seed(42)
 
         console.rule("[bold cyan]Random Policy Simulation[/bold cyan]")
+
+        # Hard-coded warmup: collect exactly one random-policy episode for training.
+        warmup_episodes = 1
         console.print(
             f"[cyan]Simulating[/cyan] {self.num_episodes} [cyan]episodes with up to[/cyan] "
-            f"{self.env.max_steps} [cyan]steps each (RANDOM actions)...[/cyan]"
+            f"{self.env.max_steps} [cyan]steps each (RANDOM actions)...[/cyan]\n"
+            f"[yellow](Warmup uses 1 random episode for training; remaining episodes are greedy.)[/yellow]"
         )
-        self.dataset.simulate_random(self.env, num_episodes=self.num_episodes)
+        self.dataset.simulate_random(self.env, num_episodes=warmup_episodes)
         n_steps_total = len(self.dataset.observations)
         console.print(f"[cyan]Total decision steps collected:[/cyan] {n_steps_total}")
 
@@ -993,6 +997,12 @@ class Experiment:
 
         print("\n=== Reward model (concept vector -> discounted return) ===")
         X_all = self.dataset.build_action_features(self.universe)
+        if not train_idx:
+            console.print(
+                "[bold red]No train steps available (warmup episode too small); "
+                "skipping RewardModel training and greedy demo.[/bold red]"
+            )
+            return
         self.reward_model.fit(X_all, G, train_idx)
         self.reward_model.evaluate(X_all, G, train_idx, "Train")
         self.reward_model.evaluate(X_all, G, test_idx, "Test")
