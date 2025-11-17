@@ -11,6 +11,5 @@ a() {
   # Call the tiny Python helper (keeps shell minimal and consistent with app logic)
   local repo_root
   repo_root="${${(%):-%x}:A:h:h}"  # this file's dir -> repo root
-  python3 "$repo_root/scripts/constraints_add_entry.py" -- "$msg"
+  python3 "$repo_root/scripts/constraints_add_entry.py" "$msg"
 }
-
