@@ -142,6 +142,16 @@ Release
   - Tests: `tests/test_add_constraint_script.py` ensures day heading and line formatting, deduping headings on same day, and new day headings.
   - Artifact view defaults to top scroll already; tests in place: `tests/test_timestamp_artifact_default_top.py` and `tests/test_timestamp_artifact_no_autoscroll.py` (env `TIMESTAMP_AUTO_SCROLL=0` disables it).
 
+- v0.1.47 (2025-11-17): Quick usage cheat‑sheet for constraints appends.
+  - Zsh function: source `scripts/zsh_functions.zsh:1` then run `a do the thing`.
+  - CLI: `python3 scripts/constraints_add_entry.py did the thing` (uses HH:MM:SS; daily `# YYYY-MM-DD`).
+  - Path resolution: honors `NLCO_CONSTRAINTS_PATH` → default `~/.nlco/private/constraints.md`.
+  - Verification: `tail -n 5 ~/.nlco/private/constraints.md` (or the env‑overridden path).
+
+Notes/Learnings
+- Shell stays minimal by delegating to the tested Python helper; consistent behavior with TUI/HTMX.
+- Memory replace tool prints unified diffs; look for them in nlco_iter console output.
+
 File locations (default; outside repo)
 - Constraints: `~/.nlco/private/constraints.md` (set `NLCO_CONSTRAINTS_PATH` to override)
 - Artifact: `~/.nlco/private/artifact.md` (set `NLCO_ARTIFACT_PATH`)
