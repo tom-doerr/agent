@@ -1057,6 +1057,8 @@ class Experiment:
             meltdown_happened = False
             ep_reward = 0.0
             ep_steps = 0
+            episode_features: List[np.ndarray] = []
+            episode_rewards: List[float] = []
             console.print(f"\n[bold green]Episode {ep}[/bold green]:")
             while not done:
                 state_vec = self.tagger.tag_state(obs, self.universe)
@@ -1067,12 +1069,26 @@ class Experiment:
                 if explore:
                     a = random.choice([0, 1, 2])
                 a_name = action_names.get(a, f"unknown({a})")
+
+                # Build full feature vector for (state_vec, a)
+                K_state = len(self.universe.state_concepts)
+                K = self.universe.K
+                full_state = np.zeros(K, dtype=float)
+                state_indices = self.universe.state_index_map()
+                full_state[state_indices] = state_vec
+                action_ids = ["ACTION_STEADY", "ACTION_COOL", "ACTION_PUSH"]
+                cid = action_ids[a]
+                j_act = self.universe.id_to_idx[cid]
+                full_state[j_act] = 1.0
+
                 obs, done, meltdown = self.env.step(a)
                 reward = 0.0 if meltdown else 1.0
                 ep_reward += reward
                 ep_steps += 1
                 total_reward += reward
                 total_steps += 1
+                episode_features.append(full_state)
+                episode_rewards.append(reward)
 
                 avg_reward_global = total_reward / total_steps if total_steps else 0.0
                 avg_reward_ep = ep_reward / ep_steps if ep_steps else 0.0
@@ -1095,6 +1111,19 @@ class Experiment:
                     meltdown_happened = True
                     console.print(f"    [bold red]-> MELTDOWN at step {step}[/bold red]")
                 step += 1
+
+            # After each episode, recompute Monte-Carlo returns for this episode
+            # and refit the RewardModel on its transitions.
+            if episode_rewards:
+                gamma = self.dataset.gamma
+                T = len(episode_rewards)
+                G_ep = np.zeros(T, dtype=float)
+                G_ep[-1] = episode_rewards[-1]
+                for t in range(T - 2, -1, -1):
+                    G_ep[t] = episode_rewards[t] + gamma * G_ep[t + 1]
+                X_ep = np.stack(episode_features)
+                idx_ep = list(range(T))
+                self.reward_model.fit(X_ep, G_ep, idx_ep)
 
             if not meltdown_happened:
                 console.print("    [green]-> no meltdown in this episode (greedy actor run)[/green]")
