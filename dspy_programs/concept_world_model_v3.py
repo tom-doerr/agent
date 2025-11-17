@@ -44,7 +44,7 @@ import numpy as np
 from pydantic import BaseModel, Field, ValidationError
 from rich.console import Console
 from rich.table import Table
-from sklearn.linear_model import LinearRegression, LogisticRegression, Ridge
+from sklearn.linear_model import LinearRegression, LogisticRegression, Ridge, Lasso
 from sklearn.metrics.pairwise import cosine_similarity
 from sklearn.metrics import mean_squared_error, r2_score
 
@@ -119,45 +119,29 @@ class ConceptUniverse:
 
 
 # --- Base STATE concepts (LLM-tagged) ---
-# You *can* remove/replace these; they are just a seed vocabulary.
+# Seed vocabulary is intentionally simple and text-centric so it can transfer
+# to other worlds: length, structure, tone, symbols.
 BASE_STATE_CONCEPTS = [
     Concept(
-        id="STRAINED_CORE",
-        definition=(
-            "The core is under unusually high internal stress, typically together with "
-            "repeated small disturbances or glitches."
-        ),
+        id="TEXT_LENGTHY",
+        definition="The log text is long (many words/clauses).",
         source=ConceptSource.LLM,
     ),
     Concept(
-        id="THIN_MARGIN",
-        definition=(
-            "Safety margins on the core are thin: the spare capacity or buffer is low, "
-            "leaving little room for further stress."
-        ),
+        id="STRUCTURED_TEXT",
+        definition="The text looks structured (lists, sections, repeated patterns).",
         source=ConceptSource.LLM,
     ),
     Concept(
-        id="STORMY_CHANNEL",
-        definition=(
-            "The energy channel is stormy: there have been several recent glitches or "
-            "spikes in a short timespan."
-        ),
+        id="TECHNICAL_TONE",
+        definition="The text sounds technical or formal (numbers, units, jargon).",
         source=ConceptSource.LLM,
     ),
     Concept(
-        id="AGITATED_OPERATOR",
+        id="SPECIAL_SYMBOLS",
         definition=(
-            "The human operator is clearly agitated or upset, showing annoyance or anger "
-            "about the system's behavior."
-        ),
-        source=ConceptSource.LLM,
-    ),
-    Concept(
-        id="CRITICAL_MODE",
-        definition=(
-            "The overall situation is critical: the core is strained, safety margins are thin, "
-            "and the operator is agitated, making a serious incident likely."
+            "The text contains special symbols beyond letters/digits "
+            "(brackets, hashes, unusual punctuation)."
         ),
         source=ConceptSource.LLM,
     ),
@@ -220,12 +204,16 @@ class ReactorEnv:
     actually sees interesting variation.
     """
 
-    def __init__(self, max_steps: int = 15, difficulty: float = 1.0):
+    def __init__(self, max_steps: int = 15, difficulty: float = 1.0, noise: float = 1.0):
         self.max_steps = max_steps
-        # Difficulty scales how unstable the reactor is: higher values
-        # increase glitch probability, stress drift, and tighten the
-        # meltdown thresholds slightly. Default 1.0 = baseline.
+        # Base difficulty scales how unstable the reactor is. We derive a
+        # current_difficulty from this and the step index so that difficulty
+        # ramps up within an episode but resets when the episode resets.
         self.difficulty = max(0.1, difficulty)
+        # Global noise factor that scales stochastic dynamics; 0.0 means
+        # deterministic updates from the drift terms only, >1.0 amplifies
+        # randomness.
+        self.noise = max(0.0, noise)
         self.reset()
 
     def reset(self) -> str:
@@ -240,6 +228,11 @@ class ReactorEnv:
         self.step_idx = 0
         self.meltdown = False
         return self._make_observation(last_action=None)
+
+    def current_difficulty(self) -> float:
+        """Difficulty ramp that increases with step index and resets each episode."""
+        progress = self.step_idx / max(self.max_steps, 1)
+        return self.difficulty * (1.0 + progress)
 
     def _update_mood(self):
         if self.stress < 60 and self.glitches < 2:
@@ -257,7 +250,7 @@ class ReactorEnv:
         stress_term = max(0.0, (self.stress - 40.0) / 50.0)  # 0..>1 above 40
         margin_term = max(0.0, (60.0 - self.margin) / 60.0)  # 0..>1 below 60
         base_p = 0.10 + 0.25 * stress_term + 0.25 * margin_term
-        base_p *= self.difficulty
+        base_p *= self.current_difficulty() * max(self.noise, 0.0)
         base_p = max(0.0, min(0.7, base_p))  # clamp
 
         if random.random() < base_p:
@@ -271,9 +264,10 @@ class ReactorEnv:
         # Deterministic meltdown rule; tuned so meltdowns are not ultra-rare.
         # Make meltdown more likely by lowering the stress threshold,
         # relaxing the margin constraint, and requiring fewer glitches.
-        # Difficulty >1 tightens thresholds slightly; <1 loosens them.
-        stress_thresh = 80.0 - 5.0 * (self.difficulty - 1.0)
-        margin_thresh = 35.0 + 5.0 * (self.difficulty - 1.0)
+        # Higher current_difficulty tightens thresholds slightly; lower loosens them.
+        cur = self.current_difficulty()
+        stress_thresh = 80.0 - 5.0 * (cur - 1.0)
+        margin_thresh = 35.0 + 5.0 * (cur - 1.0)
         if self.stress > stress_thresh and self.margin < margin_thresh and self.glitches >= 1:
             self.meltdown = True
 
@@ -333,6 +327,21 @@ class ReactorEnv:
                 ]
             )
 
+        # Indirectly hint at reactor power via steam/turbine behavior so the
+        # operator note carries a soft signal about output without quoting
+        # numbers.
+        if self.output < 0.4:
+            output_phrase = "The steam output feels anemic; turbines are barely loaded."
+        elif self.output < 0.9:
+            output_phrase = "Steam output feels normal; turbines hum steadily."
+        else:
+            output_phrase = "Steam output is heavy; turbines are straining a bit."
+
+        operator_msg_full = (
+            f"{operator_msg} {output_phrase} "
+            f"(measured reactor output={self.output:.3f})."
+        )
+
         if last_action is None:
             action_phrase = "No control adjustment yet this run."
         elif last_action == 0:
@@ -342,12 +351,22 @@ class ReactorEnv:
         else:
             action_phrase = "Operator pushes the core harder for more output."
 
+        # Red blinking warning light when the reactor operates in a risky band.
+        # Keep it simple: treat high stress/low margin or many glitches as the
+        # trigger and describe it textually.
+        if (self.stress > 80 and self.margin < 35) or self.glitches >= 3:
+            light_phrase = "A red warning light blinks on the console."
+        else:
+            light_phrase = ""
+
         obs_lines = [
             f"Reactor log step {self.step_idx}: {stress_phrase}, {margin_phrase}, {glitch_phrase}.",
             demand_phrase,
             f"{action_phrase}",
-            f"Operator note: \"{operator_msg}\"",
+            f"Operator note: \"{operator_msg_full}\"",
         ]
+        if light_phrase:
+            obs_lines.append(light_phrase)
         return " ".join(obs_lines)
 
     def step(self, action: int) -> Tuple[str, bool, bool]:
@@ -363,26 +382,27 @@ class ReactorEnv:
         # Dynamics tuned so PUSH tends to drive toward meltdown,
         # COOL tends to move away, STEADY dithers.
         if action == 0:  # steady
-            self.stress += random.uniform(-4, 6)
-            self.margin += random.uniform(-4, 4)
+            self.stress += random.uniform(-4, 6) * self.noise
+            self.margin += random.uniform(-4, 4) * self.noise
             # Hold output roughly steady with a little noise.
-            self.output += random.uniform(-0.05, 0.05)
+            self.output += random.uniform(-0.05, 0.05) * self.noise
         elif action == 1:  # cool
-            self.stress += random.uniform(-14, -1)
-            self.margin += random.uniform(2, 10)
+            self.stress += random.uniform(-14, -1) * self.noise
+            self.margin += random.uniform(2, 10) * self.noise
             # Cooling reduces output, with some randomness.
-            self.output += random.uniform(-0.25, -0.05)
+            self.output += random.uniform(-0.25, -0.05) * self.noise
         else:  # push
-            self.stress += random.uniform(6, 18)
-            self.margin += random.uniform(-12, 1)
+            self.stress += random.uniform(6, 18) * self.noise
+            self.margin += random.uniform(-12, 1) * self.noise
             self.glitches += random.randint(0, 2)
             # Pushing increases output, with some randomness.
-            self.output += random.uniform(0.05, 0.25)
+            self.output += random.uniform(0.05, 0.25) * self.noise
 
         # Time drift: later steps are intrinsically harder
         drift = self.step_idx / max(self.max_steps, 1)
-        self.stress += 2.0 * drift * self.difficulty
-        self.margin -= 2.0 * drift * self.difficulty
+        cur = self.current_difficulty()
+        self.stress += 2.0 * drift * cur
+        self.margin -= 2.0 * drift * cur
 
         self.stress = max(0.0, min(100.0, self.stress))
         self.margin = max(0.0, min(100.0, self.margin))
@@ -390,7 +410,8 @@ class ReactorEnv:
         self.output = max(0.0, min(2.0, self.output))
 
         # Occasionally flip demand to simulate changing grid needs.
-        if random.random() < 0.2:
+        p_flip = min(1.0, max(0.0, 0.2 * self.noise))
+        if random.random() < p_flip:
             self.demand = "high" if self.demand == "low" else "low"
 
         self._maybe_glitch()
@@ -425,8 +446,8 @@ class TagConcepts(dspy.Signature):
       - concepts: the list of STATE concepts to tag, each with id + definition.
 
     Output:
-      - activations_json: a JSON object matching the ConceptActivations schema:
-          {"activations": [{"concept_id": "...", "value": 0 or 1}, ...]}.
+      - activations: a structured object matching the ConceptActivations schema:
+          {"activations": [{"concept_id": "...", "value": true/false}, ...]}.
         For each input concept, you MUST output exactly one activation, with:
           - concept_id: EXACTLY one of the given concept ids.
           - value: true if the concept is clearly present in the observation,
@@ -441,11 +462,8 @@ class TagConcepts(dspy.Signature):
     concepts: List[Concept] = dspy.InputField(
         desc="List of STATE concept objects with 'id' and 'definition'."
     )
-    activations_json: str = dspy.OutputField(
-        desc=(
-            "JSON string matching ConceptActivations: "
-            '{"activations": [{"concept_id": "...", "value": 0 or 1}, ...]}.'
-        )
+    activations: ConceptActivations = dspy.OutputField(
+        desc="Structured ConceptActivations object for the given concepts."
     )
 
 
@@ -468,15 +486,17 @@ class LLMConceptTagger(dspy.Module):
         state_concepts = universe.state_concepts
         out = self.predict(observation=observation, concepts=state_concepts)
         try:
-            activations = ConceptActivations.model_validate_json(out.activations_json)
+            # Allow either a ConceptActivations instance, a dict-like object,
+            # or a JSON string; Pydantic will validate/convert accordingly.
+            activations = ConceptActivations.model_validate(out.activations)
         except ValidationError as exc:
             console.rule(
                 "[bold red]Pydantic validation error in LLM TAG OUTPUT (ConceptActivations)[/bold red]"
             )
             console.print(
-                "[red]Failed to parse ConceptActivations from activations_json.[/red]"
+                "[red]Failed to parse ConceptActivations from 'activations' output.[/red]"
             )
-            console.print(f"[red]Raw activations_json:[/red] {out.activations_json!r}")
+            console.print(f"[red]Raw activations output:[/red] {getattr(out, 'activations', None)!r}")
             console.print(exc)
             raise
         K_state = len(state_concepts)
@@ -695,7 +715,8 @@ class RewardModel:
     """
 
     def __init__(self):
-        self.model = LinearRegression()
+        # Use a simple linear model with mild L2 regularization.
+        self.model = Ridge(alpha=0.1)
         self.n_features: Optional[int] = None
 
     def fit(self, X: np.ndarray, G: np.ndarray, idx: List[int]):
@@ -741,7 +762,7 @@ class NewConceptSpec(BaseModel):
 
 class ProposeNewConcept(dspy.Signature):
     """
-    Create a new, more abstract STATE concept from a pattern over existing concepts.
+    Create a new, more abstract STATE concept that explains a pattern over existing concepts.
 
     Inputs:
       - all_concepts: the full current concept set (IDs + defs) for context.
@@ -751,9 +772,12 @@ class ProposeNewConcept(dspy.Signature):
       - negative_examples: logs where it does not.
 
     Task:
-      - Invent a new concept that captures the underlying situation in the positive
-        examples and excludes the negative ones.
-      - Concept should be more abstract than just "A AND B"; don't just list IDs.
+      - Invent a new concept that captures a plausible underlying situation or cause
+        that makes the pattern_concepts tend to be true together in the positive
+        examples and not in the negative ones.
+      - Concept should be more abstract than just "A AND B"; do NOT simply restate
+        or conjoin the input concept names. Describe a latent condition that could
+        generate their correlation.
       - Output:
           * ID in UPPER_SNAKE_CASE, no spaces.
           * One-sentence definition (~<=25 tokens).
@@ -765,10 +789,13 @@ class ProposeNewConcept(dspy.Signature):
         desc="Full current concept set (STATE, ACTION, MODEL)."
     )
     pattern_concepts: List[Concept] = dspy.InputField(
-        desc="STATE concepts directly involved in the high-reward pattern."
+        desc=(
+            "STATE concepts directly involved in the high-value, highly correlated "
+            "pattern we want to explain."
+        )
     )
     pattern_description: str = dspy.InputField(
-        desc="Short description of the pattern we want to abstract."
+        desc="Short description of the correlated pattern we want to explain."
     )
     positive_examples: List[str] = dspy.InputField(
         desc="Example logs where the pattern holds."
@@ -919,8 +946,11 @@ class PairwiseConceptDiscovery:
             neg_examples = [dataset.observations[k] for k in neg_idx[:5]]
 
             pattern_desc = (
-                f"Situations where both {cid_i} and {cid_j} are true in the same log; "
-                f"these co-occurrences tend to reflect especially important conditions."
+                "Situations where both "
+                f"{cid_i} and {cid_j} are true in the same log, and their "
+                "discounted future-occupancy weights are strongly correlated. "
+                "Explain a single underlying situation or cause that would make "
+                "both of these concepts tend to be true together in those cases."
             )
             pattern_concepts = [state_concepts[i], state_concepts[j]]
 
@@ -963,9 +993,11 @@ class Experiment:
         eps_greedy: float = 0.0,
         corr_threshold: float = 0.0,
         difficulty: float = 1.0,
+        max_concepts: int = 10,
+        noise: float = 1.0,
     ):
         self.num_episodes = num_episodes
-        self.env = ReactorEnv(max_steps=max_steps, difficulty=difficulty)
+        self.env = ReactorEnv(max_steps=max_steps, difficulty=difficulty, noise=noise)
         self.universe = BASE_UNIVERSE  # includes STATE + ACTION + MODEL defs
         self.tagger = LLMConceptTagger()
         self.dataset = EpisodeDataset(gamma=gamma)
@@ -986,6 +1018,27 @@ class Experiment:
         # Map meta-concept id -> tuple of parent concept ids that generated it.
         # Used to avoid reusing the same parent pair over and over.
         self.concept_parents: Dict[str, Tuple[str, str]] = {}
+        # Track how often each concept ends up with zero reward-model weight
+        # across fits; used to identify concepts that might be droppable.
+        self.concept_zero_counts: Dict[str, int] = {}
+        self.concept_fit_updates: int = 0
+        # Track cumulative importance scores per concept across fits so we can
+        # compute a simple average importance for pruning.
+        self.concept_importance_sums: Dict[str, float] = {}
+        self.concept_importance_updates: int = 0
+        # Global replay-style buffers for greedy episodes: we keep all
+        # (state, action, return) samples and always train the RewardModel on
+        # the full accumulated dataset, padding missing concepts with 0.
+        self.memory_states: List[Dict[str, int]] = []
+        self.memory_actions: List[int] = []
+        self.memory_returns: List[float] = []
+        # Track which STATE concepts were introduced in the most recent
+        # future-occupancy analysis so we can avoid immediately pruning the
+        # ones we just created.
+        self.new_state_concepts_last_analysis: List[str] = []
+        # Hard cap on total concepts; if exceeded, we drop the concept that
+        # has been zero-weight most often in the reward model. Default 15.
+        self.max_concepts = max_concepts
 
     def _update_concept_importance(self) -> None:
         """
@@ -1006,6 +1059,59 @@ class Experiment:
         for idx, cid in self.universe.idx_to_id.items():
             importance[cid] = float(scores[idx])
         self.concept_importance = importance
+        # Maintain running sums so we can estimate average importance per
+        # concept across fits.
+        self.concept_importance_updates += 1
+        for cid, score in importance.items():
+            self.concept_importance_sums[cid] = (
+                self.concept_importance_sums.get(cid, 0.0) + score
+            )
+
+    def _update_zero_weight_counts(self, coef_arr: np.ndarray) -> None:
+        """
+        Increment a counter for any concept whose reward-model coefficient is
+        effectively zero in this fit. Concepts that remain zero across many
+        fits are natural candidates for pruning.
+        """
+        self.concept_fit_updates += 1
+        for idx, cid in self.universe.idx_to_id.items():
+            if idx >= coef_arr.size:
+                continue
+            if float(abs(coef_arr[idx])) < 1e-6:
+                self.concept_zero_counts[cid] = self.concept_zero_counts.get(cid, 0) + 1
+
+    def _build_training_data(self) -> Tuple[np.ndarray, np.ndarray]:
+        """
+        Build full training arrays X_all, G_all from all stored samples,
+        embedding per-step state dicts and actions into the current concept
+        universe. STATE concepts that did not exist when a sample was
+        collected are treated as 0 (missing / no information).
+        """
+        n = len(self.memory_states)
+        K = self.universe.K
+        if n == 0:
+            return np.zeros((0, K), dtype=float), np.zeros(0, dtype=float)
+
+        X = np.zeros((n, K), dtype=float)
+        G = np.asarray(self.memory_returns, dtype=float)
+
+        action_ids = ["ACTION_STEADY", "ACTION_COOL", "ACTION_PUSH"]
+
+        for i in range(n):
+            state_dict = self.memory_states[i]
+            action = self.memory_actions[i]
+            # Embed STATE concepts by id.
+            for idx, concept in enumerate(self.universe.concepts):
+                if concept.source == ConceptSource.LLM:
+                    X[i, idx] = float(state_dict.get(concept.id, 0))
+            # Embed ACTION as one-hot.
+            if action in (0, 1, 2):
+                cid = action_ids[action]
+                if cid in self.universe.id_to_idx:
+                    j_act = self.universe.id_to_idx[cid]
+                    X[i, j_act] = 1.0
+
+        return X, G
 
     def _analyze_concept_future(
         self,
@@ -1020,6 +1126,9 @@ class Experiment:
         """
         if not state_traces:
             return
+
+        # Reset record of newly added STATE concepts for this analysis run.
+        self.new_state_concepts_last_analysis = []
 
         gamma_c = 0.9
         Z_list: List[np.ndarray] = []
@@ -1196,6 +1305,8 @@ class Experiment:
                             used_pairs.add(pair_key)
                             if hasattr(self, "total_new_concepts"):
                                 self.total_new_concepts += 1
+                            if hasattr(self, "new_state_concepts_last_analysis"):
+                                self.new_state_concepts_last_analysis.append(new_c.id)
 
                 if printed >= max_pairs:
                     break
@@ -1275,10 +1386,11 @@ class Experiment:
             meltdown_happened = False
             ep_reward = 0.0
             ep_steps = 0
-            episode_features: List[np.ndarray] = []
             episode_rewards: List[float] = []
             episode_states: List[np.ndarray] = []
             episode_obs: List[str] = []
+            episode_state_dicts: List[Dict[str, int]] = []
+            episode_actions: List[int] = []
             console.print(
                 f"\n[bold green]Episode {ep + 1}/{num_episodes}[/bold green]:"
             )
@@ -1292,6 +1404,13 @@ class Experiment:
                     a = random.choice([0, 1, 2])
                 a_name = action_names.get(a, f"unknown({a})")
 
+                # Snapshot state dict with current STATE concept ids so we can
+                # safely embed later even if the universe grows.
+                state_dict = {
+                    c.id: int(state_vec[j])
+                    for j, c in enumerate(self.universe.state_concepts)
+                }
+
                 # Build full feature vector for (state_vec, a)
                 K_state = len(self.universe.state_concepts)
                 K = self.universe.K
@@ -1304,6 +1423,8 @@ class Experiment:
                 full_state[j_act] = 1.0
 
                 episode_obs.append(obs)
+                episode_state_dicts.append(state_dict)
+                episode_actions.append(a)
                 obs, done, meltdown = self.env.step(a)
                 # Continuous reward based on reactor output with a strong
                 # penalty on meltdown. Higher output is better, especially
@@ -1320,7 +1441,6 @@ class Experiment:
                 ep_steps += 1
                 total_reward += reward
                 total_steps += 1
-                episode_features.append(full_state)
                 episode_rewards.append(reward)
                 episode_states.append(state_vec.copy())
 
@@ -1353,16 +1473,19 @@ class Experiment:
                     f"[yellow]avg_reward_episode[/yellow]={avg_reward_ep:.3f} | "
                     f"[green]concept_importance[/green]=[{imp_str}] | "
                     f"[green]concepts_added_total[/green]={added_total} | "
-                    f"[green]samples_total[/green]={samples_so_far}"
+                    f"[green]samples_total[/green]={samples_so_far} | "
+                    f"[green]difficulty[/green]={self.env.current_difficulty():.2f}"
                 )
+                console.print(f"    [white]observation[/white]: {obs}")
 
                 if meltdown and not meltdown_happened:
                     meltdown_happened = True
                     console.print(f"    [bold red]-> MELTDOWN at step {step}[/bold red]")
                 step += 1
 
-            # After each episode, recompute Monte-Carlo returns for this episode
-            # and refit the RewardModel on its transitions.
+            # After each episode, recompute Monte-Carlo returns for this
+            # episode and add them to the global replay buffers. We then
+            # refit the RewardModel on all accumulated samples so far.
             if episode_rewards:
                 gamma = self.dataset.gamma
                 T = len(episode_rewards)
@@ -1370,11 +1493,44 @@ class Experiment:
                 G_ep[-1] = episode_rewards[-1]
                 for t in range(T - 2, -1, -1):
                     G_ep[t] = episode_rewards[t] + gamma * G_ep[t + 1]
-                X_ep = np.stack(episode_features)
-                idx_ep = list(range(T))
-                self.reward_model.fit(X_ep, G_ep, idx_ep)
-                # Update concept importance after each greedy episode fit
-                self._update_concept_importance()
+                for t in range(T):
+                    self.memory_states.append(episode_state_dicts[t])
+                    self.memory_actions.append(episode_actions[t])
+                    self.memory_returns.append(G_ep[t])
+
+                X_all, G_all = self._build_training_data()
+                idx_all = list(range(len(self.memory_returns)))
+                if idx_all:
+                    self.reward_model.fit(X_all, G_all, idx_all)
+                    # Update concept importance after each greedy episode fit
+                    self._update_concept_importance()
+                    # Tiny summary of the reward predictor fit using all data.
+                    coef = getattr(self.reward_model.model, "coef_", None)
+                    if coef is not None:
+                        coef_arr = np.asarray(coef).ravel()
+                        abs_coef = np.abs(coef_arr)
+                        # Track which concepts are effectively unused in this fit.
+                        self._update_zero_weight_counts(coef_arr)
+                        top_idx = np.argsort(-abs_coef)[:3]
+                        top_terms = []
+                        for j in top_idx:
+                            if abs_coef[j] == 0.0:
+                                continue
+                            cid_feat = self.universe.idx_to_id.get(j, f"idx{j}")
+                            top_terms.append(f"{cid_feat}:{coef_arr[j]:.3f}")
+                        top_str = ", ".join(top_terms) if top_terms else "all ~0"
+                        always_zero = [
+                            cid
+                            for cid in self.universe.idx_to_id.values()
+                            if self.concept_zero_counts.get(cid, 0)
+                            == self.concept_fit_updates
+                        ]
+                        console.print(
+                            f"[magenta]Fitted reward model[/magenta]: "
+                            f"samples={len(idx_all)}, mean_G={G_all.mean():.3f}, "
+                            f"top_weights=[{top_str}], "
+                            f"always_zero={always_zero}"
+                        )
 
             if episode_states:
                 # After this episode, analyze its future concept-occupancy
@@ -1384,6 +1540,43 @@ class Experiment:
                     [np.stack(episode_states)],
                     [episode_obs],
                 )
+                # If we've exceeded the max concept budget, drop the STATE
+                # concept with the lowest average importance under the
+                # RewardModel so far (ties broken arbitrarily). Do not drop
+                # concepts that were just created in this analysis run.
+                if self.universe.K > self.max_concepts and self.concept_importance_sums:
+                    # Do not drop ACTION or MODEL concepts; only STATE.
+                    recent_new = set(
+                        getattr(self, "new_state_concepts_last_analysis", [])
+                    )
+                    candidates = [
+                        cid
+                        for cid, concept in zip(
+                            self.universe.ids, self.universe.concepts
+                        )
+                        if concept.source == ConceptSource.LLM and cid not in recent_new
+                    ]
+                    if candidates:
+                        # Compute simple average importance per candidate.
+                        denom = max(self.concept_importance_updates, 1)
+                        def avg_importance(cid: str) -> float:
+                            return self.concept_importance_sums.get(cid, 0.0) / denom
+
+                        drop_cid = min(candidates, key=avg_importance)
+                        drop_idx = self.universe.id_to_idx.get(drop_cid)
+                        if drop_idx is not None:
+                            avg_imp = avg_importance(drop_cid)
+                            console.print(
+                                f"[magenta]Dropping concept[/magenta]: {drop_cid} "
+                                f"(avg_importance={avg_imp:.3f} over "
+                                f"{self.concept_importance_updates} fits)"
+                            )
+                            new_concepts = [
+                                c
+                                for i, c in enumerate(self.universe.concepts)
+                                if i != drop_idx
+                            ]
+                            self.universe = ConceptUniverse(new_concepts)
 
                 # Episode summary: average reward and meltdown flag.
                 if ep_steps:
@@ -1393,6 +1586,29 @@ class Experiment:
                     )
                     episode_summaries.append(
                         (ep + 1, ep_reward, ep_steps, meltdown_happened)
+                    )
+                    # Print running per-episode totals so far.
+                    cumulative = 0.0
+                    console.print("    [cyan]Episode totals so far:[/cyan]")
+                    for idx, total, steps, melted in episode_summaries:
+                        cumulative += total
+                        avg_so_far = total / steps if steps else 0.0
+                        status = "MELTDOWN" if melted else "no-meltdown"
+                        console.print(
+                            f"      [cyan]Episode {idx}[/cyan]: "
+                            f"total={total:.3f}, avg={avg_so_far:.3f}, status={status}"
+                        )
+                    # Running average reward per episode across all completed
+                    # episodes so far (based on total rewards).
+                    if episode_summaries:
+                        running_avg = cumulative / len(episode_summaries)
+                    else:
+                        running_avg = 0.0
+                    console.print(
+                        f"    [cyan]Cumulative total reward[/cyan]: {cumulative:.3f}"
+                    )
+                    console.print(
+                        f"    [cyan]Running avg episode reward[/cyan]: {running_avg:.3f}"
                     )
                 if not meltdown_happened:
                     console.print(
@@ -1482,6 +1698,26 @@ def main(argv: Optional[List[str]] = None):
             "tighter meltdown thresholds). Default: 1.0."
         ),
     )
+    parser.add_argument(
+        "--noise",
+        type=float,
+        default=1.0,
+        help=(
+            "Global noise factor for stochastic dynamics (0 = no random "
+            "perturbations in stress/margin/output; 1 = default levels; "
+            ">1 amplifies noise). Default: 1.0."
+        ),
+    )
+    parser.add_argument(
+        "--max-concepts",
+        type=int,
+        default=15,
+        help=(
+            "Maximum total concepts in the universe before we drop the "
+            "STATE concept with the highest zero-weight count in the reward "
+            "model. Default: 15."
+        ),
+    )
 
     args = parser.parse_args(argv)
 
@@ -1496,6 +1732,8 @@ def main(argv: Optional[List[str]] = None):
         eps_greedy=args.epsilon,
         corr_threshold=args.corr_threshold,
         difficulty=args.difficulty,
+        max_concepts=args.max_concepts,
+        noise=args.noise,
     )
     exp.run()
 
