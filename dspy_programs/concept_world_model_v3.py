@@ -41,6 +41,8 @@ from typing import Dict, List, Optional, Tuple
 
 import numpy as np
 from pydantic import BaseModel, Field
+from rich.console import Console
+from rich.table import Table
 from sklearn.linear_model import LinearRegression
 from sklearn.metrics import mean_squared_error, r2_score
 
@@ -50,6 +52,9 @@ import dspy
 # =========================
 # 1. LM + CONCEPTS
 # =========================
+
+# Rich console for pretty output
+console = Console()
 
 # Configure DSPy LM. Adjust the model string to whatever you actually use.
 LM = dspy.LM(model="openrouter/deepseek/deepseek-v3.2-exp")
@@ -343,6 +348,11 @@ class ReactorEnv:
             self.stress += random.uniform(6, 18)
             self.margin += random.uniform(-12, 1)
             self.glitches += random.randint(0, 2)
+
+        # Time drift: later steps are intrinsically harder
+        drift = self.step_idx / max(self.max_steps, 1)
+        self.stress += 2.0 * drift
+        self.margin -= 2.0 * drift
 
         self.stress = max(0.0, min(100.0, self.stress))
         self.margin = max(0.0, min(100.0, self.margin))
@@ -901,40 +911,57 @@ class Experiment:
         random.seed(42)
         np.random.seed(42)
 
-        print(
-            f"Simulating {self.num_episodes} episodes with up to "
-            f"{self.env.max_steps} steps each (RANDOM actions)..."
+        console.rule("[bold cyan]Random Policy Simulation[/bold cyan]")
+        console.print(
+            f"[cyan]Simulating[/cyan] {self.num_episodes} [cyan]episodes with up to[/cyan] "
+            f"{self.env.max_steps} [cyan]steps each (RANDOM actions)...[/cyan]"
         )
         self.dataset.simulate_random(self.env, num_episodes=self.num_episodes)
         n_steps_total = len(self.dataset.observations)
-        print(f"Total decision steps collected: {n_steps_total}")
+        console.print(f"[cyan]Total decision steps collected:[/cyan] {n_steps_total}")
 
-        print("\n[Pass 1] Tagging STATE concepts (one LLM call per step)...")
+        console.rule("[bold cyan]Pass 1: Tag STATE Concepts[/bold cyan]")
+        console.print("[cyan]Tagging STATE concepts (one LLM call per step)...[/cyan]")
         self.dataset.tag_all_state(self.tagger, self.universe)
 
-        print("\nBuilding discounted cumulative reward labels (Monte-Carlo G_t)...")
+        console.rule("[bold cyan]Monte-Carlo Returns[/bold cyan]")
+        console.print("[cyan]Building discounted cumulative reward labels (G_t)...[/cyan]")
         G = self.dataset.build_discounted_reward()
 
         # Baseline: random policy discounted return stats
-        print("\n=== Baseline: random policy (behavior) ===")
-        # Episode-level meltdown rate
         num_eps = len(self.dataset.meltdown_flags)
         num_meltdowns = sum(1 for f in self.dataset.meltdown_flags if f)
         meltdown_rate = num_meltdowns / num_eps if num_eps > 0 else 0.0
-        print(f"Episodes: {num_eps} | Meltdowns: {num_meltdowns} | Meltdown rate: {meltdown_rate:.3f}")
+        console.rule("[bold magenta]Baseline: Random Policy (Behavior)[/bold magenta]")
+        console.print(
+            f"[magenta]Episodes:[/magenta] {num_eps}  |  "
+            f"[magenta]Meltdowns:[/magenta] {num_meltdowns}  |  "
+            f"[magenta]Meltdown rate:[/magenta] {meltdown_rate:.3f}"
+        )
 
-        # Per-action average discounted return
+        self.baseline_overall_mean = float(G.mean()) if len(G) > 0 else 0.0
+        self.baseline_action_means: Dict[int, float] = {}
         action_names = {0: "steady", 1: "cool", 2: "push"}
+        table = Table(title="Baseline action returns (random policy)")
+        table.add_column("Action", justify="left")
+        table.add_column("Mean G_t", justify="right")
+        table.add_column("# Steps", justify="right")
         for a in (0, 1, 2):
             idxs = [i for i, act in enumerate(self.dataset.actions) if act == a]
             if not idxs:
-                print(f"Action {action_names[a]:6s}: no samples under random policy")
+                table.add_row(action_names[a], "—", "0")
                 continue
             mean_g = float(G[idxs].mean())
-            print(f"Action {action_names[a]:6s}: mean discounted return G_t = {mean_g:.3f} over {len(idxs)} steps")
+            self.baseline_action_means[a] = mean_g
+            table.add_row(action_names[a], f"{mean_g:.3f}", str(len(idxs)))
+        console.print(table)
 
         train_idx, test_idx = self.dataset.train_test_split_by_episode(test_frac=0.2)
-        print(f"Train steps: {len(train_idx)} | Test steps: {len(test_idx)}")
+        console.rule("[bold cyan]Train / Test Split[/bold cyan]")
+        console.print(
+            f"[cyan]Train steps:[/cyan] {len(train_idx)}  |  "
+            f"[cyan]Test steps:[/cyan] {len(test_idx)}"
+        )
 
         new_concepts_with_parents = self.discovery.discover(
             self.universe,
@@ -1007,30 +1034,55 @@ class Experiment:
     def run_greedy_actor_demo(self, num_episodes: int = 3):
         action_names = {0: "steady", 1: "cool", 2: "push"}
 
-        print("\n=== Greedy Actor Demo (using RewardModel, actions & reward as concepts) ===")
+        console.rule("[bold green]Greedy Actor Demo (using RewardModel)[/bold green]")
+        baseline_overall = getattr(self, "baseline_overall_mean", 0.0)
+        baseline_action_means = getattr(self, "baseline_action_means", {})
+        total_reward = 0.0
+        total_steps = 0
+
         for ep in range(num_episodes):
             obs = self.env.reset()
             done = False
             step = 0
             meltdown_happened = False
-            print(f"\nEpisode {ep}:")
+            ep_reward = 0.0
+            ep_steps = 0
+            console.print(f"\n[bold green]Episode {ep}[/bold green]:")
             while not done:
                 state_vec = self.tagger.tag_state(obs, self.universe)
                 a, preds = self._greedy_action(state_vec)
                 a_name = action_names.get(a, f"unknown({a})")
-                print(
-                    f"  step {step}: action={a_name} (raw={a}) | "
-                    f"predicted_return_per_action={np.round(preds, 3)}"
+                obs, done, meltdown = self.env.step(a)
+                reward = 0.0 if meltdown else 1.0
+                ep_reward += reward
+                ep_steps += 1
+                total_reward += reward
+                total_steps += 1
+
+                avg_reward_global = total_reward / total_steps if total_steps else 0.0
+                avg_reward_ep = ep_reward / ep_steps if ep_steps else 0.0
+
+                base_means = [
+                    baseline_action_means.get(i, float("nan")) for i in (0, 1, 2)
+                ]
+
+                console.print(
+                    f"  [white]step {step}[/white]: "
+                    f"[bold]action[/bold]={a_name} (raw={a}) | "
+                    f"[cyan]predicted_return_per_action[/cyan]={np.round(preds, 3)} | "
+                    f"[magenta]baseline_mean_G[/magenta]={baseline_overall:.3f} | "
+                    f"[magenta]baseline_action_means[/magenta]={np.round(base_means, 3)} | "
+                    f"[yellow]avg_reward_global[/yellow]={avg_reward_global:.3f} | "
+                    f"[yellow]avg_reward_episode[/yellow]={avg_reward_ep:.3f}"
                 )
 
-                obs, done, meltdown = self.env.step(a)
                 if meltdown and not meltdown_happened:
                     meltdown_happened = True
-                    print(f"    -> MELTDOWN at step {step}")
+                    console.print(f"    [bold red]-> MELTDOWN at step {step}[/bold red]")
                 step += 1
 
             if not meltdown_happened:
-                print("    -> no meltdown in this episode (greedy actor run)")
+                console.print("    [green]-> no meltdown in this episode (greedy actor run)[/green]")
 
 
 # =========================
