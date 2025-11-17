@@ -997,7 +997,7 @@ class Experiment:
 
         print("\nDone. Concept-learning + reward modeling complete.")
         print("Now running a greedy-actor demo using predicted cumulative reward per action...")
-        self.run_greedy_actor_demo(num_episodes=3)
+        self.run_greedy_actor_demo(num_episodes=self.num_episodes)
 
     def _greedy_action(self, state_vec_state_only: np.ndarray) -> Tuple[int, np.ndarray]:
         """
