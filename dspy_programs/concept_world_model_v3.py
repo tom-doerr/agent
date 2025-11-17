@@ -43,7 +43,8 @@ import numpy as np
 from pydantic import BaseModel, Field
 from rich.console import Console
 from rich.table import Table
-from sklearn.linear_model import LinearRegression
+from sklearn.linear_model import LinearRegression, LogisticRegression, Ridge
+from sklearn.metrics.pairwise import cosine_similarity
 from sklearn.metrics import mean_squared_error, r2_score
 
 import dspy
@@ -943,6 +944,86 @@ class Experiment:
             importance[cid] = float(scores[idx])
         self.concept_importance = importance
 
+    def _analyze_concept_future(self, state_traces: List[np.ndarray]) -> None:
+        """
+        For each concept j, compute a discounted future-occurrence signal S_j(t)
+        over the collected STATE traces, then train a tiny linear predictor
+        S_j(t) ≈ w_j^T Z_state(t). Use cosine similarity between w_j vectors
+        to identify strongly correlated concept pairs.
+        """
+        if not state_traces:
+            return
+
+        gamma_c = 0.9
+        Z_list: List[np.ndarray] = []
+        S_list: List[np.ndarray] = []
+
+        for Z_ep in state_traces:
+            if Z_ep.size == 0:
+                continue
+            Z_ep = Z_ep.astype(float)
+            T, K_state = Z_ep.shape
+            S_ep = np.zeros_like(Z_ep, dtype=float)
+            S_ep[-1] = Z_ep[-1]
+            for t in range(T - 2, -1, -1):
+                S_ep[t] = Z_ep[t] + gamma_c * S_ep[t + 1]
+            Z_list.append(Z_ep)
+            S_list.append(S_ep)
+
+        if not Z_list:
+            return
+
+        Z_all = np.vstack(Z_list)
+        S_all = np.vstack(S_list)
+        _, K_state = Z_all.shape
+
+        W = np.zeros((K_state, K_state), dtype=float)
+        for j in range(K_state):
+            # Binary target: does concept j appear at or after t?
+            y = (S_all[:, j] > 0).astype(int)
+            if y.mean() in (0.0, 1.0):
+                continue  # constant target, skip
+            clf = LogisticRegression(
+                penalty="l2",
+                solver="lbfgs",
+                max_iter=1000,
+            )
+            clf.fit(Z_all, y)
+            W[j] = clf.coef_.ravel()
+
+        console.rule("[bold blue]Concept Future-Occupancy Structure[/bold blue]")
+        # If all-zero, nothing to report
+        if not np.any(W):
+            console.print(
+                "[blue]Future-occupancy predictors are all zero/constant; "
+                "no structure to report.[/blue]"
+            )
+            return
+
+        sim = cosine_similarity(W)
+        state_ids = self.universe.state_ids
+        printed = 0
+        for j in range(K_state):
+            for k in range(j + 1, K_state):
+                if np.allclose(W[j], 0) or np.allclose(W[k], 0):
+                    continue
+                if sim[j, k] > 0.8:
+                    console.print(
+                        f"[blue]Pair[/blue] {state_ids[j]} & {state_ids[k]} | "
+                        f"cosine_sim={sim[j, k]:.3f}"
+                    )
+                    printed += 1
+                    if printed >= 5:
+                        break
+            if printed >= 5:
+                break
+
+        if printed == 0:
+            console.print(
+                "[blue]No strong concept-weight correlations found "
+                "in future-occupancy predictors.[/blue]"
+            )
+
     def run(self):
         random.seed(42)
         np.random.seed(42)
@@ -1005,6 +1086,8 @@ class Experiment:
         total_reward = 0.0
         total_steps = 0
 
+        state_traces: List[np.ndarray] = []
+
         for ep in range(num_episodes):
             obs = self.env.reset()
             done = False
@@ -1014,6 +1097,7 @@ class Experiment:
             ep_steps = 0
             episode_features: List[np.ndarray] = []
             episode_rewards: List[float] = []
+            episode_states: List[np.ndarray] = []
             console.print(
                 f"\n[bold green]Episode {ep + 1}/{num_episodes}[/bold green]:"
             )
@@ -1068,6 +1152,7 @@ class Experiment:
                 total_steps += 1
                 episode_features.append(full_state)
                 episode_rewards.append(reward)
+                episode_states.append(state_vec.copy())
 
                 avg_reward_global = total_reward / total_steps if total_steps else 0.0
                 avg_reward_ep = ep_reward / ep_steps if ep_steps else 0.0
@@ -1119,8 +1204,14 @@ class Experiment:
                 # Update concept importance after each greedy episode fit
                 self._update_concept_importance()
 
+            if episode_states:
+                state_traces.append(np.stack(episode_states))
+
             if not meltdown_happened:
                 console.print("    [green]-> no meltdown in this episode (greedy actor run)[/green]")
+
+        # After all episodes, analyze future concept-occupancy structure.
+        self._analyze_concept_future(state_traces)
 
 
 # =========================
