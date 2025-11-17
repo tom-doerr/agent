@@ -913,16 +913,14 @@ class Experiment:
         random.seed(42)
         np.random.seed(42)
 
-        console.rule("[bold cyan]Random Policy Simulation[/bold cyan]")
+        console.rule("[bold cyan]Warmup: Random Policy (1 episode)[/bold cyan]")
 
         # Hard-coded warmup: collect exactly one random-policy episode for training.
-        warmup_episodes = 1
         console.print(
-            f"[cyan]Simulating[/cyan] {self.num_episodes} [cyan]episodes with up to[/cyan] "
-            f"{self.env.max_steps} [cyan]steps each (RANDOM actions)...[/cyan]\n"
-            f"[yellow](Warmup uses 1 random episode for training; remaining episodes are greedy.)[/yellow]"
+            f"[cyan]Simulating 1 warmup episode with up to[/cyan] "
+            f"{self.env.max_steps} [cyan]steps each (RANDOM actions)...[/cyan]"
         )
-        self.dataset.simulate_random(self.env, num_episodes=warmup_episodes)
+        self.dataset.simulate_random(self.env, num_episodes=1)
         n_steps_total = len(self.dataset.observations)
         console.print(f"[cyan]Total decision steps collected:[/cyan] {n_steps_total}")
 
