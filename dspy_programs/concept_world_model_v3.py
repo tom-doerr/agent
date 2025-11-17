@@ -908,64 +908,98 @@ class Experiment:
             min_support=0.05,
         )
         self.eps_greedy = eps_greedy
+        self.concept_importance: Dict[str, float] = {}
+
+    def _update_concept_importance(self) -> None:
+        """
+        Compute a simple importance score per concept from the current RewardModel:
+        normalized |coef| over the feature dimensions.
+        """
+        coef = getattr(self.reward_model.model, "coef_", None)
+        if coef is None:
+            self.concept_importance = {}
+            return
+        coef_arr = np.asarray(coef).ravel()
+        abs_coef = np.abs(coef_arr)
+        if abs_coef.max() == 0:
+            scores = abs_coef
+        else:
+            scores = abs_coef / abs_coef.max()
+        importance: Dict[str, float] = {}
+        for idx, cid in self.universe.idx_to_id.items():
+            importance[cid] = float(scores[idx])
+        self.concept_importance = importance
 
     def run(self):
         random.seed(42)
         np.random.seed(42)
 
-        console.rule("[bold cyan]Warmup: Random Policy (1 episode)[/bold cyan]")
+        console.rule("[bold cyan]Warmup: Random Policy[/bold cyan]")
 
-        # Hard-coded warmup: collect exactly one random-policy episode for training.
-        console.print(
-            f"[cyan]Simulating 1 warmup episode with up to[/cyan] "
-            f"{self.env.max_steps} [cyan]steps each (RANDOM actions)...[/cyan]"
-        )
-        self.dataset.simulate_random(self.env, num_episodes=1)
-        n_steps_total = len(self.dataset.observations)
-        console.print(f"[cyan]Total decision steps collected:[/cyan] {n_steps_total}")
+        # Collect random-policy episodes until we have enough train steps
+        # for an initial RewardModel fit.
+        warmup_episodes = 1
+        min_train_steps = 10
+        while True:
+            console.print(
+                f"[cyan]Simulating {warmup_episodes} warmup episode(s) with up to[/cyan] "
+                f"{self.env.max_steps} [cyan]steps each (RANDOM actions)...[/cyan]"
+            )
+            self.dataset.simulate_random(self.env, num_episodes=warmup_episodes)
+            n_steps_total = len(self.dataset.observations)
+            console.print(f"[cyan]Total decision steps collected:[/cyan] {n_steps_total}")
 
-        console.rule("[bold cyan]Pass 1: Tag STATE Concepts[/bold cyan]")
-        console.print("[cyan]Tagging STATE concepts (one LLM call per step)...[/cyan]")
-        self.dataset.tag_all_state(self.tagger, self.universe)
+            console.rule("[bold cyan]Pass 1: Tag STATE Concepts[/bold cyan]")
+            console.print("[cyan]Tagging STATE concepts (one LLM call per step)...[/cyan]")
+            self.dataset.tag_all_state(self.tagger, self.universe)
 
-        console.rule("[bold cyan]Monte-Carlo Returns[/bold cyan]")
-        console.print("[cyan]Building discounted cumulative reward labels (G_t)...[/cyan]")
-        G = self.dataset.build_discounted_reward()
+            console.rule("[bold cyan]Monte-Carlo Returns[/bold cyan]")
+            console.print("[cyan]Building discounted cumulative reward labels (G_t)...[/cyan]")
+            G = self.dataset.build_discounted_reward()
 
-        # Baseline: random policy discounted return stats
-        num_eps = len(self.dataset.meltdown_flags)
-        num_meltdowns = sum(1 for f in self.dataset.meltdown_flags if f)
-        meltdown_rate = num_meltdowns / num_eps if num_eps > 0 else 0.0
-        console.rule("[bold magenta]Baseline: Random Policy (Behavior)[/bold magenta]")
-        console.print(
-            f"[magenta]Episodes:[/magenta] {num_eps}  |  "
-            f"[magenta]Meltdowns:[/magenta] {num_meltdowns}  |  "
-            f"[magenta]Meltdown rate:[/magenta] {meltdown_rate:.3f}"
-        )
+            # Baseline: random policy discounted return stats
+            num_eps = len(self.dataset.meltdown_flags)
+            num_meltdowns = sum(1 for f in self.dataset.meltdown_flags if f)
+            meltdown_rate = num_meltdowns / num_eps if num_eps > 0 else 0.0
+            console.rule("[bold magenta]Baseline: Random Policy (Behavior)[/bold magenta]")
+            console.print(
+                f"[magenta]Episodes:[/magenta] {num_eps}  |  "
+                f"[magenta]Meltdowns:[/magenta] {num_meltdowns}  |  "
+                f"[magenta]Meltdown rate:[/magenta] {meltdown_rate:.3f}"
+            )
 
-        self.baseline_overall_mean = float(G.mean()) if len(G) > 0 else 0.0
-        self.baseline_action_means: Dict[int, float] = {}
-        action_names = {0: "steady", 1: "cool", 2: "push"}
-        table = Table(title="Baseline action returns (random policy)")
-        table.add_column("Action", justify="left")
-        table.add_column("Mean G_t", justify="right")
-        table.add_column("# Steps", justify="right")
-        for a in (0, 1, 2):
-            idxs = [i for i, act in enumerate(self.dataset.actions) if act == a]
-            if not idxs:
-                table.add_row(action_names[a], "—", "0")
-                continue
-            mean_g = float(G[idxs].mean())
-            self.baseline_action_means[a] = mean_g
-            table.add_row(action_names[a], f"{mean_g:.3f}", str(len(idxs)))
-        console.print(table)
+            self.baseline_overall_mean = float(G.mean()) if len(G) > 0 else 0.0
+            self.baseline_action_means: Dict[int, float] = {}
+            action_names = {0: "steady", 1: "cool", 2: "push"}
+            table = Table(title="Baseline action returns (random policy)")
+            table.add_column("Action", justify="left")
+            table.add_column("Mean G_t", justify="right")
+            table.add_column("# Steps", justify="right")
+            for a in (0, 1, 2):
+                idxs = [i for i, act in enumerate(self.dataset.actions) if act == a]
+                if not idxs:
+                    table.add_row(action_names[a], "—", "0")
+                    continue
+                mean_g = float(G[idxs].mean())
+                self.baseline_action_means[a] = mean_g
+                table.add_row(action_names[a], f"{mean_g:.3f}", str(len(idxs)))
+            console.print(table)
 
-        train_idx, test_idx = self.dataset.train_test_split_by_episode(test_frac=0.2)
-        console.rule("[bold cyan]Train / Test Split[/bold cyan]")
-        console.print(
-            f"[cyan]Train steps:[/cyan] {len(train_idx)}  |  "
-            f"[cyan]Test steps:[/cyan] {len(test_idx)}"
-        )
+            train_idx, test_idx = self.dataset.train_test_split_by_episode(test_frac=0.2)
+            console.rule("[bold cyan]Train / Test Split[/bold cyan]")
+            console.print(
+                f"[cyan]Train steps:[/cyan] {len(train_idx)}  |  "
+                f"[cyan]Test steps:[/cyan] {len(test_idx)}"
+            )
+
+            if len(train_idx) >= min_train_steps:
+                break
+
+            console.print(
+                "[yellow]Not enough train steps yet; "
+                "increasing warmup random episodes...[/yellow]"
+            )
+            warmup_episodes += 1
 
         new_concepts_with_parents = self.discovery.discover(
             self.universe,
@@ -995,15 +1029,11 @@ class Experiment:
 
         print("\n=== Reward model (concept vector -> discounted return) ===")
         X_all = self.dataset.build_action_features(self.universe)
-        if not train_idx:
-            console.print(
-                "[bold red]No train steps available (warmup episode too small); "
-                "skipping RewardModel training and greedy demo.[/bold red]"
-            )
-            return
         self.reward_model.fit(X_all, G, train_idx)
         self.reward_model.evaluate(X_all, G, train_idx, "Train")
         self.reward_model.evaluate(X_all, G, test_idx, "Test")
+        # Initial concept importance from warmup-trained RewardModel
+        self._update_concept_importance()
 
         print("\nDone. Concept-learning + reward modeling complete.")
         print("Now running a greedy-actor demo using predicted cumulative reward per action...")
@@ -1059,7 +1089,9 @@ class Experiment:
             ep_steps = 0
             episode_features: List[np.ndarray] = []
             episode_rewards: List[float] = []
-            console.print(f"\n[bold green]Episode {ep}[/bold green]:")
+            console.print(
+                f"\n[bold green]Episode {ep + 1}/{num_episodes}[/bold green]:"
+            )
             while not done:
                 state_vec = self.tagger.tag_state(obs, self.universe)
                 a, preds = self._greedy_action(state_vec)
@@ -1097,6 +1129,18 @@ class Experiment:
                     baseline_action_means.get(i, float("nan")) for i in (0, 1, 2)
                 ]
 
+                # Compact per-concept importance string (ID:score sorted by importance)
+                if self.concept_importance:
+                    sorted_ids = sorted(
+                        self.concept_importance.keys(),
+                        key=lambda cid: -self.concept_importance[cid],
+                    )
+                    imp_str = ", ".join(
+                        f"{cid}:{self.concept_importance[cid]:.2f}" for cid in sorted_ids
+                    )
+                else:
+                    imp_str = "n/a"
+
                 console.print(
                     f"  [white]step {step}[/white]: "
                     f"[bold]action[/bold]={a_name} (raw={a}) | "
@@ -1104,7 +1148,8 @@ class Experiment:
                     f"[magenta]baseline_mean_G[/magenta]={baseline_overall:.3f} | "
                     f"[magenta]baseline_action_means[/magenta]={np.round(base_means, 3)} | "
                     f"[yellow]avg_reward_global[/yellow]={avg_reward_global:.3f} | "
-                    f"[yellow]avg_reward_episode[/yellow]={avg_reward_ep:.3f}"
+                    f"[yellow]avg_reward_episode[/yellow]={avg_reward_ep:.3f} | "
+                    f"[green]concept_importance[/green]=[{imp_str}]"
                 )
 
                 if meltdown and not meltdown_happened:
@@ -1124,6 +1169,8 @@ class Experiment:
                 X_ep = np.stack(episode_features)
                 idx_ep = list(range(T))
                 self.reward_model.fit(X_ep, G_ep, idx_ep)
+                # Update concept importance after each greedy episode fit
+                self._update_concept_importance()
 
             if not meltdown_happened:
                 console.print("    [green]-> no meltdown in this episode (greedy actor run)[/green]")
