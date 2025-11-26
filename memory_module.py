@@ -1,11 +1,10 @@
-"""ReAct-based memory maintenance module for NLCO."""
+"""Predict-based memory maintenance module for NLCO."""
 
 from __future__ import annotations
 
-import textwrap
 from pathlib import Path
 import difflib
-from typing import Any, Callable, Dict, List, Literal, Optional
+from typing import List, Optional
 
 import dspy
 from pydantic import BaseModel, Field
@@ -13,13 +12,10 @@ from rich.console import Console
 from rich.panel import Panel
 
 
-class MemoryState(BaseModel):
-    """Tracks in-memory edits for the current iteration."""
-
-    original_text: str
-    working_text: str
-    edits_applied: int = 0
-    notes: List[str] = Field(default_factory=list)
+class EditBlock(BaseModel):
+    """A single search/replace edit operation."""
+    search: str = Field(description="Exact text to find (empty string to append)")
+    replace: str = Field(description="Text to replace with")
 
 
 class MemoryModule(dspy.Module):
@@ -30,13 +26,11 @@ class MemoryModule(dspy.Module):
         lm: dspy.LM,
         *,
         memory_path: Path | str = "memory.md",
-        max_iters: int = 4,
         console: Optional[Console] = None,
     ) -> None:
         super().__init__()
         self.lm = lm
         self.memory_path = Path(memory_path)
-        self.max_iters = max_iters
         self.console = console or Console()
 
     def run(
@@ -46,137 +40,51 @@ class MemoryModule(dspy.Module):
         constraints: str,
         context: str,
     ) -> Optional[str]:
-        """Execute a ReAct loop to update the memory file if needed."""
+        """Execute a Predict call to update the memory file if needed."""
 
         initial_memory = self._read_memory()
-        state = MemoryState(
-            original_text=initial_memory,
-            working_text=initial_memory,
-        )
 
-        tools = self._build_tools(state)
+        class MemoryEditSignature(dspy.Signature):
+            """Review memory and context. Output search/replace edits to capture durable
+            knowledge. Maintain a Hypotheses section with evidence for/against each.
+            Do refine the memory and the hythotheses on it every time, don't just output an empty list.
+            Use empty search string to append."""
 
-        signature = (
-            dspy.Signature(
-                {
-                    "constraints": dspy.InputField(desc="User-provided soft constraints."),
-                    "memory": dspy.InputField(desc="Current memory markdown text."),
-                    "artifact": dspy.InputField(desc="Latest artifact produced by NLCO."),
-                    "context": dspy.InputField(desc="Runtime context string (datetime, system info, etc.)."),
-                },
-                instructions=textwrap.dedent(
-                    """
-                    Review memory, artifact, constraints, and context. Use the provided tools to perform
-                    targeted search/replace edits on memory. Only modify memory when doing so captures
-                    durable, reusable knowledge (policies, routines, lessons learned). Avoid duplicating
-                    transient task details already present in the artifact. Once satisfied, call the
-                    `finish` tool (built-in) and summarize the final memory state in one sentence.
-                    """
-                ).strip(),
-            )
-            .append("summary", dspy.OutputField(), type_=str)
-        )
+            constraints: str = dspy.InputField()
+            memory: str = dspy.InputField()
+            artifact: str = dspy.InputField()
+            context: str = dspy.InputField()
+            edits: List[EditBlock] = dspy.OutputField()
+            summary: str = dspy.OutputField()
 
-        react = dspy.ReAct(signature=signature, tools=list(tools.values()), max_iters=self.max_iters)
+        predict = dspy.Predict(MemoryEditSignature)
 
         with dspy.settings.context(lm=self.lm):
-            prediction = react(
-                memory=state.original_text,
+            prediction = predict(
+                memory=initial_memory,
                 artifact=artifact,
                 constraints=constraints,
                 context=context,
             )
 
-        self._log_trajectory(prediction.trajectory)
-
-        if state.working_text == state.original_text:
+        edits = prediction.edits or []
+        if not edits:
             return None
 
-        self._write_memory(state.working_text)
-        summary_line = prediction.summary.strip() if prediction.summary else "Memory updated."
-        detail = f"{state.edits_applied} edit(s) applied."
-        return f"{summary_line} ({detail})"
+        working = initial_memory
+        applied = 0
+        for edit in edits:
+            working, ok = self._apply_edit(working, edit)
+            if ok:
+                applied += 1
 
-    # ------------------------------------------------------------------
-    # Tool construction
-    # ------------------------------------------------------------------
-    def _build_tools(self, state: MemoryState) -> Dict[str, dspy.Tool]:
-        console = self.console
+        if working == initial_memory:
+            return None
 
-        def show_memory(section: Literal["full", "head", "tail"] = "full", lines: int = 20) -> str:
-            """Return a portion of the working memory for inspection."""
-
-            content = state.working_text.splitlines()
-            if not content:
-                return "<memory is currently empty>"
-            if section == "head":
-                snippet = content[:lines]
-            elif section == "tail":
-                snippet = content[-lines:]
-            else:
-                snippet = content
-            rendered = "\n".join(snippet)
-            console.print(Panel(rendered or "<empty>", title=f"show_memory ({section})", border_style="blue", expand=False))
-            return rendered
-
-        def replace_block(search: str, replace: str) -> str:
-            """Replace occurrences of `search` with `replace` in the working memory."""
-
-            if not search:
-                return "Search string is empty; aborting."
-            if search not in state.working_text:
-                message = f"Search term `{search}` not found."
-                console.print(Panel(message, title="replace_memory", border_style="red", expand=False))
-                return message
-
-            before = state.working_text
-            state.working_text = state.working_text.replace(search, replace)
-            state.edits_applied += 1
-            state.notes.append(f"Replaced `{search}` -> `{replace}`")
-            message = "Replacement applied successfully."
-            console.print(Panel(message, title="replace_memory", border_style="green", expand=False))
-            # show a minimal unified diff for visibility
-            diff = self._render_diff(before, state.working_text)
-            if diff.strip():
-                console.print(diff)
-            return message
-
-        def append_block(content: str) -> str:
-            """Append a new markdown block to the end of memory."""
-
-            if not content.strip():
-                message = "Provided content is empty; nothing appended."
-                console.print(Panel(message, title="append_memory", border_style="red", expand=False))
-                return message
-            separator = "\n\n" if state.working_text.strip() else ""
-            state.working_text += f"{separator}{content.strip()}\n"
-            state.edits_applied += 1
-            state.notes.append("Appended new block")
-            message = "Block appended to memory."
-            console.print(Panel(message, title="append_memory", border_style="green", expand=False))
-            return message
-
-        def discard_changes() -> str:
-            """Reset working memory to its original state."""
-
-            state.working_text = state.original_text
-            state.edits_applied = 0
-            state.notes.append("Reverted to original memory.")
-            message = "Memory reverted to original contents."
-            console.print(Panel(message, title="reset_memory", border_style="yellow", expand=False))
-            return message
-
-        tool_map: Dict[str, Callable[..., str]] = {
-            "show_memory": show_memory,
-            "replace_memory": replace_block,
-            "append_memory": append_block,
-            "reset_memory": discard_changes,
-        }
-
-        return {
-            name: dspy.Tool(func, name=name, desc=func.__doc__ or "")
-            for name, func in tool_map.items()
-        }
+        self._write_memory(working)
+        summary = prediction.summary.strip() if prediction.summary else "Memory updated."
+        self.console.print(Panel(summary, title=f"Memory ({applied} edit(s))", border_style="cyan"))
+        return f"{summary} ({applied} edit(s))"
 
     # ------------------------------------------------------------------
     # IO helpers
@@ -189,26 +97,18 @@ class MemoryModule(dspy.Module):
     def _write_memory(self, text: str) -> None:
         self.memory_path.write_text(text)
 
-    def _log_trajectory(self, trajectory: Dict[str, Any]) -> None:
-        if not trajectory:
-            return
-        self.console.rule("Memory ReAct Steps", style="magenta")
-        idx = 0
-        while f"thought_{idx}" in trajectory:
-            thought = trajectory.get(f"thought_{idx}", "").strip()
-            tool_name = trajectory.get(f"tool_name_{idx}", "")
-            tool_args = trajectory.get(f"tool_args_{idx}", {})
-            observation = trajectory.get(f"observation_{idx}", "")
-
-            if thought:
-                self.console.print(f"[bold]{idx}[/bold] 🤔 {thought}")
-            self.console.print(
-                f"   🛠️ [cyan]{tool_name}[/cyan] args={tool_args!r}"
-            )
-            if observation:
-                obs_text = observation if isinstance(observation, str) else repr(observation)
-                self.console.print(f"   📥 {obs_text}\n")
-            idx += 1
+    def _apply_edit(self, text: str, edit: EditBlock) -> tuple[str, bool]:
+        """Apply a single edit. Empty search means append."""
+        if not edit.search:
+            sep = "\n\n" if text.strip() else ""
+            self.console.print(Panel(edit.replace.strip(), title="Appending", border_style="green"))
+            return text + sep + edit.replace.strip() + "\n", True
+        if edit.search not in text:
+            self.console.print(Panel(edit.search[:80], title="Not found", border_style="red"))
+            return text, False
+        result = text.replace(edit.search, edit.replace)
+        self.console.print(self._render_diff(text, result))
+        return result, True
 
     # ------------------------------------------------------------------
     # Small helper: render unified diff between texts
