@@ -13,6 +13,7 @@ Multi-project repository focused on DSPy-based AI agents and tools:
 - **Textual DSPy** - Terminal UI for DSPy
 - **agent-manual Poetry Package** - Minimal Textual DSPy TUI packaged for installation (modular runtime, memory, CLI, TUI components)
 - **Webapp** - Multimodal web app with Gemini
+- **Hill Climb Learning** - Interactive text improvement via human-in-the-loop DSPy optimization
 
 ## Environment Setup
 
@@ -150,6 +151,20 @@ Features:
 - Backend URL defaults to `http://10.0.2.2:48123/`; override with `-Pnlco.baseUrl=https://your-host/` or adjust `gradle.properties`.
 - Tests: run from `android/nlco-android/` with `JAVA_HOME=/path/to/jdk17 ./gradlew test` (ensure the Gradle wrapper can download `gradle-8.7-bin.zip`).
 - Manual builds: `JAVA_HOME=/path/to/jdk17 ./gradlew assembleDebug`. To avoid wrapper downloads on restricted networks, you can use a pre-installed Gradle 8.7 binary (`/path/to/gradle-8.7/bin/gradle assembleDebug`).
+
+### Hill Climb Learning
+```bash
+cd hill_climb_learning/
+python cli.py "Your initial text here"
+```
+
+Features:
+- Interactive Rich CLI for human-in-the-loop text improvement.
+- Two DSPy modules: `TextModifier` generates improved versions, `TextEvaluator` predicts if modifications are better.
+- Human feedback loop: user marks each modification as better/worse, feedback becomes few-shot examples.
+- Uses `dspy.LabeledFewShot` with k=64 to rebuild the evaluator after each feedback round.
+- Few-shot examples stored in `examples.jsonl` with fields: `original`, `modified`, `is_better`.
+- Tests: `pytest tests/test_hill_climb_learning.py -v`
 
 Auth configuration:
 - `NLCO_AUTH_DB_URI` (default `sqlite+aiosqlite:///./nlco_auth.db`)
