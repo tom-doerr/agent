@@ -97,6 +97,15 @@ def _now_str() -> str:
     return datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
 
+def _save_artifact_history(artifact_path: Path, content: str) -> None:
+    """Save artifact version with datetime to history dir next to artifact."""
+    history_dir = artifact_path.parent / "artifact_history"
+    history_dir.mkdir(parents=True, exist_ok=True)
+    ts = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+    history_file = history_dir / f"artifact_{ts}.md"
+    history_file.write_text(content)
+
+
 def _extract_reasoning_from_message(msg: dict) -> str | None:
     """Return provider-native reasoning text, if present.
     - DeepSeek API: message["reasoning_content"] (string)
@@ -231,6 +240,7 @@ async def iteration_loop(*, max_iterations: Optional[int] = None):
             )
 
             ARTIFACT_FILE.write_text(refined)
+            _save_artifact_history(ARTIFACT_FILE, refined)
             history += [f'Iteration {i + 1}', artifact, constraints, refined]
         finally:
             if mlflow_run is not None:
