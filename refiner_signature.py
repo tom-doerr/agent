@@ -6,13 +6,20 @@ from datetime import datetime, date
 from typing import Any, Iterable, List, Sequence
 
 import dspy
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 class ArtifactEdit(BaseModel):
     """A single-line search/replace edit for the artifact."""
     search: str = Field(description="Single line to find (empty to append)")
     replace: str = Field(description="Replacement text (can be multi-line)")
+
+    @field_validator("search")
+    @classmethod
+    def must_be_single_line(cls, v: str) -> str:
+        if v and "\n" in v:
+            raise ValueError("search must be a single line")
+        return v
 
 
 class ScheduleBlock(BaseModel):
