@@ -2,6 +2,7 @@
 
 import asyncio
 import datetime
+import difflib
 from pathlib import Path
 import re
 from typing import Optional
@@ -29,7 +30,7 @@ from memory_module import MemoryModule
 from planning_module import PlanningModule
 from affect_module import AffectModule
 from nlco_scheduler import evaluate_run_decision
-from refiner_signature import RefineSignature, SystemState
+from refiner_signature import RefineSignature, SystemState, ArtifactEdit
 import timestamp_app_core as core
 
 # Print DSPy version at startup
@@ -69,15 +70,10 @@ else:  # pragma: no cover - logging only
     console.print(Panel("MLflow not available; logging disabled.", border_style="yellow"))
 
 
-class Edit(BaseModel):
-    search: str = Field(..., description="Search term to find in the artifact.")
-    replace: str = Field(..., description="Replacement text for the search term.")
-
-
 refiner = dspy.Predict(
     RefineSignature,
     instructions=(
-        "Refine the artifact based on the critique while keeping the full human-readable schedule narrative in the artifact text."
+        "Output single-line search/replace edits to refine the artifact. Keep edits minimal and targeted."
     ),
 )
 # Critic module removed; refiner operates without an explicit critique input.
@@ -179,6 +175,36 @@ def _log_affect(affect_report, *, iteration_index: int) -> None:
     log_iteration_to_mlflow(iteration_index, affect_report, executive_summary=None)
 
 
+def _cdiff(a: str, b: str) -> str:
+    out = []
+    for ln in difflib.unified_diff(a.splitlines(), b.splitlines(), lineterm=""):
+        if ln.startswith("+") and not ln.startswith("+++"):
+            out.append(f"[green]{ln}[/green]")
+        elif ln.startswith("-") and not ln.startswith("---"):
+            out.append(f"[red]{ln}[/red]")
+        else:
+            out.append(ln)
+    return "\n".join(out)
+
+
+def _apply_artifact_edit(text: str, edit: ArtifactEdit) -> str:
+    """Apply a single edit. Empty search means append."""
+    if not edit.search:
+        sep = "\n\n" if text.strip() else ""
+        return text + sep + edit.replace.strip() + "\n"
+    if edit.search not in text:
+        return text
+    return text.replace(edit.search, edit.replace)
+
+
+def _show_artifact_diff(before: str, after: str, summary: str, n_edits: int) -> None:
+    diff = _cdiff(before, after)
+    if diff.strip():
+        console.print(Panel(diff, title="Artifact Delta", border_style="magenta"))
+    if summary:
+        console.print(Panel(summary, title=f"Refiner ({n_edits} edit(s))", border_style="cyan"))
+
+
 def _run_refiner_and_print(*, constraints: str, system_state: SystemState, context: str, artifact: str) -> str:
     pred = run_with_metrics(
         'Refiner',
@@ -188,16 +214,14 @@ def _run_refiner_and_print(*, constraints: str, system_state: SystemState, conte
         context=context,
         artifact=artifact,
     )
-    refined = pred.refined_artifact
-    try:
-        _log_model("Refiner", output=refined, reasoning=_extract_last_reasoning_text())
-    except Exception:
-        pass
-    reasoning = _extract_last_reasoning_text()
-    if reasoning:
-        console.print(Panel(reasoning, title="Model Reasoning · Refiner", border_style="blue"))
-    console.rule(f"{_now_str()} · Updated Artifact", style="white")
-    console.print(refined)
+    edits = pred.edits or []
+    summary = pred.summary.strip() if pred.summary else ""
+
+    refined = artifact
+    for edit in edits:
+        refined = _apply_artifact_edit(refined, edit)
+
+    _show_artifact_diff(artifact, refined, summary, len(edits))
     return refined
 
 

@@ -3,10 +3,16 @@ from __future__ import annotations
 
 import json
 from datetime import datetime, date
-from typing import Any, Iterable, Sequence
+from typing import Any, Iterable, List, Sequence
 
 import dspy
 from pydantic import BaseModel, Field
+
+
+class ArtifactEdit(BaseModel):
+    """A single-line search/replace edit for the artifact."""
+    search: str = Field(description="Single line to find (empty to append)")
+    replace: str = Field(description="Replacement text (can be multi-line)")
 
 
 class ScheduleBlock(BaseModel):
@@ -29,17 +35,14 @@ class SystemState(BaseModel):
 
 
 class RefineSignature(dspy.Signature):
-    """Refiner signature returning only the refined artifact text (no structured schedule)."""
+    """Refine artifact via single-line search/replace edits. Use empty search to append."""
 
     constraints: str = dspy.InputField(desc="Active constraints influencing the artifact.")
-    system_state: SystemState = dspy.InputField(desc="Minimal system state (last artifact update time).")
+    system_state: SystemState = dspy.InputField(desc="Minimal system state.")
     artifact: str = dspy.InputField(desc="Current artifact to refine.")
-    context: str = dspy.InputField(desc="Ambient context string (dates, telemetry, etc.).")
-    refined_artifact: str = dspy.OutputField(
-        desc=(
-            "Updated artifact after refinement. Keep the full human-readable schedule narrative if present, but no structured schedule output is required."
-        )
-    )
+    context: str = dspy.InputField(desc="Ambient context (dates, telemetry, etc.).")
+    edits: List[ArtifactEdit] = dspy.OutputField(desc="List of single-line edits.")
+    summary: str = dspy.OutputField(desc="One sentence summary of changes.")
 
 
 def normalize_schedule(data: Any) -> list[ScheduleBlock]:
