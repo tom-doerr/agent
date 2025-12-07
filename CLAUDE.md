@@ -234,6 +234,7 @@ Docker Compose files with non-standard ports to avoid host conflicts:
 - `context_provider.py` - Builds runtime context (weather, system stats, home status, post queue counts, autoposter health alerts)
 - `constraints_diff_module.py` - Computes diffs for constraints.md, feeds the current `task +nlco export` to the LLM, auto-tags commands with `+nlco`, and exposes both a verification module and a 3-try reconciliation loop so Taskwarrior updates are validated before acceptance.
 - `nlco_iter.py` - Natural Language Command Optimization; async loop (`iteration_loop`) awaits an asyncified memory manager, so memory updates run concurrently and summaries print once each pass completes.
+- `refiner_signature.py` - `RefineSignature` outputs `List[ArtifactEdit]` (single-line search/replace) + summary; Pydantic validator enforces no newlines in search field.
 - `nlco_scheduler.py` - Centralized scheduling rules for the iteration loop: runs immediately on constraint edits, at least once per hour otherwise, and skips the hourly run when constraints have been untouched for ≥3 days. Tested via `pytest tests/test_nlco_scheduler.py -q`.
 - `setup_env.sh` - Environment setup script
 
@@ -244,7 +245,7 @@ Docker Compose files with non-standard ports to avoid host conflicts:
 - `constraints.md` - Symlink to user's personal constraints file
 
 These files are tracked but should not be committed in normal workflows.
-- `memory_module.py` - ReAct loop that edits persistent `memory.md` via search/replace tools
+- `memory_module.py` - Predict-based module that edits `memory.md` via `List[EditBlock]` search/replace; maintains a Hypotheses section with evidence for/against
 - `timewarrior_tools.py` - Structured DSPy tool for `timew summary/start/stop`
 - `timewarrior_module.py` - Fast loop that keeps Timewarrior tracking aligned with plans
 - `executive_module.py` - ReAct coordinator that triggers Timewarrior, memory, or planning updates as needed
