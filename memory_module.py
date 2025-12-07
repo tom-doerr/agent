@@ -120,15 +120,15 @@ class MemoryModule(dspy.Module):
     # Small helper: render unified diff between texts
     # ------------------------------------------------------------------
     def _render_diff(self, before: str, after: str) -> str:
-        a = before.splitlines()
-        b = after.splitlines()
-        lines = difflib.unified_diff(a, b, fromfile="before", tofile="after", lineterm="")
-        colored = []
-        for line in lines:
-            if line.startswith("+") and not line.startswith("+++"):
-                colored.append(f"[green]{line}[/green]")
-            elif line.startswith("-") and not line.startswith("---"):
-                colored.append(f"[red]{line}[/red]")
-            else:
-                colored.append(line)
-        return "\n".join(colored)
+        a = before.splitlines(keepends=True)
+        b = after.splitlines(keepends=True)
+        out = []
+        for ln in difflib.ndiff(a, b):
+            c, txt = ln[0], ln.rstrip()
+            if c == "+":
+                out.append(f"[green]{txt}[/green]")
+            elif c == "-":
+                out.append(f"[red]{txt}[/red]")
+            elif c == "?":
+                out.append(f"[yellow]{txt}[/yellow]")
+        return "\n".join(out)

@@ -177,13 +177,14 @@ def _log_affect(affect_report, *, iteration_index: int) -> None:
 
 def _cdiff(a: str, b: str) -> str:
     out = []
-    for ln in difflib.unified_diff(a.splitlines(), b.splitlines(), lineterm=""):
-        if ln.startswith("+") and not ln.startswith("+++"):
-            out.append(f"[green]{ln}[/green]")
-        elif ln.startswith("-") and not ln.startswith("---"):
-            out.append(f"[red]{ln}[/red]")
-        else:
-            out.append(ln)
+    for ln in difflib.ndiff(a.splitlines(keepends=True), b.splitlines(keepends=True)):
+        c, txt = ln[0], ln.rstrip()
+        if c == "+":
+            out.append(f"[green]{txt}[/green]")
+        elif c == "-":
+            out.append(f"[red]{txt}[/red]")
+        elif c == "?":
+            out.append(f"[yellow]{txt}[/yellow]")
     return "\n".join(out)
 
 
