@@ -48,12 +48,14 @@ class MemoryModule(dspy.Module):
             """Review memory and context. Output search/replace edits to capture durable
             knowledge. Maintain a Hypotheses section with evidence for/against each.
             Do refine the memory and the hythotheses on it every time, don't just output an empty list.
+            You only can modify the memory text, you can't edit the constraints or the artitact.
+            Do write the hypotheses into the memory text itself.
             Use empty search string to append."""
 
             constraints: str = dspy.InputField()
-            memory: str = dspy.InputField()
             artifact: str = dspy.InputField()
             context: str = dspy.InputField()
+            memory: str = dspy.InputField()
             edits: List[EditBlock] = dspy.OutputField()
             summary: str = dspy.OutputField()
 
@@ -80,6 +82,10 @@ class MemoryModule(dspy.Module):
 
         if working == initial_memory:
             return None
+
+        full_diff = self._render_diff(initial_memory, working)
+        if full_diff.strip():
+            self.console.print(Panel(full_diff, title="Memory Delta", border_style="magenta"))
 
         self._write_memory(working)
         summary = prediction.summary.strip() if prediction.summary else "Memory updated."
@@ -117,4 +123,12 @@ class MemoryModule(dspy.Module):
         a = before.splitlines()
         b = after.splitlines()
         lines = difflib.unified_diff(a, b, fromfile="before", tofile="after", lineterm="")
-        return "\n".join(lines)
+        colored = []
+        for line in lines:
+            if line.startswith("+") and not line.startswith("+++"):
+                colored.append(f"[green]{line}[/green]")
+            elif line.startswith("-") and not line.startswith("---"):
+                colored.append(f"[red]{line}[/red]")
+            else:
+                colored.append(line)
+        return "\n".join(colored)
