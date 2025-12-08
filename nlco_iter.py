@@ -189,13 +189,13 @@ def _cdiff(a: str, b: str) -> str:
 
 
 def _apply_artifact_edit(text: str, edit: ArtifactEdit) -> str:
-    """Apply a single edit. Empty search means append."""
-    if not edit.search:
-        sep = "\n\n" if text.strip() else ""
-        return text + sep + edit.replace.strip() + "\n"
-    if edit.search not in text:
-        return text
-    return text.replace(edit.search, edit.replace)
+    """Apply a line-number edit. line=0 appends."""
+    lines = text.splitlines()
+    if edit.line == 0:
+        lines.append(edit.content)
+    elif 1 <= edit.line <= len(lines):
+        lines[edit.line - 1] = edit.content
+    return "\n".join(lines)
 
 
 def _show_artifact_diff(before: str, after: str, summary: str, n_edits: int) -> None:

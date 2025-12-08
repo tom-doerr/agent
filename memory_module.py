@@ -13,9 +13,9 @@ from rich.panel import Panel
 
 
 class EditBlock(BaseModel):
-    """A single search/replace edit operation."""
-    search: str = Field(description="Exact text to find (empty string to append)")
-    replace: str = Field(description="Text to replace with")
+    """A line-number based edit operation."""
+    line: int = Field(description="Line number (1-indexed, 0 to append)")
+    content: str = Field(description="New content for this line")
 
 
 class MemoryModule(dspy.Module):
@@ -45,12 +45,9 @@ class MemoryModule(dspy.Module):
         initial_memory = self._read_memory()
 
         class MemoryEditSignature(dspy.Signature):
-            """Review memory and context. Output search/replace edits to capture durable
+            """Review memory and context. Output line-number edits to capture durable
             knowledge. Maintain a Hypotheses section with evidence for/against each.
-            Do refine the memory and the hythotheses on it every time, don't just output an empty list.
-            You only can modify the memory text, you can't edit the constraints or the artitact.
-            Do write the hypotheses into the memory text itself.
-            Use empty search string to append."""
+            Edits use 1-indexed line numbers; line=0 appends new content."""
 
             constraints: str = dspy.InputField()
             artifact: str = dspy.InputField()
@@ -104,17 +101,20 @@ class MemoryModule(dspy.Module):
         self.memory_path.write_text(text)
 
     def _apply_edit(self, text: str, edit: EditBlock) -> tuple[str, bool]:
-        """Apply a single edit. Empty search means append."""
-        if not edit.search:
-            sep = "\n\n" if text.strip() else ""
-            self.console.print(Panel(edit.replace.strip(), title="Appending", border_style="green"))
-            return text + sep + edit.replace.strip() + "\n", True
-        if edit.search not in text:
-            self.console.print(Panel(edit.search[:80], title="Not found", border_style="red"))
-            return text, False
-        result = text.replace(edit.search, edit.replace)
-        self.console.print(self._render_diff(text, result))
-        return result, True
+        """Apply a line-number edit. line=0 appends."""
+        lines = text.splitlines()
+        if edit.line == 0:
+            self.console.print(Panel(edit.content, title="Appending", border_style="green"))
+            lines.append(edit.content)
+            return "\n".join(lines), True
+        if 1 <= edit.line <= len(lines):
+            old = lines[edit.line - 1]
+            lines[edit.line - 1] = edit.content
+            self.console.print(f"[red]- L{edit.line}: {old}[/red]")
+            self.console.print(f"[green]+ L{edit.line}: {edit.content}[/green]")
+            return "\n".join(lines), True
+        self.console.print(f"[red]Line {edit.line} out of range[/red]")
+        return text, False
 
     # ------------------------------------------------------------------
     # Small helper: render unified diff between texts

@@ -6,20 +6,13 @@ from datetime import datetime, date
 from typing import Any, Iterable, List, Sequence
 
 import dspy
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field
 
 
 class ArtifactEdit(BaseModel):
-    """A single-line search/replace edit for the artifact."""
-    search: str = Field(description="Single line to find (empty to append)")
-    replace: str = Field(description="Replacement text (can be multi-line)")
-
-    @field_validator("search")
-    @classmethod
-    def must_be_single_line(cls, v: str) -> str:
-        if v and "\n" in v:
-            raise ValueError("search must be a single line")
-        return v
+    """A line-number based edit for the artifact."""
+    line: int = Field(description="Line number (1-indexed, 0 to append)")
+    content: str = Field(description="New content for this line")
 
 
 class ScheduleBlock(BaseModel):
@@ -42,13 +35,13 @@ class SystemState(BaseModel):
 
 
 class RefineSignature(dspy.Signature):
-    """Refine artifact via single-line search/replace edits. Use empty search to append."""
+    """Refine artifact via line-number edits. line=0 appends, 1+ replaces."""
 
-    constraints: str = dspy.InputField(desc="Active constraints influencing the artifact.")
+    constraints: str = dspy.InputField(desc="Active constraints.")
     system_state: SystemState = dspy.InputField(desc="Minimal system state.")
     artifact: str = dspy.InputField(desc="Current artifact to refine.")
     context: str = dspy.InputField(desc="Ambient context (dates, telemetry, etc.).")
-    edits: List[ArtifactEdit] = dspy.OutputField(desc="List of single-line edits.")
+    edits: List[ArtifactEdit] = dspy.OutputField(desc="Line-number edits.")
     summary: str = dspy.OutputField(desc="One sentence summary of changes.")
 
 
