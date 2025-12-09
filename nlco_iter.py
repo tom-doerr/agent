@@ -36,11 +36,11 @@ import timestamp_app_core as core
 # Print DSPy version at startup
 print(f"DSPy version: {dspy.__version__}")
 
-lm=dspy.LM('deepseek/deepseek-reasoner', max_tokens=40_000, num_retries=5)
+lm=dspy.LM('deepseek/deepseek-reasoner', max_tokens=40_000, num_retries=100)
 # lm = dspy.LM( 'ollama_chat/deepseek-r1:8b', api_base='http://localhost:11434', api_key='', temperature=0,  # Critical for structured output max_tokens=2000  # Prevent rambling)
 dspy.configure(lm=lm)
 
-support_lm = dspy.LM('deepseek/deepseek-chat', max_tokens=4_000, temperature=0, num_retries=5)
+support_lm = dspy.LM('deepseek/deepseek-chat', max_tokens=4_000, temperature=0, num_retries=100)
 console = Console()
 # Shared paths for memory files
 MEMORY_FILE = core.resolve_memory_path()
