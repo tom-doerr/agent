@@ -8,6 +8,7 @@ from actor_tui_pkg.dataset import (
     save_example,
     list_examples,
     update_example,
+    delete_example,
 )
 
 
@@ -61,3 +62,21 @@ def test_load_empty(tmp_path):
     path = tmp_path / "nonexistent.jsonl"
     assert load_examples(path) == []
     assert list_examples(path) == []
+
+
+def test_delete_example(tmp_path):
+    path = tmp_path / "reviews.jsonl"
+    for i in range(3):
+        ex = ReviewExample(
+            actor_name="interaction",
+            actor_inputs={},
+            actor_output=f"out{i}",
+            reasoning=f"reason{i}",
+            passed=True,
+        )
+        save_example(path, ex)
+    delete_example(path, 1)
+    results = list_examples(path)
+    assert len(results) == 2
+    assert results[0].actor_output == "out0"
+    assert results[1].actor_output == "out2"

@@ -74,3 +74,12 @@ def update_example(
         data["passed"] = passed
     lines[index] = json.dumps(data)
     path.write_text("\n".join(lines) + "\n")
+
+
+def delete_example(path: Path, index: int) -> None:
+    """Remove an example at a given line index."""
+    lines = path.read_text().splitlines()
+    if index < 0 or index >= len(lines):
+        raise IndexError(f"Review index {index} out of range")
+    del lines[index]
+    path.write_text("\n".join(lines) + "\n" if lines else "")

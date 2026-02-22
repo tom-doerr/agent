@@ -37,6 +37,9 @@ class AppConfig:
     memory_dataset_path: str = str(
         Path.home() / ".config" / "actor-tui" / "memory_reviews.jsonl"
     )
+    tool_dataset_path: str = str(
+        Path.home() / ".config" / "actor-tui" / "tool_reviews.jsonl"
+    )
 
 
 _config: Optional[AppConfig] = None

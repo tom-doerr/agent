@@ -38,6 +38,7 @@ def run_actor_reviewer_loop(
     actor_kwargs: dict,
     max_iters: int = 3,
     output_field: str = "reply",
+    on_actor_done: Optional[Callable[[int, Any], None]] = None,
     on_attempt: Optional[Callable[[Attempt], None]] = None,
 ) -> ActorReviewerResult:
     """Run actor, review output, retry with feedback on failure."""
@@ -47,6 +48,10 @@ def run_actor_reviewer_loop(
     for i in range(max_iters):
         prediction = actor(**actor_kwargs, feedback=feedback)
         actor_output = getattr(prediction, output_field)
+
+        if on_actor_done:
+            on_actor_done(i + 1, prediction)
+
         inputs_json = json.dumps(
             {k: v for k, v in actor_kwargs.items() if k != "feedback"},
             default=str,

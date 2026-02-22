@@ -13,11 +13,14 @@ from typing import Optional
 from rich.text import Text
 from textual.app import App, ComposeResult
 from textual.containers import Horizontal, Vertical
-from textual.widgets import Footer, Input, RichLog, Static
+from textual.widgets import Footer, RichLog, Static, TextArea
 
 from .actors import InteractionActor, MemoryActor
 from .config import get_config, load_config
 from .dataset import list_examples, save_example, ReviewExample
+from .dataset_views import DatasetBrowser
+from .router import Router
+from .tool_actor import ToolCallingActor
 from .loop import Attempt, run_actor_reviewer_loop
 from .memory import MemoryManager
 from .reviewer import build_reviewer, ReviewResult
@@ -43,12 +46,12 @@ CSS = (
     "  background: #1a0c0d; padding: 0 1; } "
     "#status { width: 1fr; } "
     "#spinner { width: auto; } "
-    "#in { margin: 0 1; } "
+    "#in { height: 3; margin: 0 1; } "
     "#content { height: 1fr; layout: horizontal; } "
     "#side-pane { width: 1fr; min-width: 30; layout: vertical; } "
     "#side-pane > RichLog { border: solid #3b1416; padding: 0 1; } "
     "#log { width: 2fr; min-width: 40; border: solid #3b1416; padding: 0 1; } "
-    ".user-msg { color: #f7f1f2; } "
+    ".user-msg { color: #ffffff; text-style: bold; } "
     ".agent-msg { color: #d3a4a6; text-style: italic; } "
     ".system-msg { color: #d3a4a6; } "
     ".answer-msg { color: #ff4d4f; text-style: bold; } "
@@ -64,9 +67,10 @@ class ActorTUI(App):
         self.cfg = load_config()
         self.memory_mgr = MemoryManager(Path(self.cfg.memory_path))
         self.history: list[dict[str, str]] = []
-        self._last_reviews: list[ReviewResult] = []
+        self._last_reviews: list[tuple[str, ReviewResult]] = []
         self._request_start: Optional[float] = None
         self._status_timer = None
+        self._phase: str = "idle"
         self._rebuild_reviewers()
 
     def _rebuild_reviewers(self) -> None:
@@ -76,6 +80,9 @@ class ActorTUI(App):
         self.memory_reviewer = build_reviewer(
             "memory", Path(self.cfg.memory_dataset_path)
         )
+        self.tool_reviewer = build_reviewer(
+            "tool", Path(self.cfg.tool_dataset_path)
+        )
 
     def compose(self) -> ComposeResult:
         yield Horizontal(
@@ -83,7 +90,7 @@ class ActorTUI(App):
             Static("", id="spinner"),
             id="top-bar",
         )
-        yield Input(placeholder="Type a message...", id="in")
+        yield TextArea("", id="in")
         yield Horizontal(
             Vertical(
                 RichLog(id="memory", wrap=True, auto_scroll=True),
@@ -97,7 +104,7 @@ class ActorTUI(App):
 
     async def on_mount(self) -> None:
         asyncio.create_task(self._worker())
-        self.query_one(Input).focus()
+        self.query_one("#in", TextArea).focus()
         self._label_panes()
         self._refresh_memory_view()
         self._refresh_reviews_view()
@@ -112,19 +119,25 @@ class ActorTUI(App):
             pane.border_title = title
             pane.border_title_align = "left"
 
-    async def on_input_submitted(self, event: Input.Submitted) -> None:
-        text = event.value.strip()
+    BINDINGS = [
+        ("ctrl+j", "submit", "Send (Ctrl+Enter)"),
+        ("ctrl+d", "show_datasets", "Datasets"),
+    ]
+
+    async def action_submit(self) -> None:
+        ta = self.query_one("#in", TextArea)
+        text = ta.text.strip()
         if not text:
             return
         log = self.query_one("#log", RichLog)
         if self._handle_command(text, log):
-            event.input.value = ""
+            ta.clear()
             return
-        log.write(Text(f"You: {text}", style="user-msg"))
+        log.write(Text(f">> {text}", style="user-msg"))
         log.scroll_end()
         self.history.append({"role": "user", "content": text})
         await self.q.put(Job(id=str(uuid.uuid4()), prompt=text))
-        event.input.value = ""
+        ta.clear()
 
     async def _worker(self) -> None:
         log = self.query_one("#log", RichLog)
@@ -146,18 +159,23 @@ class ActorTUI(App):
     ) -> None:
         memory_text = self.memory_mgr.read()
         chat_str = format_chat_history(self.history)
-        ia_kw = {
+        self._set_phase("Routing")
+        route_result = await loop.run_in_executor(
+            None, lambda: self._route(job.prompt, memory_text, chat_str),
+        )
+        route = route_result.route.strip().lower()
+        log.write(Text(f"  [Route: {route}]", style="system-msg"))
+        actor_kw = {
             "user_message": job.prompt,
             "memory": memory_text,
             "chat_history": chat_str,
         }
-        ia_result = await loop.run_in_executor(
-            None, lambda: self._run_interaction(ia_kw),
-        )
-        for a in ia_result.attempts:
-            self._log_attempt("Interaction", a, log)
-        reply = ia_result.final_output.reply
-        log.write(Text(f"Assistant: {reply}", style="answer-msg"))
+        if route == "tool":
+            actor_result = await self._run_tool_phase(actor_kw, log, loop)
+        else:
+            actor_result = await self._run_ia_phase(actor_kw, log, loop)
+        reply = actor_result.final_output.reply
+        log.write(Text(f"<< {reply}", style="answer-msg"))
         log.scroll_end()
         self.history.append({"role": "assistant", "content": reply})
 
@@ -167,22 +185,38 @@ class ActorTUI(App):
             "assistant_reply": reply,
             "memory": memory_text,
         }
+        self._set_phase("Memory actor")
         mem_result = await loop.run_in_executor(
-            None, lambda: self._run_memory(mem_kw),
+            None, lambda: self._run_memory(mem_kw, log),
         )
-        for a in mem_result.attempts:
-            self._log_attempt("Memory", a, log)
 
         edits = mem_result.final_output.edits or []
         if edits:
             _, diff = self.memory_mgr.apply_edits(edits)
             summary = getattr(mem_result.final_output, "summary", "")
             log.write(Text(f"Memory updated: {summary}", style="system-msg"))
-        self._collect_reviews(ia_result, mem_result)
+        self._collect_reviews(actor_result, mem_result)
         self._refresh_memory_view()
         self._refresh_reviews_view()
 
-    def _run_interaction(self, kwargs: dict):
+    def _route(self, user_message: str, memory: str, chat_history: str):
+        return Router()(
+            user_message=user_message, memory=memory, chat_history=chat_history,
+        )
+
+    async def _run_ia_phase(self, kw, log, loop):
+        self._set_phase("Interaction actor")
+        return await loop.run_in_executor(
+            None, lambda: self._run_interaction(kw, log),
+        )
+
+    async def _run_tool_phase(self, kw, log, loop):
+        self._set_phase("Tool actor")
+        return await loop.run_in_executor(
+            None, lambda: self._run_tool(kw, log),
+        )
+
+    def _run_interaction(self, kwargs: dict, log: RichLog):
         return run_actor_reviewer_loop(
             actor=InteractionActor(),
             reviewer=self.interaction_reviewer,
@@ -190,9 +224,15 @@ class ActorTUI(App):
             actor_kwargs=kwargs,
             max_iters=self.cfg.max_review_iters,
             output_field="reply",
+            on_actor_done=lambda i, p: self.call_from_thread(
+                self._log_actor_output, "Interaction", i, p, log,
+            ),
+            on_attempt=lambda a: self.call_from_thread(
+                self._log_review, "Interaction", a, log,
+            ),
         )
 
-    def _run_memory(self, kwargs: dict):
+    def _run_memory(self, kwargs: dict, log: RichLog):
         return run_actor_reviewer_loop(
             actor=MemoryActor(),
             reviewer=self.memory_reviewer,
@@ -200,29 +240,58 @@ class ActorTUI(App):
             actor_kwargs=kwargs,
             max_iters=self.cfg.max_review_iters,
             output_field="edits",
+            on_actor_done=lambda i, p: self.call_from_thread(
+                self._log_actor_output, "Memory", i, p, log,
+            ),
+            on_attempt=lambda a: self.call_from_thread(
+                self._log_review, "Memory", a, log,
+            ),
         )
 
-    def _log_attempt(self, label: str, attempt: Attempt, log: RichLog) -> None:
+    def _run_tool(self, kwargs: dict, log: RichLog):
+        return run_actor_reviewer_loop(
+            actor=ToolCallingActor(),
+            reviewer=self.tool_reviewer,
+            actor_name="tool",
+            actor_kwargs=kwargs,
+            max_iters=self.cfg.max_review_iters,
+            output_field="reply",
+            on_actor_done=lambda i, p: self.call_from_thread(
+                self._log_actor_output, "Tool", i, p, log,
+            ),
+            on_attempt=lambda a: self.call_from_thread(
+                self._log_review, "Tool", a, log,
+            ),
+        )
+
+    def _log_actor_output(
+        self, label: str, iteration: int, prediction: object, log: RichLog,
+    ) -> None:
         out = str(
-            getattr(attempt.actor_output, "reply", None)
-            or getattr(attempt.actor_output, "edits", None)
-            or attempt.actor_output
+            getattr(prediction, "reply", None)
+            or getattr(prediction, "edits", None)
+            or prediction
         )[:200]
-        log.write(Text(f"  [{label} attempt {attempt.iteration}]", style="system-msg"))
+        log.write(Text(f"  [{label} attempt {iteration}]", style="system-msg"))
         log.write(Text(f"    Output: {out}", style="agent-msg"))
+        log.scroll_end()
+
+    def _log_review(
+        self, label: str, attempt: Attempt, log: RichLog,
+    ) -> None:
         if attempt.review:
             r = attempt.review
             verdict = "PASS" if r.passed else "FAIL"
             style = "green" if r.passed else "red"
             log.write(Text(f"    Review: {verdict} - {r.reasoning}", style=style))
-        log.scroll_end()
+            log.scroll_end()
 
-    def _collect_reviews(self, ia_result, mem_result) -> None:
+    def _collect_reviews(self, *results) -> None:
         self._last_reviews = []
-        for result in (ia_result, mem_result):
+        for result in results:
             for a in result.attempts:
                 if a.review:
-                    self._last_reviews.append(a.review)
+                    self._last_reviews.append((result.actor_name, a.review))
 
     def _refresh_memory_view(self) -> None:
         pane = self.query_one("#memory", RichLog)
@@ -240,6 +309,7 @@ class ActorTUI(App):
         for path_key, label in [
             (self.cfg.interaction_dataset_path, "Interaction"),
             (self.cfg.memory_dataset_path, "Memory"),
+            (self.cfg.tool_dataset_path, "Tool"),
         ]:
             examples = list_examples(Path(path_key))
             pane.write(Text(f"-- {label} ({len(examples)}) --", style="system-msg"))
@@ -256,27 +326,30 @@ class ActorTUI(App):
             return self._cmd_add_review(log)
         if text.startswith("/edit_review"):
             return self._cmd_edit_review(text, log)
+        if text == "/datasets":
+            self._open_datasets()
+            return True
         return False
 
     def _cmd_add_review(self, log: RichLog) -> bool:
         if not self._last_reviews:
             log.write(Text("No reviews to add.", style="system-msg"))
             return True
-        for r in self._last_reviews:
-            self._save_one_review(r)
+        for name, r in self._last_reviews:
+            self._save_one_review(name, r)
         n = len(self._last_reviews)
         log.write(Text(f"Added {n} review(s).", style="system-msg"))
         self._rebuild_reviewers()
         self._refresh_reviews_view()
         return True
 
-    def _save_one_review(self, r: ReviewResult) -> None:
-        has_history = "chat_history" in r.actor_inputs
-        name = "interaction" if has_history else "memory"
-        path = Path(
-            self.cfg.interaction_dataset_path
-            if has_history else self.cfg.memory_dataset_path
-        )
+    def _save_one_review(self, name: str, r: ReviewResult) -> None:
+        path_map = {
+            "interaction": self.cfg.interaction_dataset_path,
+            "memory": self.cfg.memory_dataset_path,
+            "tool": self.cfg.tool_dataset_path,
+        }
+        path = Path(path_map.get(name, self.cfg.interaction_dataset_path))
         ex = ReviewExample(
             actor_name=name,
             actor_inputs=r.actor_inputs,
@@ -313,17 +386,45 @@ class ActorTUI(App):
         self._refresh_reviews_view()
         return True
 
+    def action_show_datasets(self) -> None:
+        self._open_datasets()
+
+    def _open_datasets(self) -> None:
+        def on_dismiss(_result: None) -> None:
+            self._rebuild_reviewers()
+            self._refresh_reviews_view()
+        self.push_screen(DatasetBrowser(self.cfg), callback=on_dismiss)
+
+    def _set_phase(self, phase: str) -> None:
+        self._phase = phase
+        self._update_status_display()
+
     def _start_request(self) -> None:
         self._request_start = time.monotonic()
-        self.query_one("#status", Static).update("actor-tui | running...")
-        self.query_one("#spinner", Static).update("...")
+        self._phase = "starting"
+        self._update_status_display()
+        self._status_timer = self.set_interval(1.0, self._tick_status)
+
+    def _tick_status(self) -> None:
+        self._update_status_display()
+
+    def _update_status_display(self) -> None:
+        elapsed = ""
+        if self._request_start:
+            s = int(time.monotonic() - self._request_start)
+            elapsed = f" {s}s"
+        self.query_one("#status", Static).update(f"actor-tui | {self._phase}{elapsed}")
 
     def _finish_request(self, success: bool) -> None:
+        if self._status_timer:
+            self._status_timer.stop()
+            self._status_timer = None
         elapsed = ""
         if self._request_start:
             s = int(time.monotonic() - self._request_start)
             elapsed = f" ({s}s)"
         label = "done" if success else "error"
+        self._phase = "idle"
         self.query_one("#status", Static).update(f"actor-tui | {label}{elapsed}")
         self.query_one("#spinner", Static).update("")
         self._request_start = None
