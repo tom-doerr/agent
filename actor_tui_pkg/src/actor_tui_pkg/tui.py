@@ -11,8 +11,10 @@ from pathlib import Path
 from typing import Optional
 
 from rich.text import Text
+from textual import events
 from textual.app import App, ComposeResult
 from textual.containers import Horizontal, Vertical
+from textual.message import Message
 from textual.widgets import Footer, RichLog, Static, TextArea
 
 from .actors import InteractionActor, MemoryActor
@@ -38,6 +40,25 @@ def format_chat_history(history: list[dict[str, str]]) -> str:
         role = msg.get("role", "?")
         lines.append(f"{role}: {msg.get('content', '')}")
     return "\n".join(lines)
+
+
+class ChatTextArea(TextArea):
+    """TextArea where Enter submits and paste inserts normally."""
+
+    class Submitted(Message):
+        def __init__(self, text: str) -> None:
+            super().__init__()
+            self.text = text
+
+    async def _on_key(self, event: events.Key) -> None:
+        if event.key == "enter":
+            event.stop()
+            event.prevent_default()
+            text = self.text.strip()
+            if text:
+                self.post_message(self.Submitted(text))
+            return
+        await super()._on_key(event)
 
 
 CSS = (
@@ -90,7 +111,7 @@ class ActorTUI(App):
             Static("", id="spinner"),
             id="top-bar",
         )
-        yield TextArea("", id="in")
+        yield ChatTextArea("", id="in")
         yield Horizontal(
             Vertical(
                 RichLog(id="memory", wrap=True, auto_scroll=True),
@@ -104,7 +125,7 @@ class ActorTUI(App):
 
     async def on_mount(self) -> None:
         asyncio.create_task(self._worker())
-        self.query_one("#in", TextArea).focus()
+        self.query_one("#in", ChatTextArea).focus()
         self._label_panes()
         self._refresh_memory_view()
         self._refresh_reviews_view()
@@ -119,16 +140,11 @@ class ActorTUI(App):
             pane.border_title = title
             pane.border_title_align = "left"
 
-    BINDINGS = [
-        ("ctrl+j", "submit", "Send (Ctrl+Enter)"),
-        ("ctrl+d", "show_datasets", "Datasets"),
-    ]
+    BINDINGS = [("ctrl+d", "show_datasets", "Datasets")]
 
-    async def action_submit(self) -> None:
-        ta = self.query_one("#in", TextArea)
-        text = ta.text.strip()
-        if not text:
-            return
+    async def on_chat_text_area_submitted(self, event: ChatTextArea.Submitted) -> None:
+        text = event.text
+        ta = self.query_one("#in", ChatTextArea)
         log = self.query_one("#log", RichLog)
         if self._handle_command(text, log):
             ta.clear()
@@ -322,8 +338,10 @@ class ActorTUI(App):
             self._refresh_reviews_view()
             log.write(Text("Reviews refreshed.", style="system-msg"))
             return True
-        if text == "/add_review":
-            return self._cmd_add_review(log)
+        if text == "/samples":
+            return self._cmd_samples(log)
+        if text.startswith("/save"):
+            return self._cmd_save(text, log)
         if text.startswith("/edit_review"):
             return self._cmd_edit_review(text, log)
         if text == "/datasets":
@@ -331,16 +349,60 @@ class ActorTUI(App):
             return True
         return False
 
-    def _cmd_add_review(self, log: RichLog) -> bool:
+    def _cmd_samples(self, log: RichLog) -> bool:
         if not self._last_reviews:
-            log.write(Text("No reviews to add.", style="system-msg"))
+            log.write(Text("No samples from last run.", style="system-msg"))
+            return True
+        for i, (name, r) in enumerate(self._last_reviews):
+            v = "PASS" if r.passed else "FAIL"
+            out = r.actor_output[:80]
+            log.write(Text(f"  [{i}] {name}: {v} - {out}", style="system-msg"))
+        log.write(Text("Use /save <idx> pass|fail [reasoning]", style="system-msg"))
+        return True
+
+    def _cmd_save(self, text: str, log: RichLog) -> bool:
+        if text.strip() == "/save_all":
+            return self._cmd_save_all(log)
+        parts = text.split(maxsplit=3)
+        if len(parts) < 3:
+            log.write(Text("Usage: /save <idx> pass|fail [reasoning]", style="system-msg"))
+            return True
+        try:
+            idx = int(parts[1])
+            passed = parts[2].lower() == "pass"
+            reasoning = parts[3] if len(parts) > 3 else None
+        except (ValueError, IndexError):
+            log.write(Text("Invalid args.", style="system-msg"))
+            return True
+        return self._do_save(idx, passed, reasoning, log)
+
+    def _do_save(self, idx, passed, reasoning, log):
+        if idx < 0 or idx >= len(self._last_reviews):
+            log.write(Text("Index out of range.", style="system-msg"))
+            return True
+        name, r = self._last_reviews[idx]
+        r = ReviewResult(
+            reasoning=reasoning or r.reasoning,
+            passed=passed,
+            actor_inputs=r.actor_inputs,
+            actor_output=r.actor_output,
+        )
+        self._save_one_review(name, r)
+        self._rebuild_reviewers()
+        self._refresh_reviews_view()
+        log.write(Text(f"Saved [{idx}].", style="system-msg"))
+        return True
+
+    def _cmd_save_all(self, log: RichLog) -> bool:
+        if not self._last_reviews:
+            log.write(Text("No samples.", style="system-msg"))
             return True
         for name, r in self._last_reviews:
             self._save_one_review(name, r)
         n = len(self._last_reviews)
-        log.write(Text(f"Added {n} review(s).", style="system-msg"))
         self._rebuild_reviewers()
         self._refresh_reviews_view()
+        log.write(Text(f"Saved {n} samples.", style="system-msg"))
         return True
 
     def _save_one_review(self, name: str, r: ReviewResult) -> None:
