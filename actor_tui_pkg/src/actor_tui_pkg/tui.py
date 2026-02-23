@@ -77,6 +77,13 @@ CSS = (
     ".agent-msg { color: #d3a4a6; text-style: italic; } "
     ".system-msg { color: #d3a4a6; } "
     ".answer-msg { color: #ff4d4f; text-style: bold; } "
+    ".phase-msg { color: #5fafaf; } "
+    ".attempt-msg { color: #888888; } "
+    ".cmd-msg { color: #d4a647; } "
+    ".cmd-out { color: #777777; } "
+    ".pass-msg { color: #4ec94e; text-style: bold; } "
+    ".fail-msg { color: #e05555; text-style: bold; } "
+    ".mem-msg { color: #888888; text-style: italic; } "
 )
 
 
@@ -184,7 +191,7 @@ class ActorTUI(App):
             None, lambda: self._route(state),
         )
         route = route_result.route.strip().lower()
-        log.write(Text(f"  [Route: {route}]", style="system-msg"))
+        log.write(Text(f"--- Route: {route} ---", style="phase-msg"))
         if route == "tool":
             actor_result = await self._run_tool_phase(state, log, loop)
         else:
@@ -205,7 +212,9 @@ class ActorTUI(App):
         if edits:
             _, diff = self.memory_mgr.apply_edits(edits)
             summary = getattr(mem_result.final_output, "summary", "")
-            log.write(Text(f"Memory updated: {summary}", style="system-msg"))
+            log.write(Text(f"  Memory: {summary}", style="mem-msg"))
+        else:
+            log.write(Text("  Memory: no changes", style="mem-msg"))
         self._collect_reviews(actor_result, mem_result)
         self._refresh_memory_view()
         self._refresh_reviews_view()
@@ -226,15 +235,16 @@ class ActorTUI(App):
         )
 
     def _run_interaction(self, state: SystemState, log: RichLog):
+        m = self.cfg.max_review_iters
         return run_actor_reviewer_loop(
             actor=InteractionActor(),
             reviewer=self.interaction_reviewer,
             actor_name="interaction",
             state=state,
-            max_iters=self.cfg.max_review_iters,
+            max_iters=m,
             output_field="reply",
             on_actor_done=lambda i, p: self.call_from_thread(
-                self._log_actor_output, "Interaction", i, p, log,
+                self._log_actor_output, "Interaction", i, m, p, log,
             ),
             on_attempt=lambda a: self.call_from_thread(
                 self._log_review, "Interaction", a, log,
@@ -242,15 +252,16 @@ class ActorTUI(App):
         )
 
     def _run_memory(self, state: SystemState, log: RichLog):
+        m = self.cfg.max_review_iters
         return run_actor_reviewer_loop(
             actor=MemoryActor(),
             reviewer=self.memory_reviewer,
             actor_name="memory",
             state=state,
-            max_iters=self.cfg.max_review_iters,
+            max_iters=m,
             output_field="edits",
             on_actor_done=lambda i, p: self.call_from_thread(
-                self._log_actor_output, "Memory", i, p, log,
+                self._log_actor_output, "Memory", i, m, p, log,
             ),
             on_attempt=lambda a: self.call_from_thread(
                 self._log_review, "Memory", a, log,
@@ -258,25 +269,26 @@ class ActorTUI(App):
         )
 
     def _log_command(self, cmd: str, output: str, log: RichLog) -> None:
-        log.write(Text(f"    $ {cmd}", style="system-msg"))
+        log.write(Text(f"    $ {cmd}", style="cmd-msg"))
         truncated = output[:200]
         if len(output) > 200:
             truncated += "..."
         for line in truncated.splitlines():
-            log.write(Text(f"      {line}", style="agent-msg"))
+            log.write(Text(f"    | {line}", style="cmd-out"))
         log.scroll_end()
 
     def _run_tool(self, state: SystemState, log: RichLog):
+        m = self.cfg.max_review_iters
         cb = lambda c, o: self.call_from_thread(self._log_command, c, o, log)
         return run_actor_reviewer_loop(
             actor=ToolCallingActor(on_command=cb),
             reviewer=self.tool_reviewer,
             actor_name="tool",
             state=state,
-            max_iters=self.cfg.max_review_iters,
+            max_iters=m,
             output_field="reply",
             on_actor_done=lambda i, p: self.call_from_thread(
-                self._log_actor_output, "Tool", i, p, log,
+                self._log_actor_output, "Tool", i, m, p, log,
             ),
             on_attempt=lambda a: self.call_from_thread(
                 self._log_review, "Tool", a, log,
@@ -284,15 +296,16 @@ class ActorTUI(App):
         )
 
     def _log_actor_output(
-        self, label: str, iteration: int, prediction: object, log: RichLog,
+        self, label: str, iteration: int, max_iters: int,
+        prediction: object, log: RichLog,
     ) -> None:
-        out = str(
-            getattr(prediction, "reply", None)
-            or getattr(prediction, "edits", None)
-            or prediction
-        )[:200]
-        log.write(Text(f"  [{label} attempt {iteration}]", style="system-msg"))
-        log.write(Text(f"    Output: {out}", style="agent-msg"))
+        log.write(Text(f"  Attempt {iteration}/{max_iters}", style="attempt-msg"))
+        reply = getattr(prediction, "reply", None)
+        edits = getattr(prediction, "edits", None)
+        if reply:
+            log.write(Text(f"    Reply: {str(reply)[:200]}", style="agent-msg"))
+        elif edits:
+            log.write(Text(f"    Edits: {str(edits)[:200]}", style="agent-msg"))
         log.scroll_end()
 
     def _log_review(
@@ -301,8 +314,8 @@ class ActorTUI(App):
         if attempt.review:
             r = attempt.review
             verdict = "PASS" if r.passed else "FAIL"
-            style = "green" if r.passed else "red"
-            log.write(Text(f"    Review: {verdict} - {r.reasoning}", style=style))
+            style = "pass-msg" if r.passed else "fail-msg"
+            log.write(Text(f"    {verdict} - {r.reasoning}", style=style))
             log.scroll_end()
 
     def _collect_reviews(self, *results) -> None:
