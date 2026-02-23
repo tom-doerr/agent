@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import asyncio
 import json
+import shutil
+import subprocess
 import time
 import uuid
 from dataclasses import dataclass
@@ -43,6 +45,20 @@ def format_chat_history(history: list[dict[str, str]]) -> str:
     return "\n".join(lines)
 
 
+def _read_primary_selection() -> str:
+    """Read X11/Wayland primary selection (middle-click buffer)."""
+    for cmd in [["wl-paste", "--primary", "--no-newline"], ["xclip", "-selection", "primary", "-o"]]:
+        if not shutil.which(cmd[0]):
+            continue
+        try:
+            r = subprocess.run(cmd, capture_output=True, text=True, timeout=2)
+            if r.returncode == 0:
+                return r.stdout
+        except Exception:
+            pass
+    return ""
+
+
 class ChatTextArea(TextArea):
     """TextArea where Enter submits and paste inserts normally."""
 
@@ -50,6 +66,14 @@ class ChatTextArea(TextArea):
         def __init__(self, text: str) -> None:
             super().__init__()
             self.text = text
+
+    def on_mouse_down(self, event: events.MouseDown) -> None:
+        if event.button == 2:
+            text = _read_primary_selection()
+            if text:
+                self.insert(text)
+            event.stop()
+            event.prevent_default()
 
     async def _on_key(self, event: events.Key) -> None:
         if event.key == "enter":
