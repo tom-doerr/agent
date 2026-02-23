@@ -4,6 +4,7 @@ import dspy
 
 from actor_tui_pkg.loop import run_actor_reviewer_loop, Attempt
 from actor_tui_pkg.reviewer import Reviewer
+from actor_tui_pkg.state import SystemState
 
 
 class FakeActor(dspy.Module):
@@ -12,7 +13,7 @@ class FakeActor(dspy.Module):
         self._replies = list(replies)
         self._idx = 0
 
-    def forward(self, *, feedback="", **kw):
+    def forward(self, state):
         reply = self._replies[min(self._idx, len(self._replies) - 1)]
         self._idx += 1
         return dspy.Prediction(reply=reply)
@@ -37,7 +38,7 @@ def test_passes_first_attempt():
         actor=actor,
         reviewer=reviewer,
         actor_name="test",
-        actor_kwargs={"user_message": "hi"},
+        state=SystemState(user_message="hi"),
         output_field="reply",
     )
     assert result.passed is True
@@ -51,7 +52,7 @@ def test_retries_on_failure():
         actor=actor,
         reviewer=reviewer,
         actor_name="test",
-        actor_kwargs={"user_message": "hi"},
+        state=SystemState(user_message="hi"),
         output_field="reply",
     )
     assert result.passed is True
@@ -65,7 +66,7 @@ def test_max_iters_reached():
         actor=actor,
         reviewer=reviewer,
         actor_name="test",
-        actor_kwargs={"user_message": "hi"},
+        state=SystemState(user_message="hi"),
         max_iters=3,
         output_field="reply",
     )
@@ -81,7 +82,7 @@ def test_on_attempt_callback():
         actor=actor,
         reviewer=reviewer,
         actor_name="test",
-        actor_kwargs={},
+        state=SystemState(user_message=""),
         output_field="reply",
         on_attempt=lambda a: logged.append(a),
     )

@@ -9,6 +9,7 @@ from typing import Any, Callable, Optional
 import dspy
 
 from .reviewer import Reviewer, ReviewResult
+from .state import SystemState
 
 
 @dataclass
@@ -35,7 +36,7 @@ def run_actor_reviewer_loop(
     actor: dspy.Module,
     reviewer: Reviewer,
     actor_name: str,
-    actor_kwargs: dict,
+    state: SystemState,
     max_iters: int = 3,
     output_field: str = "reply",
     on_actor_done: Optional[Callable[[int, Any], None]] = None,
@@ -46,24 +47,26 @@ def run_actor_reviewer_loop(
     feedback = ""
 
     for i in range(max_iters):
-        prediction = actor(**actor_kwargs, feedback=feedback)
+        state.feedback = feedback
+        prediction = actor(state)
         actor_output = getattr(prediction, output_field)
 
         if on_actor_done:
             on_actor_done(i + 1, prediction)
 
         inputs_json = json.dumps(
-            {k: v for k, v in actor_kwargs.items() if k != "feedback"},
+            state.model_dump(exclude={"feedback"}),
             default=str,
         )
 
         review_pred = reviewer(
-            actor_inputs=inputs_json, actor_output=str(actor_output)
+            actor_inputs=inputs_json,
+            actor_output=str(actor_output),
         )
         review = ReviewResult(
             reasoning=review_pred.reasoning,
             passed=review_pred.passed,
-            actor_inputs=actor_kwargs,
+            actor_inputs=state.model_dump(exclude={"feedback"}),
             actor_output=str(actor_output),
         )
 

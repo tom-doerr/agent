@@ -26,6 +26,7 @@ from .tool_actor import ToolCallingActor
 from .loop import Attempt, run_actor_reviewer_loop
 from .memory import MemoryManager
 from .reviewer import build_reviewer, ReviewResult
+from .state import SystemState
 
 
 @dataclass
@@ -173,37 +174,31 @@ class ActorTUI(App):
     async def _process_message(
         self, job: Job, log: RichLog, loop: asyncio.AbstractEventLoop
     ) -> None:
-        memory_text = self.memory_mgr.read()
-        chat_str = format_chat_history(self.history)
+        state = SystemState(
+            user_message=job.prompt,
+            memory=self.memory_mgr.read(),
+            chat_history=format_chat_history(self.history),
+        )
         self._set_phase("Routing")
         route_result = await loop.run_in_executor(
-            None, lambda: self._route(job.prompt, memory_text, chat_str),
+            None, lambda: self._route(state),
         )
         route = route_result.route.strip().lower()
         log.write(Text(f"  [Route: {route}]", style="system-msg"))
-        actor_kw = {
-            "user_message": job.prompt,
-            "memory": memory_text,
-            "chat_history": chat_str,
-        }
         if route == "tool":
-            actor_result = await self._run_tool_phase(actor_kw, log, loop)
+            actor_result = await self._run_tool_phase(state, log, loop)
         else:
-            actor_result = await self._run_ia_phase(actor_kw, log, loop)
+            actor_result = await self._run_ia_phase(state, log, loop)
         reply = actor_result.final_output.reply
         log.write(Text(f"<< {reply}", style="answer-msg"))
         log.scroll_end()
         self.history.append({"role": "assistant", "content": reply})
 
         # Phase 2: Memory actor + reviewer
-        mem_kw = {
-            "user_message": job.prompt,
-            "assistant_reply": reply,
-            "memory": memory_text,
-        }
+        state.assistant_reply = reply
         self._set_phase("Memory actor")
         mem_result = await loop.run_in_executor(
-            None, lambda: self._run_memory(mem_kw, log),
+            None, lambda: self._run_memory(state, log),
         )
 
         edits = mem_result.final_output.edits or []
@@ -215,29 +210,27 @@ class ActorTUI(App):
         self._refresh_memory_view()
         self._refresh_reviews_view()
 
-    def _route(self, user_message: str, memory: str, chat_history: str):
-        return Router()(
-            user_message=user_message, memory=memory, chat_history=chat_history,
-        )
+    def _route(self, state: SystemState):
+        return Router()(state)
 
-    async def _run_ia_phase(self, kw, log, loop):
+    async def _run_ia_phase(self, state, log, loop):
         self._set_phase("Interaction actor")
         return await loop.run_in_executor(
-            None, lambda: self._run_interaction(kw, log),
+            None, lambda: self._run_interaction(state, log),
         )
 
-    async def _run_tool_phase(self, kw, log, loop):
+    async def _run_tool_phase(self, state, log, loop):
         self._set_phase("Tool actor")
         return await loop.run_in_executor(
-            None, lambda: self._run_tool(kw, log),
+            None, lambda: self._run_tool(state, log),
         )
 
-    def _run_interaction(self, kwargs: dict, log: RichLog):
+    def _run_interaction(self, state: SystemState, log: RichLog):
         return run_actor_reviewer_loop(
             actor=InteractionActor(),
             reviewer=self.interaction_reviewer,
             actor_name="interaction",
-            actor_kwargs=kwargs,
+            state=state,
             max_iters=self.cfg.max_review_iters,
             output_field="reply",
             on_actor_done=lambda i, p: self.call_from_thread(
@@ -248,12 +241,12 @@ class ActorTUI(App):
             ),
         )
 
-    def _run_memory(self, kwargs: dict, log: RichLog):
+    def _run_memory(self, state: SystemState, log: RichLog):
         return run_actor_reviewer_loop(
             actor=MemoryActor(),
             reviewer=self.memory_reviewer,
             actor_name="memory",
-            actor_kwargs=kwargs,
+            state=state,
             max_iters=self.cfg.max_review_iters,
             output_field="edits",
             on_actor_done=lambda i, p: self.call_from_thread(
@@ -264,12 +257,12 @@ class ActorTUI(App):
             ),
         )
 
-    def _run_tool(self, kwargs: dict, log: RichLog):
+    def _run_tool(self, state: SystemState, log: RichLog):
         return run_actor_reviewer_loop(
             actor=ToolCallingActor(),
             reviewer=self.tool_reviewer,
             actor_name="tool",
-            actor_kwargs=kwargs,
+            state=state,
             max_iters=self.cfg.max_review_iters,
             output_field="reply",
             on_actor_done=lambda i, p: self.call_from_thread(

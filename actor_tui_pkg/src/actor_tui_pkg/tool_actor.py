@@ -9,6 +9,8 @@ from typing import List
 import dspy
 from pydantic import BaseModel, Field, field_validator
 
+from .state import SystemState
+
 ALLOWED_COMMANDS = frozenset({"ls", "head", "tail"})
 MAX_OUTPUT_BYTES = 8192
 FORBIDDEN_CHARS = frozenset("|;&`$()\n")
@@ -97,19 +99,12 @@ class ToolCallingActor(dspy.Module):
         self.plan = dspy.Predict(ToolSignature)
         self.summarize = dspy.Predict(ToolResultSignature)
 
-    def forward(
-        self,
-        *,
-        user_message: str,
-        memory: str,
-        chat_history: str,
-        feedback: str = "",
-    ) -> dspy.Prediction:
+    def forward(self, state: SystemState) -> dspy.Prediction:
         plan_result = self.plan(
-            user_message=user_message,
-            memory=memory,
-            chat_history=chat_history,
-            feedback=feedback,
+            user_message=state.user_message,
+            memory=state.memory,
+            chat_history=state.chat_history,
+            feedback=state.feedback,
         )
         results = []
         for cmd in plan_result.commands:
@@ -117,7 +112,7 @@ class ToolCallingActor(dspy.Module):
             results.append(f"$ {cmd.command}\n{output}")
         cmd_text = "\n---\n".join(results) if results else "(no commands)"
         summary_result = self.summarize(
-            user_message=user_message,
+            user_message=state.user_message,
             command_results=cmd_text,
         )
         return dspy.Prediction(

@@ -7,6 +7,8 @@ from typing import List
 import dspy
 from pydantic import BaseModel, Field
 
+from .state import SystemState
+
 
 class MemoryEditBlock(BaseModel):
     """A search/replace edit for memory.md."""
@@ -30,19 +32,12 @@ class InteractionActor(dspy.Module):
         super().__init__()
         self.predict = dspy.Predict(InteractionSignature)
 
-    def forward(
-        self,
-        *,
-        user_message: str,
-        memory: str,
-        chat_history: str,
-        feedback: str = "",
-    ) -> dspy.Prediction:
+    def forward(self, state: SystemState) -> dspy.Prediction:
         return self.predict(
-            user_message=user_message,
-            memory=memory,
-            chat_history=chat_history,
-            feedback=feedback,
+            user_message=state.user_message,
+            memory=state.memory,
+            chat_history=state.chat_history,
+            feedback=state.feedback,
         )
 
 
@@ -64,17 +59,10 @@ class MemoryActor(dspy.Module):
         super().__init__()
         self.predict = dspy.Predict(MemorySignature)
 
-    def forward(
-        self,
-        *,
-        user_message: str,
-        assistant_reply: str,
-        memory: str,
-        feedback: str = "",
-    ) -> dspy.Prediction:
+    def forward(self, state: SystemState) -> dspy.Prediction:
         return self.predict(
-            user_message=user_message,
-            assistant_reply=assistant_reply,
-            memory=memory,
-            feedback=feedback,
+            user_message=state.user_message,
+            assistant_reply=state.assistant_reply or "",
+            memory=state.memory,
+            feedback=state.feedback,
         )
