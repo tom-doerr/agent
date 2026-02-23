@@ -137,6 +137,8 @@ class ActorTUI(App):
         self._label_panes()
         self._refresh_memory_view()
         self._refresh_reviews_view()
+        log = self.query_one("#log", RichLog)
+        log.write(Text("actor-tui ready. /help or Ctrl+H for commands.", style="phase-msg"))
 
     def _label_panes(self) -> None:
         for sel, title in {
@@ -148,7 +150,10 @@ class ActorTUI(App):
             pane.border_title = title
             pane.border_title_align = "left"
 
-    BINDINGS = [("ctrl+d", "show_datasets", "Datasets")]
+    BINDINGS = [
+        ("ctrl+d", "show_datasets", "Datasets"),
+        ("ctrl+h", "show_help", "Help"),
+    ]
 
     async def on_chat_text_area_submitted(self, event: ChatTextArea.Submitted) -> None:
         text = event.text
@@ -350,6 +355,9 @@ class ActorTUI(App):
                 pane.write(f"  [{i}] {v}: {ex.reasoning[:80]}")
 
     def _handle_command(self, text: str, log: RichLog) -> bool:
+        if text in ("/help", "/?"):
+            self._cmd_help(log)
+            return True
         if text == "/reviews":
             self._refresh_reviews_view()
             log.write(Text("Reviews refreshed.", style="system-msg"))
@@ -364,6 +372,28 @@ class ActorTUI(App):
             self._open_datasets()
             return True
         return False
+
+    HELP_LINES = [
+        ("Commands", "phase-msg"),
+        ("  /help        Show this help", "system-msg"),
+        ("  /samples     List samples from last run", "system-msg"),
+        ("  /save N pass|fail [reason]", "system-msg"),
+        ("  /save_all    Save all samples", "system-msg"),
+        ("  /edit_review N pass|fail [reason]", "system-msg"),
+        ("  /reviews     Refresh reviews pane", "system-msg"),
+        ("  /datasets    Dataset browser", "system-msg"),
+        ("Keys", "phase-msg"),
+        ("  Enter  Send   Ctrl+D  Datasets   Ctrl+H  Help", "system-msg"),
+    ]
+
+    def _cmd_help(self, log: RichLog) -> None:
+        for text, style in self.HELP_LINES:
+            log.write(Text(text, style=style))
+        log.scroll_end()
+
+    def action_show_help(self) -> None:
+        log = self.query_one("#log", RichLog)
+        self._cmd_help(log)
 
     def _cmd_samples(self, log: RichLog) -> bool:
         if not self._last_reviews:
