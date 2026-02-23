@@ -22,7 +22,7 @@ from textual.widgets import Footer, RichLog, Static, TextArea
 from .actors import InteractionActor, MemoryActor
 from .config import get_config, load_config
 from .dataset import list_examples, save_example, ReviewExample
-from .dataset_views import DatasetBrowser
+from .dataset_views import DatasetBrowser, HelpScreen, SamplesScreen
 from .router import Router
 from .tool_actor import ToolCallingActor
 from .loop import Attempt, run_actor_reviewer_loop
@@ -100,7 +100,8 @@ CSS = (
     ".user-msg { color: #ffffff; text-style: bold; } "
     ".agent-msg { color: #d3a4a6; text-style: italic; } "
     ".system-msg { color: #d3a4a6; } "
-    ".answer-msg { color: #ff4d4f; text-style: bold; } "
+    ".answer-msg { color: #f0a050; text-style: bold; } "
+    ".error-msg { color: #e05555; text-style: bold; } "
     ".phase-msg { color: #5fafaf; } "
     ".attempt-msg { color: #888888; } "
     ".cmd-msg { color: #d4a647; } "
@@ -202,7 +203,7 @@ class ActorTUI(App):
                 await self._process_message(job, log, loop)
                 self._finish_request(success=True)
             except Exception as exc:
-                log.write(Text(f"Error: {exc}", style="system-msg"))
+                log.write(Text(f"Error: {exc}", style="error-msg"))
                 self._finish_request(success=False)
             finally:
                 self.q.task_done()
@@ -375,19 +376,25 @@ class ActorTUI(App):
             examples = list_examples(Path(path_key))
             pane.write(Text(f"-- {label} ({len(examples)}) --", style="system-msg"))
             for i, ex in enumerate(examples[-5:]):
-                v = "PASS" if ex.passed else "FAIL"
-                pane.write(f"  [{i}] {v}: {ex.reasoning[:80]}")
+                line = Text(f"  [{i}] ")
+                if ex.passed:
+                    line.append("PASS", "bold #4ec94e")
+                else:
+                    line.append("FAIL", "bold #e05555")
+                line.append(f": {ex.reasoning[:70]}")
+                pane.write(line)
 
     def _handle_command(self, text: str, log: RichLog) -> bool:
         if text in ("/help", "/?"):
-            self._cmd_help(log)
+            self.push_screen(HelpScreen())
             return True
         if text == "/reviews":
             self._refresh_reviews_view()
             log.write(Text("Reviews refreshed.", style="system-msg"))
             return True
         if text == "/samples":
-            return self._cmd_samples(log)
+            self._open_samples()
+            return True
         if text.startswith("/save"):
             return self._cmd_save(text, log)
         if text.startswith("/edit_review"):
@@ -397,27 +404,8 @@ class ActorTUI(App):
             return True
         return False
 
-    HELP_LINES = [
-        ("Commands", "phase-msg"),
-        ("  /help        Show this help", "system-msg"),
-        ("  /samples     List samples from last run", "system-msg"),
-        ("  /save N pass|fail [reason]", "system-msg"),
-        ("  /save_all    Save all samples", "system-msg"),
-        ("  /edit_review N pass|fail [reason]", "system-msg"),
-        ("  /reviews     Refresh reviews pane", "system-msg"),
-        ("  /datasets    Dataset browser", "system-msg"),
-        ("Keys", "phase-msg"),
-        ("  Enter  Send   Ctrl+D  Datasets   Ctrl+H  Help", "system-msg"),
-    ]
-
-    def _cmd_help(self, log: RichLog) -> None:
-        for text, style in self.HELP_LINES:
-            log.write(Text(text, style=style))
-        log.scroll_end()
-
     def action_show_help(self) -> None:
-        log = self.query_one("#log", RichLog)
-        self._cmd_help(log)
+        self.push_screen(HelpScreen())
 
     def _cmd_samples(self, log: RichLog) -> bool:
         if not self._last_reviews:
@@ -526,6 +514,23 @@ class ActorTUI(App):
             self._rebuild_reviewers()
             self._refresh_reviews_view()
         self.push_screen(DatasetBrowser(self.cfg), callback=on_dismiss)
+
+    def _open_samples(self) -> None:
+        if not self._last_reviews:
+            log = self.query_one("#log", RichLog)
+            log.write(Text("No samples.", style="system-msg"))
+            return
+        self.push_screen(SamplesScreen(self._last_reviews), callback=self._on_sample_result)
+
+    def _on_sample_result(self, r) -> None:
+        if not r:
+            return
+        log = self.query_one("#log", RichLog)
+        if r == "save_all":
+            self._cmd_save_all(log)
+        elif r.startswith("save:"):
+            _, i, v = r.split(":")
+            self._do_save(int(i), v == "pass", None, log)
 
     def _set_phase(self, phase: str) -> None:
         self._phase = phase
