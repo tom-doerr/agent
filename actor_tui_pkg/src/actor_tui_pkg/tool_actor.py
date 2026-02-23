@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import shlex
 import subprocess
-from typing import List
+from typing import Callable, List, Optional
 
 import dspy
 from pydantic import BaseModel, Field, field_validator
@@ -94,10 +94,14 @@ class ToolResultSignature(dspy.Signature):
 class ToolCallingActor(dspy.Module):
     """Actor that plans commands, executes them safely, and summarizes."""
 
-    def __init__(self) -> None:
+    def __init__(
+        self,
+        on_command: Optional[Callable[[str, str], None]] = None,
+    ) -> None:
         super().__init__()
         self.plan = dspy.Predict(ToolSignature)
         self.summarize = dspy.Predict(ToolResultSignature)
+        self._on_command = on_command
 
     def forward(self, state: SystemState) -> dspy.Prediction:
         plan_result = self.plan(
@@ -109,6 +113,8 @@ class ToolCallingActor(dspy.Module):
         results = []
         for cmd in plan_result.commands:
             output = execute_safe_command(cmd.command)
+            if self._on_command:
+                self._on_command(cmd.command, output)
             results.append(f"$ {cmd.command}\n{output}")
         cmd_text = "\n---\n".join(results) if results else "(no commands)"
         summary_result = self.summarize(

@@ -257,9 +257,19 @@ class ActorTUI(App):
             ),
         )
 
+    def _log_command(self, cmd: str, output: str, log: RichLog) -> None:
+        log.write(Text(f"    $ {cmd}", style="system-msg"))
+        truncated = output[:200]
+        if len(output) > 200:
+            truncated += "..."
+        for line in truncated.splitlines():
+            log.write(Text(f"      {line}", style="agent-msg"))
+        log.scroll_end()
+
     def _run_tool(self, state: SystemState, log: RichLog):
+        cb = lambda c, o: self.call_from_thread(self._log_command, c, o, log)
         return run_actor_reviewer_loop(
-            actor=ToolCallingActor(),
+            actor=ToolCallingActor(on_command=cb),
             reviewer=self.tool_reviewer,
             actor_name="tool",
             state=state,
