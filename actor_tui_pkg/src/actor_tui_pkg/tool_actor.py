@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import shlex
 import subprocess
 from typing import Callable, List, Optional
@@ -56,7 +57,7 @@ def execute_safe_command(raw: str) -> str:
     if not is_valid:
         return f"BLOCKED: {error}"
     try:
-        parts = shlex.split(raw)
+        parts = [os.path.expanduser(p) for p in shlex.split(raw)]
         proc = subprocess.run(
             parts, capture_output=True, text=True, timeout=10,
         )

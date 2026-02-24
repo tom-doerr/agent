@@ -78,3 +78,10 @@ def test_tool_signature_fields():
 def test_tool_result_signature_fields():
     fields = ToolResultSignature.fields
     assert "reply" in fields
+
+
+def test_execute_tilde_expansion():
+    import os
+    out = execute_safe_command("ls ~")
+    assert "BLOCKED" not in out
+    assert "ERROR" not in out
