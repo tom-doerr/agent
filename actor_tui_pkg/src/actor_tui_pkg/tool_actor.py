@@ -94,6 +94,8 @@ class ToolResultSignature(dspy.Signature):
 class ToolCallingActor(dspy.Module):
     """Actor that plans commands, executes them safely, and summarizes."""
 
+    INPUT_FIELDS = frozenset({"user_message", "memory", "chat_history"})
+
     def __init__(
         self,
         on_command: Optional[Callable[[str, str], None]] = None,

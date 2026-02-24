@@ -54,10 +54,17 @@ def run_actor_reviewer_loop(
         if on_actor_done:
             on_actor_done(i + 1, prediction)
 
-        inputs_json = json.dumps(
-            state.model_dump(exclude={"feedback"}),
-            default=str,
-        )
+        input_fields = getattr(actor, "INPUT_FIELDS", None)
+        if input_fields is not None:
+            actor_inputs = {
+                k: v
+                for k, v in state.model_dump().items()
+                if k in input_fields
+            }
+        else:
+            actor_inputs = state.model_dump(exclude={"feedback"})
+
+        inputs_json = json.dumps(actor_inputs, default=str)
 
         review_pred = reviewer(
             actor_inputs=inputs_json,
@@ -66,7 +73,7 @@ def run_actor_reviewer_loop(
         review = ReviewResult(
             reasoning=review_pred.reasoning,
             passed=review_pred.passed,
-            actor_inputs=state.model_dump(exclude={"feedback"}),
+            actor_inputs=actor_inputs,
             actor_output=str(actor_output),
         )
 

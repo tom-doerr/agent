@@ -28,6 +28,8 @@ class InteractionSignature(dspy.Signature):
 
 
 class InteractionActor(dspy.Module):
+    INPUT_FIELDS = frozenset({"user_message", "memory", "chat_history"})
+
     def __init__(self) -> None:
         super().__init__()
         self.predict = dspy.Predict(InteractionSignature)
@@ -55,6 +57,8 @@ class MemorySignature(dspy.Signature):
 
 
 class MemoryActor(dspy.Module):
+    INPUT_FIELDS = frozenset({"user_message", "assistant_reply", "memory"})
+
     def __init__(self) -> None:
         super().__init__()
         self.predict = dspy.Predict(MemorySignature)
