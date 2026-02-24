@@ -163,7 +163,7 @@ class ActorTUI(App):
         self._refresh_memory_view()
         self._refresh_reviews_view()
         log = self.query_one("#log", RichLog)
-        log.write(Text("actor-tui ready. /help or Ctrl+H for commands.", style="phase-msg"))
+        log.write(Text("actor-tui ready. /help or Ctrl+H for commands.", style="#5fafaf"))
 
     def _label_panes(self) -> None:
         for sel, title in {
@@ -187,7 +187,7 @@ class ActorTUI(App):
         if self._handle_command(text, log):
             ta.clear()
             return
-        log.write(Text(f">> {text}", style="user-msg"))
+        log.write(Text(f">> {text}", style="bold white"))
         log.scroll_end()
         self.history.append({"role": "user", "content": text})
         await self.q.put(Job(id=str(uuid.uuid4()), prompt=text))
@@ -203,7 +203,7 @@ class ActorTUI(App):
                 await self._process_message(job, log, loop)
                 self._finish_request(success=True)
             except Exception as exc:
-                log.write(Text(f"Error: {exc}", style="error-msg"))
+                log.write(Text(f"Error: {exc}", style="bold #e05555"))
                 self._finish_request(success=False)
             finally:
                 self.q.task_done()
@@ -221,13 +221,13 @@ class ActorTUI(App):
             None, lambda: self._route(state),
         )
         route = route_result.route.strip().lower()
-        log.write(Text(f"--- Route: {route} ---", style="phase-msg"))
+        log.write(Text(f"--- Route: {route} ---", style="#5fafaf"))
         if route == "tool":
             actor_result = await self._run_tool_phase(state, log, loop)
         else:
             actor_result = await self._run_ia_phase(state, log, loop)
         reply = actor_result.final_output.reply
-        log.write(Text(f"<< {reply}", style="answer-msg"))
+        log.write(Text(f"<< {reply}", style="bold #f0a050"))
         log.scroll_end()
         self.history.append({"role": "assistant", "content": reply})
 
@@ -242,9 +242,9 @@ class ActorTUI(App):
         if edits:
             _, diff = self.memory_mgr.apply_edits(edits)
             summary = getattr(mem_result.final_output, "summary", "")
-            log.write(Text(f"  Memory: {summary}", style="mem-msg"))
+            log.write(Text(f"  Memory: {summary}", style="italic #888888"))
         else:
-            log.write(Text("  Memory: no changes", style="mem-msg"))
+            log.write(Text("  Memory: no changes", style="italic #888888"))
         self._collect_reviews(actor_result, mem_result)
         self._refresh_memory_view()
         self._refresh_reviews_view()
@@ -299,12 +299,12 @@ class ActorTUI(App):
         )
 
     def _log_command(self, cmd: str, output: str, log: RichLog) -> None:
-        log.write(Text(f"    $ {cmd}", style="cmd-msg"))
+        log.write(Text(f"    $ {cmd}", style="#d4a647"))
         truncated = output[:200]
         if len(output) > 200:
             truncated += "..."
         for line in truncated.splitlines():
-            log.write(Text(f"    | {line}", style="cmd-out"))
+            log.write(Text(f"    | {line}", style="#777777"))
         log.scroll_end()
 
     def _run_tool(self, state: SystemState, log: RichLog):
@@ -329,13 +329,13 @@ class ActorTUI(App):
         self, label: str, iteration: int, max_iters: int,
         prediction: object, log: RichLog,
     ) -> None:
-        log.write(Text(f"  Attempt {iteration}/{max_iters}", style="attempt-msg"))
+        log.write(Text(f"  Attempt {iteration}/{max_iters}", style="#888888"))
         reply = getattr(prediction, "reply", None)
         edits = getattr(prediction, "edits", None)
         if reply:
-            log.write(Text(f"    Reply: {str(reply)[:200]}", style="agent-msg"))
+            log.write(Text(f"    Reply: {str(reply)[:200]}", style="italic #d3a4a6"))
         elif edits:
-            log.write(Text(f"    Edits: {str(edits)[:200]}", style="agent-msg"))
+            log.write(Text(f"    Edits: {str(edits)[:200]}", style="italic #d3a4a6"))
         log.scroll_end()
 
     def _log_review(
@@ -344,7 +344,7 @@ class ActorTUI(App):
         if attempt.review:
             r = attempt.review
             verdict = "PASS" if r.passed else "FAIL"
-            style = "pass-msg" if r.passed else "fail-msg"
+            style = "bold #4ec94e" if r.passed else "bold #e05555"
             log.write(Text(f"    {verdict} - {r.reasoning}", style=style))
             log.scroll_end()
 
@@ -374,7 +374,7 @@ class ActorTUI(App):
             (self.cfg.tool_dataset_path, "Tool"),
         ]:
             examples = list_examples(Path(path_key))
-            pane.write(Text(f"-- {label} ({len(examples)}) --", style="system-msg"))
+            pane.write(Text(f"-- {label} ({len(examples)}) --", style="#d3a4a6"))
             for i, ex in enumerate(examples[-5:]):
                 line = Text(f"  [{i}] ")
                 if ex.passed:
@@ -390,7 +390,7 @@ class ActorTUI(App):
             return True
         if text == "/reviews":
             self._refresh_reviews_view()
-            log.write(Text("Reviews refreshed.", style="system-msg"))
+            log.write(Text("Reviews refreshed.", style="#d3a4a6"))
             return True
         if text == "/samples":
             self._open_samples()
@@ -409,13 +409,13 @@ class ActorTUI(App):
 
     def _cmd_samples(self, log: RichLog) -> bool:
         if not self._last_reviews:
-            log.write(Text("No samples from last run.", style="system-msg"))
+            log.write(Text("No samples from last run.", style="#d3a4a6"))
             return True
         for i, (name, r) in enumerate(self._last_reviews):
             v = "PASS" if r.passed else "FAIL"
             out = r.actor_output[:80]
-            log.write(Text(f"  [{i}] {name}: {v} - {out}", style="system-msg"))
-        log.write(Text("Use /save <idx> pass|fail [reasoning]", style="system-msg"))
+            log.write(Text(f"  [{i}] {name}: {v} - {out}", style="#d3a4a6"))
+        log.write(Text("Use /save <idx> pass|fail [reasoning]", style="#d3a4a6"))
         return True
 
     def _cmd_save(self, text: str, log: RichLog) -> bool:
@@ -423,20 +423,20 @@ class ActorTUI(App):
             return self._cmd_save_all(log)
         parts = text.split(maxsplit=3)
         if len(parts) < 3:
-            log.write(Text("Usage: /save <idx> pass|fail [reasoning]", style="system-msg"))
+            log.write(Text("Usage: /save <idx> pass|fail [reasoning]", style="#d3a4a6"))
             return True
         try:
             idx = int(parts[1])
             passed = parts[2].lower() == "pass"
             reasoning = parts[3] if len(parts) > 3 else None
         except (ValueError, IndexError):
-            log.write(Text("Invalid args.", style="system-msg"))
+            log.write(Text("Invalid args.", style="#d3a4a6"))
             return True
         return self._do_save(idx, passed, reasoning, log)
 
     def _do_save(self, idx, passed, reasoning, log):
         if idx < 0 or idx >= len(self._last_reviews):
-            log.write(Text("Index out of range.", style="system-msg"))
+            log.write(Text("Index out of range.", style="#d3a4a6"))
             return True
         name, r = self._last_reviews[idx]
         r = ReviewResult(
@@ -448,19 +448,19 @@ class ActorTUI(App):
         self._save_one_review(name, r)
         self._rebuild_reviewers()
         self._refresh_reviews_view()
-        log.write(Text(f"Saved [{idx}].", style="system-msg"))
+        log.write(Text(f"Saved [{idx}].", style="#d3a4a6"))
         return True
 
     def _cmd_save_all(self, log: RichLog) -> bool:
         if not self._last_reviews:
-            log.write(Text("No samples.", style="system-msg"))
+            log.write(Text("No samples.", style="#d3a4a6"))
             return True
         for name, r in self._last_reviews:
             self._save_one_review(name, r)
         n = len(self._last_reviews)
         self._rebuild_reviewers()
         self._refresh_reviews_view()
-        log.write(Text(f"Saved {n} samples.", style="system-msg"))
+        log.write(Text(f"Saved {n} samples.", style="#d3a4a6"))
         return True
 
     def _save_one_review(self, name: str, r: ReviewResult) -> None:
@@ -485,7 +485,7 @@ class ActorTUI(App):
         if len(parts) < 3:
             log.write(Text(
                 "Usage: /edit_review <idx> pass|fail [reasoning]",
-                style="system-msg",
+                style="#d3a4a6",
             ))
             return True
         try:
@@ -493,15 +493,15 @@ class ActorTUI(App):
             passed = parts[2].lower() == "pass"
             reasoning = parts[3] if len(parts) > 3 else None
         except (ValueError, IndexError):
-            log.write(Text("Invalid args.", style="system-msg"))
+            log.write(Text("Invalid args.", style="#d3a4a6"))
             return True
         path = Path(self.cfg.interaction_dataset_path)
         try:
             update_example(path, idx, reasoning=reasoning, passed=passed)
         except (IndexError, FileNotFoundError) as e:
-            log.write(Text(f"Error: {e}", style="system-msg"))
+            log.write(Text(f"Error: {e}", style="#d3a4a6"))
             return True
-        log.write(Text(f"Updated review {idx}.", style="system-msg"))
+        log.write(Text(f"Updated review {idx}.", style="#d3a4a6"))
         self._rebuild_reviewers()
         self._refresh_reviews_view()
         return True
@@ -518,7 +518,7 @@ class ActorTUI(App):
     def _open_samples(self) -> None:
         if not self._last_reviews:
             log = self.query_one("#log", RichLog)
-            log.write(Text("No samples.", style="system-msg"))
+            log.write(Text("No samples.", style="#d3a4a6"))
             return
         self.push_screen(SamplesScreen(self._last_reviews), callback=self._on_sample_result)
 
